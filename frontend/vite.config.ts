@@ -49,6 +49,14 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: './tests/setup.ts',
+    exclude: [
+      '**/node_modules/**',
+      '**/dist/**',
+      '**/build/**',
+      '**/e2e/**', // Exclude E2E tests (Playwright)
+      '**/*.e2e.test.ts',
+      '**/*.e2e.test.tsx',
+    ],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
@@ -59,6 +67,7 @@ export default defineConfig({
         '**/*.test.tsx',
         '**/*.config.ts',
         '**/*.config.js',
+        '**/e2e/**', // Exclude E2E tests from coverage
       ],
       thresholds: {
         lines: 95,
