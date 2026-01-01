@@ -14,6 +14,9 @@ This guide provides step-by-step instructions for manually testing User Story 1:
 
 2. **Optional: Start the API server** (for online mode testing):
    ```bash
+   # Install the API from crates.io (version 1.0.1)
+   cargo install data-modelling-api
+   
    # In another terminal, start the data-modelling-api
    # The API should run on http://localhost:8081
    ```

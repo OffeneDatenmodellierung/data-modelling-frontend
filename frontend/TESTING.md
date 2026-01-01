@@ -7,7 +7,10 @@ This guide explains how to manually test User Story 1 (Core Data Modelling) and 
 - Node.js 20+ (LTS version)
 - npm or pnpm
 - Modern web browser (Chrome, Firefox, Safari, Edge)
-- data-modelling-api running (optional, for online mode testing)
+- **data-modelling-api** (optional, for online mode testing) - Available on [crates.io](https://crates.io/crates/data-modelling-api) as version **1.0.1**
+  ```bash
+  cargo install data-modelling-api
+  ```
 
 ## Quick Start
 
