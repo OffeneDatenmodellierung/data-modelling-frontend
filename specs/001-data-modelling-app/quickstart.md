@@ -12,7 +12,10 @@ This guide provides step-by-step instructions for getting started with the data 
 - Node.js 20+ (LTS version)
 - npm or pnpm package manager
 - Modern web browser (Chrome, Firefox, Safari, Edge - latest 2 versions)
-- data-modelling-api running (for online mode)
+- **data-modelling-api** (for online mode) - Available on [crates.io](https://crates.io/crates/data-modelling-api) as version **1.0.1**
+  ```bash
+  cargo install data-modelling-api
+  ```
 - Git (for offline GIT export)
 
 ## Setup

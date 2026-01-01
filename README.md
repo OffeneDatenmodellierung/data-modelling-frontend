@@ -146,7 +146,7 @@ The application uses a WASM build of the `data-modelling-sdk` (version **1.0.2**
 4. **Development**: Can be built manually with `npm run build:wasm`
 5. **Fallback**: If WASM SDK is not available, the app uses a JavaScript YAML parser fallback
 
-**Note**: The SDK must be version 1.0.2 or compatible. The API project (`data-modelling-api`) also uses `data-modelling-sdk = "1.0.2"` with features `["api-backend", "git"]`.
+**Note**: The SDK must be version 1.0.2 or compatible. The API project (`data-modelling-api`) is available on [crates.io](https://crates.io/crates/data-modelling-api) as version **1.0.1** and uses `data-modelling-sdk = "1.0.2"` with features `["api-backend", "git"]`.
 
 ## Offline Mode
 
@@ -169,14 +169,19 @@ The GitHub Actions workflow (`.github/workflows/build-test.yml`):
 
 ## API Specification
 
-The OpenAPI specification (`openapi.json`) has been reverse-engineered from the frontend codebase and includes:
+The `data-modelling-api` is available on [crates.io](https://crates.io/crates/data-modelling-api) as version **1.0.1**. The OpenAPI specification (`openapi.json`) has been reverse-engineered from the frontend codebase and includes:
 - Authentication endpoints (GitHub OAuth, token management)
 - Workspace and domain management
 - Table and relationship CRUD operations
 - Import/Export endpoints for multiple formats
 - Complete schema definitions
 
-To regenerate the OpenAPI spec from the API server (when available):
+To install the API from crates.io:
+```bash
+cargo install data-modelling-api
+```
+
+To regenerate the OpenAPI spec from the API server:
 ```bash
 bash scripts/fetch-openapi.sh
 ```

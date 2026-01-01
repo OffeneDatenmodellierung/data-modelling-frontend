@@ -2,6 +2,14 @@
 
 This document describes how the frontend integrates with the Data Modelling API and SDK.
 
+## API Availability
+
+The `data-modelling-api` is available on [crates.io](https://crates.io/crates/data-modelling-api) as version **1.0.1**. To install:
+
+```bash
+cargo install data-modelling-api
+```
+
 ## API Endpoints
 
 The API is available at `/api/v1` (configurable via `VITE_API_BASE_URL`).

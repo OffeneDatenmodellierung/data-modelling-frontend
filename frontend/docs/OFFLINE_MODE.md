@@ -41,7 +41,7 @@ The build script (`scripts/build-wasm.sh`):
 2. Builds the WASM module using `wasm-pack` with `--features wasm`
 3. Copies the built files to `frontend/public/wasm/`
 
-**SDK Version Requirement**: The application requires `data-modelling-sdk = "1.0.2"` crate. The API project also uses this version with features `["api-backend", "git"]`.
+**SDK Version Requirement**: The application requires `data-modelling-sdk = "1.0.2"` crate. The API project (`data-modelling-api`) is available on [crates.io](https://crates.io/crates/data-modelling-api) as version **1.0.1** and uses `data-modelling-sdk = "1.0.2"` with features `["api-backend", "git"]`.
 
 **Note**: If the SDK is not available, the build will continue successfully and offline mode will use a JavaScript YAML parser fallback.
 

@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **API Availability**: The `data-modelling-api` is now published on [crates.io](https://crates.io/crates/data-modelling-api) as version **1.0.1**. Documentation updated to reflect installation via `cargo install data-modelling-api`.
+
 ## [0.5.0] - 2025-01-XX
 
 ### Added - Phase 7: Personal and Shared Workspace Management
