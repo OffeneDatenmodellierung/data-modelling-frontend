@@ -2,7 +2,7 @@
 # This assumes the API is available as a Rust crate on crates.io
 # Note: Requires Rust 1.83+ for edition2024 support (stabilized in 1.83.0)
 
-FROM rust:latest-alpine AS builder
+FROM rust:1.83-alpine AS builder
 
 # Install build dependencies
 RUN apk add --no-cache \
