@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { WorkspaceSettings } from '@/components/workspace/WorkspaceSettings';
 import { useWorkspaceStore } from '@/stores/workspaceStore';
 import { workspaceService } from '@/services/api/workspaceService';
@@ -23,6 +23,7 @@ vi.mock('@/services/api/workspaceService', () => ({
     addCollaborator: vi.fn(),
     removeCollaborator: vi.fn(),
     updateCollaboratorAccess: vi.fn(),
+    getCollaborators: vi.fn(),
   },
 }));
 
@@ -43,6 +44,8 @@ describe('WorkspaceSettings', () => {
       currentWorkspaceId: 'workspace-1',
       updateWorkspaceRemote: vi.fn(),
     } as any);
+    // Mock getCollaborators to return empty array by default
+    vi.mocked(workspaceService.getCollaborators).mockResolvedValue([]);
   });
 
   it('should render workspace name input', () => {
@@ -122,17 +125,25 @@ describe('WorkspaceSettings', () => {
       currentWorkspaceId: 'workspace-1',
     } as any);
     vi.mocked(workspaceService.addCollaborator).mockResolvedValue(undefined);
+    vi.mocked(workspaceService.getCollaborators).mockResolvedValue([]);
 
-    render(<WorkspaceSettings workspaceId="workspace-1" />);
+    await act(async () => {
+      render(<WorkspaceSettings workspaceId="workspace-1" />);
+    });
 
-    const addButton = screen.getByText(/add collaborator|invite/i);
-    fireEvent.click(addButton);
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText(/collaborator email/i)).toBeInTheDocument();
+    });
 
-    const emailInput = screen.getByPlaceholderText(/email/i);
-    fireEvent.change(emailInput, { target: { value: 'collaborator@example.com' } });
+    const emailInput = screen.getByPlaceholderText(/collaborator email/i);
+    await act(async () => {
+      fireEvent.change(emailInput, { target: { value: 'collaborator@example.com' } });
+    });
 
-    const submitButton = screen.getByText(/add|invite/i);
-    fireEvent.click(submitButton);
+    const addButton = screen.getByText(/add/i);
+    await act(async () => {
+      fireEvent.click(addButton);
+    });
 
     await waitFor(() => {
       expect(workspaceService.addCollaborator).toHaveBeenCalledWith('workspace-1', 'collaborator@example.com', 'edit');
@@ -146,14 +157,26 @@ describe('WorkspaceSettings', () => {
       currentWorkspaceId: 'workspace-1',
     } as any);
     vi.mocked(workspaceService.removeCollaborator).mockResolvedValue(undefined);
+    vi.mocked(workspaceService.getCollaborators).mockResolvedValue([
+      { email: 'collaborator1@example.com', access_level: 'edit' },
+      { email: 'collaborator2@example.com', access_level: 'read' },
+    ]);
 
-    render(<WorkspaceSettings workspaceId="workspace-1" />);
-
-    const removeButton = screen.getAllByLabelText(/remove|delete/i)[0];
-    fireEvent.click(removeButton);
+    await act(async () => {
+      render(<WorkspaceSettings workspaceId="workspace-1" />);
+    });
 
     await waitFor(() => {
-      expect(workspaceService.removeCollaborator).toHaveBeenCalled();
+      expect(screen.getByText('collaborator1@example.com')).toBeInTheDocument();
+    });
+
+    const removeButtons = screen.getAllByLabelText(/remove/i);
+    await act(async () => {
+      fireEvent.click(removeButtons[0]);
+    });
+
+    await waitFor(() => {
+      expect(workspaceService.removeCollaborator).toHaveBeenCalledWith('workspace-1', 'collaborator1@example.com');
     });
   });
 
@@ -164,15 +187,40 @@ describe('WorkspaceSettings', () => {
       currentWorkspaceId: 'workspace-1',
     } as any);
     vi.mocked(workspaceService.updateCollaboratorAccess).mockResolvedValue(undefined);
+    // Mock getCollaborators to return updated list after the change
+    vi.mocked(workspaceService.getCollaborators)
+      .mockResolvedValueOnce([
+        { email: 'collaborator1@example.com', access_level: 'edit' },
+      ])
+      .mockResolvedValueOnce([
+        { email: 'collaborator1@example.com', access_level: 'read' },
+      ]);
 
-    render(<WorkspaceSettings workspaceId="workspace-1" />);
-
-    const accessSelect = screen.getAllByRole('combobox')[0];
-    fireEvent.change(accessSelect, { target: { value: 'read' } });
+    await act(async () => {
+      render(<WorkspaceSettings workspaceId="workspace-1" />);
+    });
 
     await waitFor(() => {
-      expect(workspaceService.updateCollaboratorAccess).toHaveBeenCalled();
+      expect(screen.getByText('collaborator1@example.com')).toBeInTheDocument();
     });
+
+    // Find the select element for the collaborator - should be in the collaborators list
+    const collaboratorEmail = screen.getByText('collaborator1@example.com');
+    const collaboratorRow = collaboratorEmail.closest('.flex.items-center.justify-between');
+    expect(collaboratorRow).toBeInTheDocument();
+    
+    const collaboratorSelect = collaboratorRow?.querySelector('select') as HTMLSelectElement;
+    expect(collaboratorSelect).toBeDefined();
+    expect(collaboratorSelect.value).toBe('edit');
+    
+    // Change the select value
+    await act(async () => {
+      fireEvent.change(collaboratorSelect, { target: { value: 'read' } });
+    });
+
+    await waitFor(() => {
+      expect(workspaceService.updateCollaboratorAccess).toHaveBeenCalledWith('workspace-1', 'collaborator1@example.com', 'read');
+    }, { timeout: 3000 });
   });
 });
 

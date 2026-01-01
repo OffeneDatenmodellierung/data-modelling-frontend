@@ -13,11 +13,19 @@ vi.mock('@/stores/modelStore', () => ({
   useModelStore: vi.fn(),
 }));
 
-vi.mock('reactflow', async () => {
-  const actual = await vi.importActual('reactflow');
+vi.mock('@/services/sdk/sdkMode', () => ({
+  useSDKModeStore: vi.fn(() => ({
+    mode: 'online',
+    getState: vi.fn(() => ({ mode: 'online' })),
+  })),
+}));
+
+vi.mock('reactflow', () => {
+  // Mock ReactFlow completely to avoid internal hook dependencies
   return {
-    ...actual,
+    default: ({ children }: { children: React.ReactNode }) => <div data-testid="reactflow">{children}</div>,
     ReactFlow: ({ children }: { children: React.ReactNode }) => <div data-testid="reactflow">{children}</div>,
+    ReactFlowProvider: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
     Background: () => <div data-testid="background" />,
     Controls: () => <div data-testid="controls" />,
     MiniMap: () => <div data-testid="minimap" />,
@@ -25,6 +33,16 @@ vi.mock('reactflow', async () => {
     useEdgesState: (initial: any) => [initial, vi.fn()],
     useNodes: () => [],
     useEdges: () => [],
+    Handle: () => null,
+    Position: {
+      Top: 'top',
+      Bottom: 'bottom',
+      Left: 'left',
+      Right: 'right',
+    },
+    addEdge: (connection: any, edges: any[]) => [...edges, connection],
+    NodeTypes: {},
+    EdgeTypes: {},
   };
 });
 
@@ -80,6 +98,7 @@ describe('DataFlowCanvas', () => {
       addDataFlowConnection: vi.fn(),
       updateDataFlowConnection: vi.fn(),
       removeDataFlowConnection: vi.fn(),
+      updateDataFlowDiagramRemote: vi.fn().mockResolvedValue(undefined),
     } as any);
   });
 

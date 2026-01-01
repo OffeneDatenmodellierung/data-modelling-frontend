@@ -27,6 +27,11 @@ describe('CollaborationStatus', () => {
       mode: 'offline',
     } as any);
 
+    // Mock useCollaborationStore to return an object with session: null
+    vi.mocked(collaborationStore.useCollaborationStore).mockReturnValue({
+      session: null,
+    } as any);
+
     render(<CollaborationStatus workspaceId="workspace-1" />);
     expect(screen.getByText(/Collaboration disabled.*offline mode/)).toBeInTheDocument();
   });

@@ -29,6 +29,24 @@ vi.mock('@/services/sdk/odcsService', () => ({
   },
 }));
 
+vi.mock('@/services/sdk/sdkMode', () => ({
+  useSDKModeStore: {
+    getState: vi.fn(),
+  },
+}));
+
+vi.mock('@/stores/modelStore', () => ({
+  useModelStore: {
+    getState: vi.fn(),
+  },
+}));
+
+vi.mock('@/stores/workspaceStore', () => ({
+  useWorkspaceStore: {
+    getState: vi.fn(),
+  },
+}));
+
 describe('Sync and Merge Integration', () => {
   const workspaceId = 'workspace-1';
   let syncService: SyncService;
@@ -36,20 +54,50 @@ describe('Sync and Merge Integration', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    useSDKModeStore.setState({
+    
+    // Mock SDK mode store
+    vi.mocked(useSDKModeStore.getState).mockReturnValue({
       mode: 'online',
-      isManualOverride: false,
-    });
-    useModelStore.setState({
-      tables: [],
-      relationships: [],
+      getMode: vi.fn().mockResolvedValue('online'),
+    } as any);
+
+    // Mock model store
+    const mockTables: Table[] = [];
+    const mockRelationships: any[] = [];
+    const mockDataFlowDiagrams: any[] = [];
+    
+    vi.mocked(useModelStore.getState).mockReturnValue({
+      tables: mockTables,
+      relationships: mockRelationships,
       domains: [],
-      dataFlowDiagrams: [],
-    });
-    useWorkspaceStore.setState({
-      workspaces: [],
+      dataFlowDiagrams: mockDataFlowDiagrams,
+      addTable: vi.fn((table: Table) => {
+        mockTables.push(table);
+      }),
+      setTables: vi.fn((tables: Table[]) => {
+        mockTables.length = 0;
+        mockTables.push(...tables);
+      }),
+      setRelationships: vi.fn((relationships: any[]) => {
+        mockRelationships.length = 0;
+        mockRelationships.push(...relationships);
+      }),
+      setDataFlowDiagrams: vi.fn((diagrams: any[]) => {
+        mockDataFlowDiagrams.length = 0;
+        mockDataFlowDiagrams.push(...diagrams);
+      }),
+      updateTable: vi.fn(),
+    } as any);
+
+    // Mock workspace store
+    const mockWorkspaces: Workspace[] = [];
+    vi.mocked(useWorkspaceStore.getState).mockReturnValue({
+      workspaces: mockWorkspaces,
       currentWorkspaceId: workspaceId,
-    });
+      addWorkspace: vi.fn((workspace: Workspace) => {
+        mockWorkspaces.push(workspace);
+      }),
+    } as any);
 
     syncService = new SyncService(workspaceId);
     conflictResolver = new ConflictResolver();
@@ -73,7 +121,8 @@ describe('Sync and Merge Integration', () => {
         last_modified_at: '2025-01-01T00:00:00Z',
       };
 
-      useModelStore.getState().addTable(localTable);
+      const modelStore = useModelStore.getState();
+      modelStore.addTable(localTable);
 
       const workspace: Workspace = {
         id: workspaceId,
@@ -84,7 +133,14 @@ describe('Sync and Merge Integration', () => {
         last_modified_at: '2025-01-01T00:00:00Z',
       };
 
-      useWorkspaceStore.getState().addWorkspace(workspace);
+      const workspaceStore = useWorkspaceStore.getState();
+      workspaceStore.addWorkspace(workspace);
+      
+      // Update mock to include the workspace
+      vi.mocked(useWorkspaceStore.getState).mockReturnValue({
+        ...workspaceStore,
+        workspaces: [workspace],
+      } as any);
 
       vi.mocked(apiClient.getAccessToken).mockReturnValue('test-token');
       vi.mocked(odcsService.toYAML).mockResolvedValue('yaml-content');
@@ -126,6 +182,11 @@ describe('Sync and Merge Integration', () => {
       expect(result.success).toBe(true);
       expect(odcsService.parseYAML).toHaveBeenCalledWith(remoteYAML);
       
+      // Verify setTables was called with the remote tables
+      const modelStore = useModelStore.getState();
+      expect(modelStore.setTables).toHaveBeenCalledWith(remoteData.tables);
+      
+      // Verify tables were set
       const tables = useModelStore.getState().tables;
       expect(tables.length).toBeGreaterThan(0);
     });
@@ -151,7 +212,14 @@ describe('Sync and Merge Integration', () => {
         last_modified_at: '2025-01-01T00:01:00Z', // Newer
       };
 
-      useWorkspaceStore.getState().addWorkspace(localWorkspace);
+      const workspaceStore = useWorkspaceStore.getState();
+      workspaceStore.addWorkspace(localWorkspace);
+      
+      // Update mock to include the workspace
+      vi.mocked(useWorkspaceStore.getState).mockReturnValue({
+        ...workspaceStore,
+        workspaces: [localWorkspace],
+      } as any);
 
       const hasConflict = await syncService.detectConflict(remoteWorkspace);
       expect(hasConflict).toBe(true);
@@ -188,7 +256,14 @@ describe('Sync and Merge Integration', () => {
         last_modified_at: '2025-01-01T00:00:00Z',
       };
 
-      useWorkspaceStore.getState().addWorkspace(localWorkspace);
+      const workspaceStore = useWorkspaceStore.getState();
+      workspaceStore.addWorkspace(localWorkspace);
+      
+      // Update mock to include the workspace
+      vi.mocked(useWorkspaceStore.getState).mockReturnValue({
+        ...workspaceStore,
+        workspaces: [localWorkspace],
+      } as any);
 
       vi.mocked(apiClient.getAccessToken).mockReturnValue('test-token');
       const mockClient = {
@@ -201,6 +276,7 @@ describe('Sync and Merge Integration', () => {
         workspace_id: workspaceId,
         tables: [],
         relationships: [],
+        data_flow_diagrams: [],
       });
 
       const result = await syncService.autoMergeOnConnectionRestored();

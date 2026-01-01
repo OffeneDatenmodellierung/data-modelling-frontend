@@ -6,6 +6,7 @@
 import { useCallback } from 'react';
 import { Node, Edge, Connection } from 'reactflow';
 import { useModelStore } from '@/stores/modelStore';
+import { useUIStore } from '@/stores/uiStore';
 import { relationshipService } from '@/services/api/relationshipService';
 import { checkCircularRelationshipWarning } from '@/utils/validation';
 
@@ -25,6 +26,7 @@ export function useCanvas(_workspaceId: string, domainId: string): UseCanvasRetu
     updateTable,
     updateTableRemote,
   } = useModelStore();
+  const { addToast } = useUIStore();
 
   const onNodeClick = useCallback(
     (_event: React.MouseEvent, node: Node) => {
@@ -85,7 +87,10 @@ export function useCanvas(_workspaceId: string, domainId: string): UseCanvasRetu
       if (warning) {
         // Show warning but allow creation
         console.warn(warning);
-        // TODO: Show toast notification with warning
+        addToast({
+          type: 'warning',
+          message: warning,
+        });
       }
 
       // Create relationship
@@ -100,12 +105,19 @@ export function useCanvas(_workspaceId: string, domainId: string): UseCanvasRetu
 
         // Relationship is added to store by the service
         console.log('Relationship created:', relationship);
+        addToast({
+          type: 'success',
+          message: 'Relationship created successfully',
+        });
       } catch (error) {
         console.error('Failed to create relationship:', error);
-        // TODO: Show error toast
+        addToast({
+          type: 'error',
+          message: `Failed to create relationship: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        });
       }
     },
-    [domainId, relationships]
+    [domainId, relationships, addToast]
   );
 
   return {

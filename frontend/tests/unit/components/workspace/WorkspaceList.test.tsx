@@ -59,18 +59,19 @@ describe('WorkspaceList', () => {
   it('should display workspace type badges', () => {
     render(<WorkspaceList />);
 
-    const personalBadge = screen.getByText(/personal/i);
-    const sharedBadge = screen.getByText(/shared/i);
+    const personalBadge = screen.getByText('Personal');
+    const sharedBadge = screen.getByText('Shared');
 
     expect(personalBadge).toBeInTheDocument();
     expect(sharedBadge).toBeInTheDocument();
   });
 
   it('should highlight current workspace', () => {
-    render(<WorkspaceList />);
+    const { container } = render(<WorkspaceList />);
 
-    const currentWorkspace = screen.getByText('Personal Workspace').closest('div');
-    expect(currentWorkspace).toHaveClass(/bg-blue|selected|active/i);
+    // Find the workspace item that contains "Personal Workspace"
+    const workspaceItem = screen.getByText('Personal Workspace').closest('.bg-blue-50');
+    expect(workspaceItem).toBeInTheDocument();
   });
 
   it('should call setCurrentWorkspace when workspace is clicked', async () => {
@@ -99,6 +100,10 @@ describe('WorkspaceList', () => {
   });
 
   it('should call deleteWorkspaceRemote when delete is clicked', async () => {
+    // Mock window.confirm to return true
+    const originalConfirm = window.confirm;
+    window.confirm = vi.fn(() => true);
+
     const mockDeleteWorkspace = vi.fn().mockResolvedValue(undefined);
     vi.mocked(useWorkspaceStore).mockReturnValue({
       workspaces: mockWorkspaces,
@@ -108,12 +113,15 @@ describe('WorkspaceList', () => {
 
     render(<WorkspaceList />);
 
-    const deleteButton = screen.getAllByLabelText(/delete|remove/i)[0];
+    const deleteButton = screen.getByLabelText(/Delete Personal Workspace/i);
     fireEvent.click(deleteButton);
 
     await waitFor(() => {
-      expect(mockDeleteWorkspace).toHaveBeenCalled();
+      expect(mockDeleteWorkspace).toHaveBeenCalledWith('workspace-1');
     });
+
+    // Restore original confirm
+    window.confirm = originalConfirm;
   });
 
   it('should show loading state when workspaces are loading', () => {

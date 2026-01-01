@@ -74,6 +74,10 @@ class WebSocketClient {
       this.socket.onerror = (error: Event) => {
         console.error('WebSocket error:', error);
         this.errorHandlers.forEach((handler) => handler(error));
+        // Close socket on error to trigger reconnection logic
+        if (this.socket) {
+          this.socket.close();
+        }
       };
     } catch (error) {
       console.error('Failed to create WebSocket connection:', error);

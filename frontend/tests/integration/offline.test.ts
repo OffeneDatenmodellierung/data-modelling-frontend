@@ -8,15 +8,18 @@ import { useSDKModeStore } from '@/services/sdk/sdkMode';
 import { useModelStore } from '@/stores/modelStore';
 import { useWorkspaceStore } from '@/stores/workspaceStore';
 import { localFileService } from '@/services/storage/localFileService';
+import { browserFileService } from '@/services/platform/browser';
 import { odcsService } from '@/services/sdk/odcsService';
 import type { Workspace } from '@/types/workspace';
 import type { Table } from '@/types/table';
 
-// Mock file operations
-vi.mock('@/services/storage/localFileService', () => ({
-  localFileService: {
-    saveFile: vi.fn(),
-    loadWorkspace: vi.fn(),
+// Mock browser file service
+vi.mock('@/services/platform/browser', () => ({
+  browserFileService: {
+    readFile: vi.fn(),
+    downloadFile: vi.fn(),
+    pickFile: vi.fn(),
+    pickFolder: vi.fn(),
   },
 }));
 
@@ -99,41 +102,34 @@ describe('Offline Mode Integration', () => {
       };
 
       useWorkspaceStore.getState().addWorkspace(workspace);
-
       vi.mocked(odcsService.toYAML).mockResolvedValue('yaml-content');
-      vi.mocked(localFileService.saveFile).mockResolvedValue();
+      vi.mocked(browserFileService.downloadFile).mockResolvedValue();
 
       await localFileService.saveFile(workspace, 'workspace.yaml');
 
       expect(odcsService.toYAML).toHaveBeenCalled();
-      expect(localFileService.saveFile).toHaveBeenCalled();
+      expect(browserFileService.downloadFile).toHaveBeenCalledWith('yaml-content', 'workspace.yaml', 'text/yaml');
     });
   });
 
   describe('offline workspace load', () => {
     it('should load workspace from local file', async () => {
-      const mockWorkspace: Workspace = {
-        id: 'offline-workspace-1',
-        name: 'Loaded Workspace',
-        type: 'personal',
-        owner_id: 'offline-user',
-        created_at: new Date().toISOString(),
-        last_modified_at: new Date().toISOString(),
-      };
-
       const mockFile = new File(['yaml-content'], 'workspace.yaml', { type: 'text/yaml' });
       
+      vi.mocked(browserFileService.readFile).mockResolvedValue('yaml-content');
       vi.mocked(odcsService.parseYAML).mockResolvedValue({
         workspace_id: 'offline-workspace-1',
         tables: [],
         relationships: [],
+        data_flow_diagrams: [],
       });
-      vi.mocked(localFileService.loadWorkspace).mockResolvedValue(mockWorkspace);
 
       const loadedWorkspace = await localFileService.loadWorkspace(mockFile);
 
-      expect(loadedWorkspace).toEqual(mockWorkspace);
-      expect(odcsService.parseYAML).toHaveBeenCalled();
+      expect(loadedWorkspace).toBeDefined();
+      expect(loadedWorkspace.id).toBe('offline-workspace-1');
+      expect(browserFileService.readFile).toHaveBeenCalledWith(mockFile);
+      expect(odcsService.parseYAML).toHaveBeenCalledWith('yaml-content');
     });
   });
 

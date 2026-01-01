@@ -20,20 +20,42 @@ vi.mock('@/services/api/apiClient', () => ({
   },
 }));
 
-vi.mock('@/services/websocket/websocketClient', () => ({
-  WebSocketClient: vi.fn().mockImplementation(() => ({
-    isConnected: vi.fn(() => true),
-    send: vi.fn(),
-    onMessage: vi.fn(() => () => {}),
-    onClose: vi.fn(() => () => {}),
-    onError: vi.fn(() => () => {}),
-    disconnect: vi.fn(),
-  })),
-}));
+// Create a shared mock instance
+let sharedMockWSClient: any;
+
+vi.mock('@/services/websocket/websocketClient', () => {
+  class MockWebSocketClient {
+    constructor() {
+      if (!sharedMockWSClient) {
+        sharedMockWSClient = {
+          isConnected: vi.fn(() => true),
+          send: vi.fn(),
+          onMessage: vi.fn(() => () => {}),
+          onClose: vi.fn(() => () => {}),
+          onError: vi.fn(() => () => {}),
+          disconnect: vi.fn(),
+        };
+      }
+      return sharedMockWSClient;
+    }
+  }
+  return {
+    WebSocketClient: MockWebSocketClient,
+  };
+});
 
 describe('useWebSocket', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Reset the shared mock
+    sharedMockWSClient = {
+      isConnected: vi.fn(() => true),
+      send: vi.fn(),
+      onMessage: vi.fn(() => () => {}),
+      onClose: vi.fn(() => () => {}),
+      onError: vi.fn(() => () => {}),
+      disconnect: vi.fn(),
+    };
     vi.mocked(useSDKModeStore).mockReturnValue({
       mode: 'online',
     } as any);
@@ -85,8 +107,6 @@ describe('useWebSocket', () => {
 
   it('should call onMessage callback when message received', async () => {
     const onMessage = vi.fn();
-    const { WebSocketClient } = await import('@/services/websocket/websocketClient');
-    const mockClient = (WebSocketClient as any).mock.results[0].value;
 
     renderHook(() =>
       useWebSocket({
@@ -97,14 +117,12 @@ describe('useWebSocket', () => {
     );
 
     await waitFor(() => {
-      expect(mockClient.onMessage).toHaveBeenCalled();
+      expect(sharedMockWSClient.onMessage).toHaveBeenCalled();
     });
   });
 
   it('should call onClose callback when connection closes', async () => {
     const onClose = vi.fn();
-    const { WebSocketClient } = await import('@/services/websocket/websocketClient');
-    const mockClient = (WebSocketClient as any).mock.results[0].value;
 
     renderHook(() =>
       useWebSocket({
@@ -115,11 +133,13 @@ describe('useWebSocket', () => {
     );
 
     await waitFor(() => {
-      expect(mockClient.onClose).toHaveBeenCalled();
+      expect(sharedMockWSClient.onClose).toHaveBeenCalled();
     });
   });
 
   it('should send messages when connected', async () => {
+    sharedMockWSClient.isConnected = vi.fn(() => true);
+
     const { result } = renderHook(() =>
       useWebSocket({
         workspaceId: 'workspace-1',
@@ -131,28 +151,19 @@ describe('useWebSocket', () => {
       expect(result.current.isConnected).toBe(true);
     });
 
-    const { WebSocketClient } = await import('@/services/websocket/websocketClient');
-    const mockClient = (WebSocketClient as any).mock.results[0].value;
-
     result.current.send({
       type: 'test_message',
       workspace_id: 'workspace-1',
     });
 
-    expect(mockClient.send).toHaveBeenCalled();
+    await waitFor(() => {
+      expect(sharedMockWSClient.send).toHaveBeenCalled();
+    });
   });
 
   it('should cleanup on unmount', async () => {
-    const { WebSocketClient } = await import('@/services/websocket/websocketClient');
     const mockDisconnect = vi.fn();
-    (WebSocketClient as any).mockImplementation(() => ({
-      isConnected: vi.fn(() => true),
-      send: vi.fn(),
-      onMessage: vi.fn(() => () => {}),
-      onClose: vi.fn(() => () => {}),
-      onError: vi.fn(() => () => {}),
-      disconnect: mockDisconnect,
-    }));
+    sharedMockWSClient.disconnect = mockDisconnect;
 
     const { unmount } = renderHook(() =>
       useWebSocket({

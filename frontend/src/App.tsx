@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from './components/auth/AuthProvider';
 import { ToastContainer } from './components/common/Toast';
 import { GlobalLoading } from './components/common/Loading';
+import { ErrorBoundary } from './components/common/ErrorBoundary';
 import Home from './pages/Home';
 import ModelEditor from './pages/ModelEditor';
 import AuthCallback from './pages/AuthCallback';
@@ -21,22 +22,32 @@ const queryClient = new QueryClient({
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <BrowserRouter>
-          <div className="min-h-screen bg-gray-50">
-            <Routes>
-              <Route path="/" element={<Home />} />
-              <Route path="/workspace/:workspaceId" element={<ModelEditor />} />
-              <Route path="/auth/complete" element={<AuthCallback />} />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-            <ToastContainer />
-            <GlobalLoading />
-          </div>
-        </BrowserRouter>
-      </AuthProvider>
-    </QueryClientProvider>
+    <ErrorBoundary
+      onError={(error, errorInfo) => {
+        // Log to error reporting service in production
+        if (import.meta.env.PROD) {
+          // TODO: Integrate with error reporting service (e.g., Sentry, LogRocket)
+          console.error('Application error:', error, errorInfo);
+        }
+      }}
+    >
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>
+          <BrowserRouter>
+            <div className="min-h-screen bg-gray-50">
+              <Routes>
+                <Route path="/" element={<Home />} />
+                <Route path="/workspace/:workspaceId" element={<ModelEditor />} />
+                <Route path="/auth/complete" element={<AuthCallback />} />
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+              <ToastContainer />
+              <GlobalLoading />
+            </div>
+          </BrowserRouter>
+        </AuthProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }
 

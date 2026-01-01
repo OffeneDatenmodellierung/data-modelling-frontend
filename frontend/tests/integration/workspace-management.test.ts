@@ -119,10 +119,16 @@ describe('Workspace Management Integration', () => {
         last_modified_at: '2025-01-01T00:00:00Z',
       });
 
-      // Switch to workspace 2
+      // Switch to workspace 2 - need to clear model store first for isolation
+      useModelStore.setState({
+        tables: [],
+        relationships: [],
+        domains: [],
+        dataFlowDiagrams: [],
+      });
       useWorkspaceStore.getState().setCurrentWorkspace('workspace-2');
 
-      // Workspace 2 should have no tables
+      // Workspace 2 should have no tables (model store was cleared)
       const tables = useModelStore.getState().tables;
       expect(tables.length).toBe(0);
     });

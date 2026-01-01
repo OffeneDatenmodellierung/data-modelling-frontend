@@ -14,6 +14,10 @@ vi.mock('@/services/sdk/odcsService', () => ({
   },
 }));
 
+vi.mock('@/services/platform/platform', () => ({
+  getPlatform: vi.fn(() => 'electron'),
+}));
+
 describe('GitVersioningService', () => {
   let gitVersioningService: GitVersioningService;
   const workspacePath = '/path/to/workspace';

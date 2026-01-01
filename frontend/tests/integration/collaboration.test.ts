@@ -10,32 +10,48 @@ import { useModelStore } from '@/stores/modelStore';
 import type { Table } from '@/types/table';
 import type { Relationship } from '@/types/relationship';
 
+// Note: We're using the actual stores here, not mocks, for integration testing
+
+// Create a shared mock instance for WebSocketClient
+let sharedMockWSClient: any;
+
 // Mock WebSocket client
-vi.mock('@/services/websocket/websocketClient', () => ({
-  WebSocketClient: vi.fn().mockImplementation(() => {
-    const handlers: Map<string, Set<Function>> = new Map();
-    
-    return {
-      isConnected: vi.fn(() => true),
-      send: vi.fn(),
-      onMessage: vi.fn((handler: Function) => {
-        if (!handlers.has('message')) {
-          handlers.set('message', new Set());
-        }
-        handlers.get('message')!.add(handler);
-        return () => handlers.get('message')!.delete(handler);
-      }),
-      onClose: vi.fn(() => () => {}),
-      onError: vi.fn(() => () => {}),
-      disconnect: vi.fn(),
-      getWorkspaceId: vi.fn(() => 'workspace-1'),
-      // Test helper to simulate message
-      _simulateMessage: (message: any) => {
-        handlers.get('message')?.forEach((h) => h(message));
-      },
-    };
-  }),
-}));
+vi.mock('@/services/websocket/websocketClient', () => {
+  const handlers: Array<(message: any) => void> = [];
+  
+  class MockWebSocketClient {
+    constructor() {
+      if (!sharedMockWSClient) {
+        sharedMockWSClient = {
+          isConnected: vi.fn(() => true),
+          send: vi.fn(),
+          onMessage: vi.fn((handler: (message: any) => void) => {
+            handlers.push(handler);
+            return () => {
+              const index = handlers.indexOf(handler);
+              if (index > -1) {
+                handlers.splice(index, 1);
+              }
+            };
+          }),
+          onClose: vi.fn(() => () => {}),
+          onError: vi.fn(() => () => {}),
+          disconnect: vi.fn(),
+          getWorkspaceId: vi.fn(() => 'workspace-1'),
+          // Test helper to simulate message
+          _simulateMessage: (message: any) => {
+            handlers.forEach((h) => h(message));
+          },
+        };
+      }
+      return sharedMockWSClient;
+    }
+  }
+  
+  return {
+    WebSocketClient: MockWebSocketClient,
+  };
+});
 
 describe('Collaboration Integration', () => {
   const workspaceId = 'workspace-1';
@@ -69,9 +85,8 @@ describe('Collaboration Integration', () => {
     // Create collaboration service
     collaborationService = new CollaborationService(workspaceId, accessToken);
     
-    // Get WebSocket client instance
-    const { WebSocketClient } = require('@/services/websocket/websocketClient');
-    wsClient = (WebSocketClient as any).mock.results[(WebSocketClient as any).mock.results.length - 1].value;
+    // Get WebSocket client instance (shared mock)
+    wsClient = sharedMockWSClient;
   });
 
   describe('real-time table updates', () => {

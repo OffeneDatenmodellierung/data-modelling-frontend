@@ -9,39 +9,66 @@ import { WebSocketClient } from '@/services/websocket/websocketClient';
 import type { Table } from '@/types/table';
 import type { Relationship } from '@/types/relationship';
 
+// Create a shared mock instance
+let sharedMockWebSocketClient: any;
+
 // Mock WebSocketClient
-vi.mock('@/services/websocket/websocketClient', () => ({
-  WebSocketClient: vi.fn().mockImplementation(() => ({
-    isConnected: vi.fn(() => true),
-    send: vi.fn(),
-    onMessage: vi.fn(() => () => {}),
-    onClose: vi.fn(() => () => {}),
-    onError: vi.fn(() => () => {}),
-    disconnect: vi.fn(),
-    getWorkspaceId: vi.fn(() => 'workspace-1'),
-  })),
-}));
+vi.mock('@/services/websocket/websocketClient', () => {
+  class MockWebSocketClient {
+    constructor() {
+      if (!sharedMockWebSocketClient) {
+        sharedMockWebSocketClient = {
+          isConnected: vi.fn(() => true),
+          send: vi.fn(),
+          onMessage: vi.fn(() => () => {}),
+          onClose: vi.fn(() => () => {}),
+          onError: vi.fn(() => () => {}),
+          disconnect: vi.fn(),
+          getWorkspaceId: vi.fn(() => 'workspace-1'),
+        };
+      }
+      return sharedMockWebSocketClient;
+    }
+  }
+  return {
+    WebSocketClient: MockWebSocketClient,
+  };
+});
 
 describe('CollaborationService', () => {
   const workspaceId = 'workspace-1';
   const accessToken = 'test-token';
   let collaborationService: CollaborationService;
-  let mockWebSocketClient: any;
+  let registeredHandlers: Array<(message: any) => void> = [];
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockWebSocketClient = {
+    registeredHandlers = [];
+    // Reset and setup the shared mock
+    sharedMockWebSocketClient = {
       isConnected: vi.fn(() => true),
       send: vi.fn(),
-      onMessage: vi.fn(() => () => {}),
+      onMessage: vi.fn((handler: any) => {
+        registeredHandlers.push(handler);
+        return () => {
+          const index = registeredHandlers.indexOf(handler);
+          if (index > -1) {
+            registeredHandlers.splice(index, 1);
+          }
+        }; // Return unsubscribe function
+      }),
       onClose: vi.fn(() => () => {}),
       onError: vi.fn(() => () => {}),
       disconnect: vi.fn(),
       getWorkspaceId: vi.fn(() => workspaceId),
     };
-    (WebSocketClient as any).mockImplementation(() => mockWebSocketClient);
     collaborationService = new CollaborationService(workspaceId, accessToken);
   });
+
+  // Helper to simulate a message being received
+  const simulateMessage = (message: any) => {
+    registeredHandlers.forEach((handler) => handler(message));
+  };
 
   describe('table updates', () => {
     it('should send table update via WebSocket', () => {
@@ -56,7 +83,7 @@ describe('CollaborationService', () => {
 
       collaborationService.sendTableUpdate(tableUpdate.table_id, tableUpdate.data);
 
-      expect(mockWebSocketClient.send).toHaveBeenCalledWith({
+      expect(sharedMockWebSocketClient.send).toHaveBeenCalledWith({
         type: 'update_table',
         workspace_id: workspaceId,
         table_id: tableUpdate.table_id,
@@ -65,8 +92,8 @@ describe('CollaborationService', () => {
     });
 
     it('should handle table update messages from other users', () => {
-      const messageHandler = vi.fn();
-      collaborationService.onTableUpdate(messageHandler);
+      const updateHandler = vi.fn();
+      collaborationService.onTableUpdate(updateHandler);
 
       const updateMessage = {
         type: 'table_updated',
@@ -82,10 +109,9 @@ describe('CollaborationService', () => {
       };
 
       // Simulate message received
-      const onMessageCallback = mockWebSocketClient.onMessage.mock.calls[0][0];
-      onMessageCallback(updateMessage);
+      simulateMessage(updateMessage);
 
-      expect(messageHandler).toHaveBeenCalledWith({
+      expect(updateHandler).toHaveBeenCalledWith({
         tableId: 'table-1',
         data: updateMessage.data,
         userId: 'user-2',
@@ -109,7 +135,7 @@ describe('CollaborationService', () => {
         relationshipUpdate.data
       );
 
-      expect(mockWebSocketClient.send).toHaveBeenCalledWith({
+      expect(sharedMockWebSocketClient.send).toHaveBeenCalledWith({
         type: 'update_relationship',
         workspace_id: workspaceId,
         relationship_id: relationshipUpdate.relationship_id,
@@ -133,8 +159,7 @@ describe('CollaborationService', () => {
         timestamp: '2025-01-01T00:00:00Z',
       };
 
-      const onMessageCallback = mockWebSocketClient.onMessage.mock.calls[0][0];
-      onMessageCallback(updateMessage);
+      simulateMessage(updateMessage);
 
       expect(messageHandler).toHaveBeenCalledWith({
         relationshipId: 'rel-1',
@@ -157,7 +182,7 @@ describe('CollaborationService', () => {
         presenceUpdate.selected_elements
       );
 
-      expect(mockWebSocketClient.send).toHaveBeenCalledWith({
+      expect(sharedMockWebSocketClient.send).toHaveBeenCalledWith({
         type: 'presence_update',
         workspace_id: workspaceId,
         cursor_position: presenceUpdate.cursor_position,
@@ -178,8 +203,7 @@ describe('CollaborationService', () => {
         timestamp: '2025-01-01T00:00:00Z',
       };
 
-      const onMessageCallback = mockWebSocketClient.onMessage.mock.calls[0][0];
-      onMessageCallback(presenceMessage);
+      simulateMessage(presenceMessage);
 
       expect(messageHandler).toHaveBeenCalledWith({
         userId: 'user-2',
@@ -204,8 +228,7 @@ describe('CollaborationService', () => {
         timestamp: '2025-01-01T00:00:00Z',
       };
 
-      const onMessageCallback = mockWebSocketClient.onMessage.mock.calls[0][0];
-      onMessageCallback(conflictMessage);
+      simulateMessage(conflictMessage);
 
       expect(conflictHandler).toHaveBeenCalledWith({
         elementType: 'table',
@@ -237,9 +260,8 @@ describe('CollaborationService', () => {
       const handler = vi.fn();
       collaborationService.onTableUpdate(handler);
 
-      const onMessageCallback = mockWebSocketClient.onMessage.mock.calls[0][0];
-      onMessageCallback(tableUpdate1);
-      onMessageCallback(tableUpdate2);
+      simulateMessage(tableUpdate1);
+      simulateMessage(tableUpdate2);
 
       // Both updates should be received, last one wins
       expect(handler).toHaveBeenCalledTimes(2);
@@ -255,12 +277,12 @@ describe('CollaborationService', () => {
   describe('connection management', () => {
     it('should check if WebSocket is connected', () => {
       expect(collaborationService.isConnected()).toBe(true);
-      expect(mockWebSocketClient.isConnected).toHaveBeenCalled();
+      expect(sharedMockWebSocketClient.isConnected).toHaveBeenCalled();
     });
 
     it('should disconnect WebSocket', () => {
       collaborationService.disconnect();
-      expect(mockWebSocketClient.disconnect).toHaveBeenCalled();
+      expect(sharedMockWebSocketClient.disconnect).toHaveBeenCalled();
     });
   });
 });

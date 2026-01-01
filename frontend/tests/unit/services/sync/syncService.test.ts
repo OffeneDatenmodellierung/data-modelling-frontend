@@ -7,6 +7,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { SyncService } from '@/services/sync/syncService';
 import { useModelStore } from '@/stores/modelStore';
 import { useWorkspaceStore } from '@/stores/workspaceStore';
+import { useSDKModeStore } from '@/services/sdk/sdkMode';
 import { odcsService } from '@/services/sdk/odcsService';
 import { apiClient } from '@/services/api/apiClient';
 import type { Workspace } from '@/types/workspace';
@@ -20,6 +21,12 @@ vi.mock('@/stores/modelStore', () => ({
 
 vi.mock('@/stores/workspaceStore', () => ({
   useWorkspaceStore: {
+    getState: vi.fn(),
+  },
+}));
+
+vi.mock('@/services/sdk/sdkMode', () => ({
+  useSDKModeStore: {
     getState: vi.fn(),
   },
 }));
@@ -58,9 +65,19 @@ describe('SyncService', () => {
         last_modified_at: '2025-01-01T00:00:00Z',
       };
 
+      vi.mocked(useSDKModeStore.getState).mockReturnValue({
+        getMode: vi.fn().mockResolvedValue('online'),
+      } as any);
+
       vi.mocked(useWorkspaceStore.getState).mockReturnValue({
         workspaces: [mockWorkspace],
         currentWorkspaceId: workspaceId,
+      } as any);
+
+      vi.mocked(useModelStore.getState).mockReturnValue({
+        tables: [],
+        relationships: [],
+        dataFlowDiagrams: [],
       } as any);
 
       vi.mocked(odcsService.toYAML).mockResolvedValue('yaml-content');
@@ -71,34 +88,65 @@ describe('SyncService', () => {
       };
       vi.mocked(apiClient.getClient).mockReturnValue(mockClient as any);
 
-      await syncService.syncToRemote();
+      const result = await syncService.syncToRemote();
 
+      expect(result.success).toBe(true);
       expect(odcsService.toYAML).toHaveBeenCalled();
       expect(mockClient.put).toHaveBeenCalled();
     });
 
     it('should handle sync errors gracefully', async () => {
+      vi.mocked(useSDKModeStore.getState).mockReturnValue({
+        getMode: vi.fn().mockResolvedValue('online'),
+      } as any);
+
       vi.mocked(useWorkspaceStore.getState).mockReturnValue({
         workspaces: [],
         currentWorkspaceId: workspaceId,
       } as any);
 
-      vi.mocked(odcsService.toYAML).mockRejectedValue(new Error('Sync failed'));
+      vi.mocked(useModelStore.getState).mockReturnValue({
+        tables: [],
+        relationships: [],
+        dataFlowDiagrams: [],
+      } as any);
 
-      await expect(syncService.syncToRemote()).rejects.toThrow('Sync failed');
+      vi.mocked(apiClient.getAccessToken).mockReturnValue('test-token');
+
+      const result = await syncService.syncToRemote();
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBeDefined();
     });
   });
 
   describe('sync from remote', () => {
     it('should sync workspace from remote when online', async () => {
-      const mockWorkspace: Workspace = {
-        id: workspaceId,
-        name: 'Remote Workspace',
-        type: 'personal',
-        owner_id: 'user-1',
-        created_at: '2025-01-01T00:00:00Z',
-        last_modified_at: '2025-01-01T00:01:00Z',
-      };
+      vi.mocked(useSDKModeStore.getState).mockReturnValue({
+        getMode: vi.fn().mockResolvedValue('online'),
+      } as any);
+
+      const mockTables: any[] = [];
+      const mockRelationships: any[] = [];
+      const mockDataFlowDiagrams: any[] = [];
+
+      vi.mocked(useModelStore.getState).mockReturnValue({
+        tables: mockTables,
+        relationships: mockRelationships,
+        dataFlowDiagrams: mockDataFlowDiagrams,
+        setTables: vi.fn((tables: any[]) => {
+          mockTables.length = 0;
+          mockTables.push(...tables);
+        }),
+        setRelationships: vi.fn((relationships: any[]) => {
+          mockRelationships.length = 0;
+          mockRelationships.push(...relationships);
+        }),
+        setDataFlowDiagrams: vi.fn((diagrams: any[]) => {
+          mockDataFlowDiagrams.length = 0;
+          mockDataFlowDiagrams.push(...diagrams);
+        }),
+      } as any);
 
       const mockClient = {
         get: vi.fn().mockResolvedValue({
@@ -106,14 +154,17 @@ describe('SyncService', () => {
         }),
       };
       vi.mocked(apiClient.getClient).mockReturnValue(mockClient as any);
+      vi.mocked(apiClient.getAccessToken).mockReturnValue('test-token');
       vi.mocked(odcsService.parseYAML).mockResolvedValue({
         workspace_id: workspaceId,
         tables: [],
         relationships: [],
+        data_flow_diagrams: [],
       });
 
-      await syncService.syncFromRemote();
+      const result = await syncService.syncFromRemote();
 
+      expect(result.success).toBe(true);
       expect(mockClient.get).toHaveBeenCalled();
       expect(odcsService.parseYAML).toHaveBeenCalledWith('yaml-content');
     });
@@ -121,6 +172,10 @@ describe('SyncService', () => {
 
   describe('automatic merge', () => {
     it('should automatically merge when connection restored', async () => {
+      vi.mocked(useSDKModeStore.getState).mockReturnValue({
+        getMode: vi.fn().mockResolvedValue('online'),
+      } as any);
+
       const localWorkspace: Workspace = {
         id: workspaceId,
         name: 'Local Workspace',
@@ -130,18 +185,15 @@ describe('SyncService', () => {
         last_modified_at: '2025-01-01T00:00:00Z',
       };
 
-      const remoteWorkspace: Workspace = {
-        id: workspaceId,
-        name: 'Remote Workspace',
-        type: 'personal',
-        owner_id: 'user-1',
-        created_at: '2025-01-01T00:00:00Z',
-        last_modified_at: '2025-01-01T00:01:00Z', // Newer
-      };
-
       vi.mocked(useWorkspaceStore.getState).mockReturnValue({
         workspaces: [localWorkspace],
         currentWorkspaceId: workspaceId,
+      } as any);
+
+      vi.mocked(useModelStore.getState).mockReturnValue({
+        tables: [],
+        relationships: [],
+        dataFlowDiagrams: [],
       } as any);
 
       const mockClient = {
@@ -150,10 +202,12 @@ describe('SyncService', () => {
         }),
       };
       vi.mocked(apiClient.getClient).mockReturnValue(mockClient as any);
+      vi.mocked(apiClient.getAccessToken).mockReturnValue('test-token');
       vi.mocked(odcsService.parseYAML).mockResolvedValue({
         workspace_id: workspaceId,
         tables: [],
         relationships: [],
+        data_flow_diagrams: [],
       });
 
       await syncService.autoMergeOnConnectionRestored();

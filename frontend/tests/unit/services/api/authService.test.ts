@@ -31,6 +31,7 @@ describe('AuthService - JWT Token Refresh', () => {
     vi.clearAllMocks();
     vi.mocked(useSDKModeStore.getState).mockReturnValue({
       mode: 'online',
+      getMode: vi.fn().mockResolvedValue('online'),
     } as any);
   });
 
@@ -114,6 +115,7 @@ describe('AuthService - JWT Token Refresh', () => {
     it('should handle refresh failure in offline mode', async () => {
       vi.mocked(useSDKModeStore.getState).mockReturnValue({
         mode: 'offline',
+        getMode: vi.fn().mockResolvedValue('offline'),
       } as any);
 
       vi.mocked(apiClient.getRefreshToken).mockReturnValue('refresh-token');

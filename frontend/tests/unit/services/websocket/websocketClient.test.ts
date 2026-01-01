@@ -51,8 +51,14 @@ class MockWebSocket {
   }
 
   simulateError() {
+    // Set readyState to CLOSED to simulate error closing the connection
+    this.readyState = WebSocket.CLOSED;
     if (this.onerror) {
       this.onerror(new Event('error'));
+    }
+    // Also trigger close event to simulate error closing connection
+    if (this.onclose) {
+      this.onclose(new CloseEvent('close', { code: 1006, reason: 'Connection error' }));
     }
   }
 }

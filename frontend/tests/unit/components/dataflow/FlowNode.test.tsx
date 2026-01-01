@@ -89,14 +89,15 @@ describe('FlowNode', () => {
   });
 
   it('should highlight selected node', () => {
-    render(
+    const { container } = render(
       <ReactFlowProvider>
         <FlowNode {...defaultProps} selected={true} />
       </ReactFlowProvider>
     );
-    const nodeElement = screen.getByText('Source Database').closest('div');
-    // Check if the element has ring-2 class (for selected state)
-    expect(nodeElement?.className).toContain('ring-2');
+    // Find the root div with the ring-2 class
+    const nodeElement = container.querySelector('.ring-2');
+    expect(nodeElement).toBeInTheDocument();
+    expect(nodeElement?.className).toContain('ring-blue-500');
   });
 
   it('should display node metadata if available', () => {

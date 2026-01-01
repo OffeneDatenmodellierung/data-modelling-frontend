@@ -5,6 +5,7 @@
 
 import React from 'react';
 import { useModelStore } from '@/stores/modelStore';
+import { useUIStore } from '@/stores/uiStore';
 import type { ModelType } from '@/types/workspace';
 import { formatModelType } from '@/utils/formatting';
 import { HelpText } from '@/components/common/HelpText';
@@ -18,6 +19,7 @@ export const DomainSelector: React.FC<DomainSelectorProps> = ({
   onModelTypeChange,
 }) => {
   const { domains, selectedDomainId, setSelectedDomain } = useModelStore();
+  const { addToast } = useUIStore();
 
   const modelTypes: ModelType[] = ['conceptual', 'logical', 'physical'];
   const currentDomain = domains.find((d) => d.id === selectedDomainId);
@@ -30,8 +32,12 @@ export const DomainSelector: React.FC<DomainSelectorProps> = ({
       setSelectedDomain(domain.id);
       onModelTypeChange?.(modelType);
     } else {
-      // TODO: Create new domain for this model type
+      // Domain for this model type doesn't exist - show message to user
       console.warn(`Domain for model type ${modelType} not found`);
+      addToast({
+        type: 'info',
+        message: `Please create a ${formatModelType(modelType)} domain first`,
+      });
     }
   };
 

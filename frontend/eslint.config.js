@@ -50,7 +50,33 @@ export default [
   },
   prettier,
   {
-    ignores: ['node_modules/', 'dist/', 'build/', 'coverage/', '*.min.js'],
+    ignores: [
+      'node_modules/',
+      'dist/',
+      'dist-electron/',
+      'build/',
+      'coverage/',
+      '*.min.js',
+      'electron/**/*',
+      'public/wasm/**/*',
+    ],
+  },
+  // Electron-specific configuration
+  {
+    files: ['electron/**/*.{js,ts}'],
+    languageOptions: {
+      globals: {
+        process: 'readonly',
+        console: 'readonly',
+        URL: 'readonly',
+        __filename: 'readonly',
+        __dirname: 'readonly',
+        document: 'readonly',
+      },
+    },
+    rules: {
+      'no-undef': 'off', // Electron has Node.js globals
+    },
   },
 ];
 

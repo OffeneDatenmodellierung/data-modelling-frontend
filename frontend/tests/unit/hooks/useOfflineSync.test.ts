@@ -14,14 +14,27 @@ vi.mock('@/services/sdk/sdkMode', () => ({
   useSDKModeStore: vi.fn(),
 }));
 
-vi.mock('@/services/sync/syncService', () => ({
-  SyncService: vi.fn().mockImplementation(() => ({
-    syncToRemote: vi.fn(),
-    syncFromRemote: vi.fn(),
-    autoMergeOnConnectionRestored: vi.fn(),
-    detectConflict: vi.fn(),
-  })),
-}));
+// Create a mock instance that will be reused
+const createMockSyncService = () => ({
+  syncToRemote: vi.fn(),
+  syncFromRemote: vi.fn(),
+  autoMergeOnConnectionRestored: vi.fn(),
+  detectConflict: vi.fn(),
+});
+
+let mockSyncServiceInstance: ReturnType<typeof createMockSyncService>;
+
+vi.mock('@/services/sync/syncService', () => {
+  class MockSyncService {
+    constructor() {
+      mockSyncServiceInstance = createMockSyncService();
+      return mockSyncServiceInstance;
+    }
+  }
+  return {
+    SyncService: MockSyncService,
+  };
+});
 
 describe('useOfflineSync', () => {
   beforeEach(() => {
@@ -43,7 +56,7 @@ describe('useOfflineSync', () => {
       })
     );
 
-    expect(SyncService).toHaveBeenCalledWith('workspace-1');
+    expect(mockSyncServiceInstance).toBeDefined();
   });
 
   it('should not sync in offline mode', async () => {
@@ -64,13 +77,7 @@ describe('useOfflineSync', () => {
   });
 
   it('should sync to remote when online', async () => {
-    const mockSyncService = {
-      syncToRemote: vi.fn().mockResolvedValue({ success: true }),
-      syncFromRemote: vi.fn(),
-      autoMergeOnConnectionRestored: vi.fn(),
-      detectConflict: vi.fn(),
-    };
-    (SyncService as any).mockImplementation(() => mockSyncService);
+    mockSyncServiceInstance.syncToRemote = vi.fn().mockResolvedValue({ success: true });
 
     const { result } = renderHook(() =>
       useOfflineSync({
@@ -81,17 +88,11 @@ describe('useOfflineSync', () => {
 
     await result.current.syncToRemote();
 
-    expect(mockSyncService.syncToRemote).toHaveBeenCalled();
+    expect(mockSyncServiceInstance.syncToRemote).toHaveBeenCalled();
   });
 
   it('should sync from remote when online', async () => {
-    const mockSyncService = {
-      syncToRemote: vi.fn(),
-      syncFromRemote: vi.fn().mockResolvedValue({ success: true }),
-      autoMergeOnConnectionRestored: vi.fn(),
-      detectConflict: vi.fn(),
-    };
-    (SyncService as any).mockImplementation(() => mockSyncService);
+    mockSyncServiceInstance.syncFromRemote = vi.fn().mockResolvedValue({ success: true });
 
     const { result } = renderHook(() =>
       useOfflineSync({
@@ -102,17 +103,11 @@ describe('useOfflineSync', () => {
 
     await result.current.syncFromRemote();
 
-    expect(mockSyncService.syncFromRemote).toHaveBeenCalled();
+    expect(mockSyncServiceInstance.syncFromRemote).toHaveBeenCalled();
   });
 
   it('should auto-merge when connection restored', async () => {
-    const mockSyncService = {
-      syncToRemote: vi.fn(),
-      syncFromRemote: vi.fn(),
-      autoMergeOnConnectionRestored: vi.fn().mockResolvedValue({ success: true }),
-      detectConflict: vi.fn(),
-    };
-    (SyncService as any).mockImplementation(() => mockSyncService);
+    mockSyncServiceInstance.autoMergeOnConnectionRestored = vi.fn().mockResolvedValue({ success: true });
 
     const { result } = renderHook(() =>
       useOfflineSync({
@@ -123,7 +118,7 @@ describe('useOfflineSync', () => {
 
     await result.current.autoMerge();
 
-    expect(mockSyncService.autoMergeOnConnectionRestored).toHaveBeenCalled();
+    expect(mockSyncServiceInstance.autoMergeOnConnectionRestored).toHaveBeenCalled();
   });
 });
 

@@ -3,19 +3,32 @@
  * Tests offline mode detection and switching
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { sdkModeDetector, useSDKModeStore } from '@/services/sdk/sdkMode';
 
 // Mock fetch
 global.fetch = vi.fn();
 
+// Mock AbortSignal.timeout
+const originalAbortSignalTimeout = AbortSignal.timeout;
+
 describe('Platform Service - Offline Mode Detection', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Mock AbortSignal.timeout to create an abort signal that aborts after the timeout
+    global.AbortSignal.timeout = vi.fn((ms: number) => {
+      const controller = new AbortController();
+      setTimeout(() => controller.abort(), ms);
+      return controller.signal;
+    });
     useSDKModeStore.setState({
       mode: 'offline',
       isManualOverride: false,
     });
+  });
+
+  afterEach(() => {
+    global.AbortSignal.timeout = originalAbortSignalTimeout;
   });
 
   describe('checkOnlineMode', () => {
@@ -47,15 +60,30 @@ describe('Platform Service - Offline Mode Detection', () => {
     });
 
     it('should timeout after 2 seconds', async () => {
+      // Mock fetch to reject when aborted (simulating timeout)
       vi.mocked(fetch).mockImplementationOnce(
-        () =>
-          new Promise((resolve) => {
-            setTimeout(() => resolve({ ok: true } as Response), 3000);
-          })
+        (_url: any, options?: any) => {
+          return new Promise((_resolve, reject) => {
+            // Check if signal is aborted
+            if (options?.signal) {
+              options.signal.addEventListener('abort', () => {
+                reject(new Error('Aborted'));
+              });
+            }
+            // Never resolve - should timeout and abort
+          });
+        }
       );
 
+      const startTime = Date.now();
       const isOnline = await sdkModeDetector.checkOnlineMode();
+      const elapsedTime = Date.now() - startTime;
+
+      // Should timeout and return false
       expect(isOnline).toBe(false);
+      // Should timeout around 2 seconds (allow some variance)
+      expect(elapsedTime).toBeLessThan(3000);
+      expect(elapsedTime).toBeGreaterThan(1500);
     });
   });
 

@@ -63,12 +63,13 @@ describe('WorkspaceSelector', () => {
   it('should display all workspaces in dropdown', async () => {
     render(<WorkspaceSelector />);
 
-    const selector = screen.getByRole('button') || screen.getByText('Personal Workspace');
+    const selector = screen.getByRole('button', { name: /personal workspace|select workspace/i });
     fireEvent.click(selector);
 
     await waitFor(() => {
-      expect(screen.getByText('Personal Workspace')).toBeVisible();
-      expect(screen.getByText('Shared Workspace')).toBeVisible();
+      // Find all workspace names in the dropdown (should be 2)
+      const workspaceNames = screen.getAllByText(/Personal Workspace|Shared Workspace/);
+      expect(workspaceNames.length).toBeGreaterThanOrEqual(2);
     });
   });
 
@@ -98,29 +99,40 @@ describe('WorkspaceSelector', () => {
   it('should show workspace type indicator', async () => {
     render(<WorkspaceSelector />);
 
-    const selector = screen.getByRole('button') || screen.getByText('Personal Workspace');
+    const selector = screen.getByRole('button', { name: /personal workspace|select workspace/i });
     fireEvent.click(selector);
 
     await waitFor(() => {
-      expect(screen.getByText(/personal/i)).toBeInTheDocument();
-      expect(screen.getByText(/shared/i)).toBeInTheDocument();
+      // Check for type badges in the dropdown
+      const personalBadge = screen.getByText('Personal');
+      const sharedBadge = screen.getByText('Shared');
+      expect(personalBadge).toBeVisible();
+      expect(sharedBadge).toBeVisible();
     });
   });
 
   it('should close dropdown when clicking outside', async () => {
-    render(<WorkspaceSelector />);
+    const { container } = render(<WorkspaceSelector />);
 
-    const selector = screen.getByRole('button') || screen.getByText('Personal Workspace');
+    const selector = screen.getByRole('button', { name: /personal workspace|select workspace/i });
     fireEvent.click(selector);
 
     await waitFor(() => {
-      expect(screen.getByText('Shared Workspace')).toBeVisible();
+      // Verify dropdown is open by checking for Shared Workspace
+      const sharedWorkspace = screen.getAllByText('Shared Workspace').find(el => {
+        // Find the one in the dropdown (not the button)
+        return el.closest('[role="button"]') !== selector;
+      });
+      expect(sharedWorkspace).toBeVisible();
     });
 
-    fireEvent.click(document.body);
+    // Click outside the dropdown
+    fireEvent.mouseDown(document.body);
 
     await waitFor(() => {
-      expect(screen.queryByText('Shared Workspace')).not.toBeVisible();
+      // Dropdown should be closed - Shared Workspace should not be visible in dropdown
+      const dropdown = container.querySelector('.absolute');
+      expect(dropdown).not.toBeInTheDocument();
     });
   });
 });

@@ -222,6 +222,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
 
           try {
             const mode = await useSDKModeStore.getState().getMode();
+            const uiStoreModule = await import('@/stores/uiStore');
             
             if (mode === 'offline') {
               // Save to local file in offline mode
@@ -229,18 +230,41 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                 // In Electron, we'd save to the workspace file
                 // For now, just mark as saved
                 set({ pendingChanges: false, lastSavedAt: new Date().toISOString() });
+                uiStoreModule.useUIStore.getState().addToast({
+                  type: 'success',
+                  message: 'Workspace saved locally',
+                });
               } else {
                 // Browser: trigger download
                 await localFileService.saveFile(workspace, `${workspace.name || 'workspace'}.yaml`);
                 set({ pendingChanges: false, lastSavedAt: new Date().toISOString() });
+                uiStoreModule.useUIStore.getState().addToast({
+                  type: 'success',
+                  message: 'Workspace saved to file',
+                });
               }
             } else {
               // In online mode, sync to remote
-              // This would be handled by sync service
-              set({ pendingChanges: false, lastSavedAt: new Date().toISOString() });
+              const syncModule = await import('@/services/sync/syncService');
+              const sync = new syncModule.SyncService(workspace.id);
+              const result = await sync.syncToRemote();
+              if (result.success) {
+                set({ pendingChanges: false, lastSavedAt: new Date().toISOString() });
+                uiStoreModule.useUIStore.getState().addToast({
+                  type: 'success',
+                  message: 'Workspace synced to server',
+                });
+              } else {
+                throw new Error(result.error || 'Sync failed');
+              }
             }
           } catch (error) {
             console.error('Auto-save failed:', error);
+            const uiStoreModule = await import('@/stores/uiStore');
+            uiStoreModule.useUIStore.getState().addToast({
+              type: 'error',
+              message: `Auto-save failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            });
             // Don't throw - auto-save failures shouldn't interrupt user
           }
         },

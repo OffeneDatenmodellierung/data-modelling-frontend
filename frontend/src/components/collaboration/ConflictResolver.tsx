@@ -13,7 +13,7 @@ export interface ConflictResolverProps {
 }
 
 export const ConflictResolver: React.FC<ConflictResolverProps> = ({ isOpen, onClose }) => {
-  const { conflicts, removeConflict } = useCollaborationStore();
+  const { conflicts, removeConflict, clearConflicts } = useCollaborationStore();
 
   const handleDismiss = (conflictId: string) => {
     removeConflict(conflictId);
@@ -23,7 +23,7 @@ export const ConflictResolver: React.FC<ConflictResolverProps> = ({ isOpen, onCl
   };
 
   const handleDismissAll = () => {
-    useCollaborationStore.getState().clearConflicts();
+    clearConflicts();
     onClose();
   };
 

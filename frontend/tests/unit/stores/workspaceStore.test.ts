@@ -90,21 +90,45 @@ describe('WorkspaceStore - Workspace Switching', () => {
           },
         ],
         currentWorkspaceId: null,
+        pendingChanges: false,
       });
 
-      await useWorkspaceStore.getState().fetchWorkspace('workspace-2');
+      await useWorkspaceStore.getState().switchWorkspace('workspace-2');
 
       const state = useWorkspaceStore.getState();
       expect(state.currentWorkspaceId).toBe('workspace-2');
     });
 
-    it('should clear pending changes when switching workspaces', () => {
+    it('should clear pending changes when switching workspaces', async () => {
       useWorkspaceStore.setState({
+        workspaces: [
+          {
+            id: 'workspace-1',
+            name: 'Workspace 1',
+            type: 'personal',
+            owner_id: 'user-1',
+            created_at: '2025-01-01T00:00:00Z',
+            last_modified_at: '2025-01-01T00:00:00Z',
+          },
+          {
+            id: 'workspace-2',
+            name: 'Workspace 2',
+            type: 'personal',
+            owner_id: 'user-1',
+            created_at: '2025-01-01T00:00:00Z',
+            last_modified_at: '2025-01-01T00:00:00Z',
+          },
+        ],
         currentWorkspaceId: 'workspace-1',
         pendingChanges: true,
       });
 
-      useWorkspaceStore.getState().setCurrentWorkspace('workspace-2');
+      vi.mocked(workspaceService.getWorkspaceInfo).mockResolvedValue({
+        workspace_path: 'workspace-2',
+        email: 'user@example.com',
+      });
+
+      await useWorkspaceStore.getState().switchWorkspace('workspace-2');
 
       expect(useWorkspaceStore.getState().pendingChanges).toBe(false);
     });
