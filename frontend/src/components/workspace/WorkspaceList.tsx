@@ -1,0 +1,114 @@
+/**
+ * Workspace List Component
+ * Displays list of workspaces with type indicators
+ */
+
+import React from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useWorkspaceStore } from '@/stores/workspaceStore';
+import type { Workspace } from '@/types/workspace';
+
+export interface WorkspaceListProps {
+  className?: string;
+  onWorkspaceSelect?: (workspaceId: string) => void;
+}
+
+export const WorkspaceList: React.FC<WorkspaceListProps> = ({ className = '', onWorkspaceSelect }) => {
+  const { workspaces, currentWorkspaceId, isLoading, setCurrentWorkspace, deleteWorkspaceRemote } =
+    useWorkspaceStore();
+  const navigate = useNavigate();
+  const [deletingId, setDeletingId] = React.useState<string | null>(null);
+
+  const handleWorkspaceClick = (workspace: Workspace) => {
+    setCurrentWorkspace(workspace.id);
+    onWorkspaceSelect?.(workspace.id);
+    navigate(`/workspace/${workspace.id}`);
+  };
+
+  const handleDelete = async (workspaceId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!confirm('Are you sure you want to delete this workspace?')) {
+      return;
+    }
+
+    setDeletingId(workspaceId);
+    try {
+      await deleteWorkspaceRemote(workspaceId);
+    } catch (error) {
+      console.error('Failed to delete workspace:', error);
+      alert('Failed to delete workspace. Please try again.');
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className={`p-4 ${className}`}>
+        <div className="text-center text-gray-500">Loading workspaces...</div>
+      </div>
+    );
+  }
+
+  if (workspaces.length === 0) {
+    return (
+      <div className={`p-4 ${className}`}>
+        <div className="text-center text-gray-500">No workspaces found. Create your first workspace to get started.</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`space-y-2 ${className}`}>
+      {workspaces.map((workspace) => (
+        <div
+          key={workspace.id}
+          onClick={() => handleWorkspaceClick(workspace)}
+          className={`
+            p-4 border rounded-lg cursor-pointer transition-colors
+            ${currentWorkspaceId === workspace.id ? 'bg-blue-50 border-blue-500' : 'bg-white border-gray-200 hover:border-gray-300'}
+          `}
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <h3 className="font-semibold text-gray-900">{workspace.name}</h3>
+                <span
+                  className={`
+                    px-2 py-1 text-xs rounded
+                    ${workspace.type === 'shared' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}
+                  `}
+                >
+                  {workspace.type === 'shared' ? 'Shared' : 'Personal'}
+                </span>
+              </div>
+              <p className="text-sm text-gray-500 mt-1">
+                Last modified: {new Date(workspace.last_modified_at).toLocaleDateString()}
+              </p>
+            </div>
+            <button
+              onClick={(e) => handleDelete(workspace.id, e)}
+              disabled={deletingId === workspace.id}
+              className="ml-4 text-red-600 hover:text-red-800 disabled:opacity-50"
+              aria-label={`Delete ${workspace.name}`}
+            >
+              {deletingId === workspace.id ? (
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600"></div>
+              ) : (
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                  />
+                </svg>
+              )}
+            </button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+

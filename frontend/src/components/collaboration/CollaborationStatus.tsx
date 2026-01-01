@@ -15,10 +15,10 @@ export const CollaborationStatus: React.FC<CollaborationStatusProps> = () => {
   const { session } = useCollaborationStore();
   const { mode } = useSDKModeStore();
 
-  // Don't show collaboration status in offline mode
+  // Show collaboration disabled message in offline mode
   if (mode === 'offline') {
     return (
-      <div className="px-3 py-1 text-xs text-gray-500 bg-yellow-50 rounded">
+      <div className="px-3 py-1 text-xs text-gray-600 bg-yellow-50 rounded border border-yellow-200">
         <span className="inline-block w-2 h-2 bg-yellow-500 rounded-full mr-2"></span>
         Collaboration disabled (offline mode)
       </div>

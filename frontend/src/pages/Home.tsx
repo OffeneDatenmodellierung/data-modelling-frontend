@@ -14,11 +14,14 @@ import { localFileService } from '@/services/storage/localFileService';
 import { useUIStore } from '@/stores/uiStore';
 import { isElectron } from '@/services/platform/platform';
 import { electronAuthService } from '@/services/api/electronAuthService';
+import { WorkspaceList } from '@/components/workspace/WorkspaceList';
+import { WorkspaceSelector } from '@/components/workspace/WorkspaceSelector';
 
 const Home: React.FC = () => {
   const navigate = useNavigate();
   const { isAuthenticated, isLoading, login } = useAuth();
-  const { workspaces, setCurrentWorkspace, addWorkspace } = useWorkspaceStore();
+  const { workspaces, setCurrentWorkspace, addWorkspace, fetchWorkspaces, isLoading: workspacesLoading, createWorkspace } = useWorkspaceStore();
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
   const { mode, initialize } = useSDKModeStore();
   const [modeLoading, setModeLoading] = useState(true);
   const [isCheckingLogin, setIsCheckingLogin] = useState(false);
@@ -32,6 +35,13 @@ const Home: React.FC = () => {
     };
     initMode();
   }, [initialize]);
+
+  // Load workspaces when authenticated and online
+  useEffect(() => {
+    if (isAuthenticated && mode === 'online' && !workspacesLoading) {
+      fetchWorkspaces();
+    }
+  }, [isAuthenticated, mode, fetchWorkspaces, workspacesLoading]);
 
   // Show loading while checking mode and auth
   if (isLoading || modeLoading) {
@@ -100,7 +110,8 @@ const Home: React.FC = () => {
         </header>
         <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
           <div className="px-4 py-6 sm:px-0">
-            <div className="mb-6 flex gap-4">
+            <div className="mb-6 flex gap-4 items-center">
+              <WorkspaceSelector />
               <button
                 onClick={handleOpenLocalFolder}
                 className="bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -108,25 +119,92 @@ const Home: React.FC = () => {
                 Open Workspace Folder
               </button>
               <button
-                onClick={() => {
-                  // Create a new empty workspace for offline use
-                  const newWorkspaceId = `offline-${Date.now()}`;
-                  navigate(`/workspace/${newWorkspaceId}`);
-                }}
-                className="bg-gray-600 text-white py-2 px-4 rounded hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500"
+                onClick={() => setShowCreateDialog(true)}
+                className="bg-green-600 text-white py-2 px-4 rounded hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500"
               >
                 New Workspace
               </button>
             </div>
-            <div className="text-center py-12">
-              <p className="text-gray-600 mb-4">Offline mode active</p>
-              <p className="text-sm text-gray-500 mb-2">
-                Open a workspace folder containing domain subfolders.
-              </p>
-              <p className="text-xs text-gray-400">
-                Expected structure: workspace-folder/domain-folder/tables.yaml and relationships.yaml
-              </p>
-            </div>
+            
+            {/* Workspace List */}
+            <WorkspaceList onWorkspaceSelect={(workspaceId) => navigate(`/workspace/${workspaceId}`)} />
+            
+            {/* Create Workspace Dialog for offline mode */}
+            {showCreateDialog && (
+              <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                <div className="bg-white rounded-lg p-6 max-w-md w-full">
+                  <h2 className="text-xl font-bold mb-4">Create New Workspace</h2>
+                  <form
+                    onSubmit={async (e) => {
+                      e.preventDefault();
+                      const formData = new FormData(e.target as HTMLFormElement);
+                      const name = formData.get('name') as string;
+                      const type = formData.get('type') as 'personal' | 'shared';
+                      
+                      try {
+                        const workspace = {
+                          id: `offline-${Date.now()}`,
+                          name,
+                          type,
+                          owner_id: 'offline-user',
+                          created_at: new Date().toISOString(),
+                          last_modified_at: new Date().toISOString(),
+                        };
+                        addWorkspace(workspace);
+                        setShowCreateDialog(false);
+                        navigate(`/workspace/${workspace.id}`);
+                      } catch (error) {
+                        addToast({
+                          type: 'error',
+                          message: 'Failed to create workspace',
+                        });
+                      }
+                    }}
+                  >
+                    <div className="mb-4">
+                      <label htmlFor="workspace-name-offline" className="block text-sm font-medium text-gray-700 mb-2">
+                        Workspace Name
+                      </label>
+                      <input
+                        id="workspace-name-offline"
+                        name="name"
+                        type="text"
+                        required
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div className="mb-4">
+                      <label htmlFor="workspace-type-offline" className="block text-sm font-medium text-gray-700 mb-2">
+                        Workspace Type
+                      </label>
+                      <select
+                        id="workspace-type-offline"
+                        name="type"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="personal">Personal</option>
+                        <option value="shared">Shared</option>
+                      </select>
+                    </div>
+                    <div className="flex justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowCreateDialog(false)}
+                        className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                      >
+                        Create
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
           </div>
         </main>
       </div>
@@ -273,36 +351,88 @@ const Home: React.FC = () => {
       </header>
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0">
-          <div className="mb-6">
+          <div className="mb-6 flex gap-4 items-center">
+            <WorkspaceSelector />
             <button
-              onClick={() => {
-                // TODO: Implement workspace creation
-                console.log('Create workspace');
-              }}
-              className="bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              onClick={() => setShowCreateDialog(true)}
+              className="bg-green-600 text-white py-2 px-4 rounded hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500"
             >
-              Create Workspace
+              New Workspace
             </button>
           </div>
-          {workspaces.length === 0 ? (
-            <div className="text-center py-12">
-              <p className="text-gray-600 mb-4">No workspaces found.</p>
-              <p className="text-sm text-gray-500">Create your first workspace to get started.</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {workspaces.map((workspace) => (
-                <div
-                  key={workspace.id}
-                  onClick={() => navigate(`/workspace/${workspace.id}`)}
-                  className="bg-white rounded-lg shadow p-6 cursor-pointer hover:shadow-lg transition-shadow"
+          
+          {/* Workspace List */}
+          <WorkspaceList onWorkspaceSelect={(workspaceId) => navigate(`/workspace/${workspaceId}`)} />
+          
+          {/* Create Workspace Dialog */}
+          {showCreateDialog && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+              <div className="bg-white rounded-lg p-6 max-w-md w-full">
+                <h2 className="text-xl font-bold mb-4">Create New Workspace</h2>
+                <form
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    const formData = new FormData(e.target as HTMLFormElement);
+                    const name = formData.get('name') as string;
+                    const type = formData.get('type') as 'personal' | 'shared';
+                    
+                    try {
+                      const workspace = await createWorkspace({
+                        name,
+                        type,
+                      });
+                      setShowCreateDialog(false);
+                      navigate(`/workspace/${workspace.id}`);
+                    } catch (error) {
+                      addToast({
+                        type: 'error',
+                        message: 'Failed to create workspace',
+                      });
+                    }
+                  }}
                 >
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">{workspace.name}</h3>
-                  <p className="text-sm text-gray-500">
-                    {workspace.type === 'personal' ? 'Personal' : 'Shared'}
-                  </p>
-                </div>
-              ))}
+                  <div className="mb-4">
+                    <label htmlFor="workspace-name" className="block text-sm font-medium text-gray-700 mb-2">
+                      Workspace Name
+                    </label>
+                    <input
+                      id="workspace-name"
+                      name="name"
+                      type="text"
+                      required
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div className="mb-4">
+                    <label htmlFor="workspace-type" className="block text-sm font-medium text-gray-700 mb-2">
+                      Workspace Type
+                    </label>
+                    <select
+                      id="workspace-type"
+                      name="type"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="personal">Personal</option>
+                      <option value="shared">Shared</option>
+                    </select>
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowCreateDialog(false)}
+                      className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                    >
+                      Create
+                    </button>
+                  </div>
+                </form>
+              </div>
             </div>
           )}
         </div>

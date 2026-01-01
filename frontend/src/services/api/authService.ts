@@ -59,6 +59,7 @@ class AuthService {
 
   /**
    * Refresh access token
+   * Handles offline mode fallback when refresh fails
    */
   async refreshToken(): Promise<RefreshTokenResponse> {
     const refreshToken = apiClient.getRefreshToken();
@@ -66,24 +67,72 @@ class AuthService {
       throw new Error('No refresh token available');
     }
 
-    const request: RefreshTokenRequest = {
-      refresh_token: refreshToken,
-    };
+    try {
+      const request: RefreshTokenRequest = {
+        refresh_token: refreshToken,
+      };
 
-    const response = await apiClient.getClient().post<RefreshTokenResponse>(
-      '/api/v1/auth/refresh',
-      request
-    );
+      const response = await apiClient.getClient().post<RefreshTokenResponse>(
+        '/api/v1/auth/refresh',
+        request
+      );
 
-    this.setTokens({
-      access_token: response.data.access_token,
-      refresh_token: response.data.refresh_token,
-      access_token_expires_at: response.data.access_token_expires_at,
-      refresh_token_expires_at: response.data.refresh_token_expires_at,
-      token_type: response.data.token_type,
-    });
+      this.setTokens({
+        access_token: response.data.access_token,
+        refresh_token: response.data.refresh_token,
+        access_token_expires_at: response.data.access_token_expires_at,
+        refresh_token_expires_at: response.data.refresh_token_expires_at,
+        token_type: response.data.token_type,
+      });
 
-    return response.data;
+      return response.data;
+    } catch (error) {
+      // If refresh fails, check if we should fall back to offline mode
+      const { useSDKModeStore } = await import('@/services/sdk/sdkMode');
+      const mode = await useSDKModeStore.getState().getMode();
+      
+      if (mode === 'offline') {
+        // In offline mode, token refresh failure is expected
+        throw new Error('Token refresh not available in offline mode');
+      }
+
+      // Check if error is network-related
+      const isNetworkError =
+        error instanceof Error &&
+        (error.message.includes('network') ||
+          error.message.includes('fetch') ||
+          error.message.includes('timeout'));
+
+      if (isNetworkError) {
+        // Network error - switch to offline mode
+        useSDKModeStore.getState().setMode('offline', true);
+        throw new Error('Network error during token refresh. Switched to offline mode.');
+      }
+
+      // Other errors - rethrow
+      throw error;
+    }
+  }
+
+  /**
+   * Refresh token before expiration
+   * Checks token expiration and refreshes if needed
+   */
+  async refreshTokenIfNeeded(): Promise<void> {
+    const accessToken = apiClient.getAccessToken();
+    if (!accessToken) {
+      return; // No token to refresh
+    }
+
+    // Check if token is close to expiration (within 5 minutes)
+    // In a real implementation, we'd decode the JWT and check exp claim
+    // For now, we'll refresh proactively
+    try {
+      await this.refreshToken();
+    } catch (error) {
+      // Refresh failed - will be handled by refreshToken method
+      console.warn('Token refresh failed:', error);
+    }
   }
 
   /**

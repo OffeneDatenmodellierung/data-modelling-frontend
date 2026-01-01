@@ -7,6 +7,92 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2025-01-XX
+
+### Added - Phase 7: Personal and Shared Workspace Management
+- **Workspace Management**: Complete workspace CRUD operations
+  - Workspace creation (personal and shared types)
+  - Workspace renaming and deletion
+  - Workspace type conversion (personal to shared)
+  - Workspace switching with state save/load
+- **Workspace UI Components**: User interface for workspace management
+  - WorkspaceList: Displays all available workspaces (personal and shared)
+  - WorkspaceSelector: Dropdown selector for current workspace
+  - WorkspaceSettings: Dialog for managing workspace settings, collaborators, and permissions
+  - VersionHistory: Dialog for viewing PostgreSQL-based version history (online mode)
+- **Workspace Service**: API integration for workspace operations
+  - Create, rename, delete workspaces
+  - Add/remove collaborators
+  - Update collaborator access levels (read/edit)
+  - Convert workspace type (personal to shared)
+- **Versioning Service**: PostgreSQL-based version history
+  - Get workspace version history
+  - View specific version details
+  - Restore workspace to previous version
+- **Home Page Integration**: Enhanced home page with workspace management
+  - Workspace list display with personal/shared indicators
+  - Workspace creation dialog (online and offline modes)
+  - Workspace selection and navigation
+- **ModelEditor Integration**: Workspace management in editor
+  - Workspace settings button in header
+  - Version history button (online mode only)
+  - Workspace settings and version history dialogs
+- **Tests**: Comprehensive test coverage
+  - Unit tests for workspace service and versioning service
+  - Unit tests for workspace store
+  - Component tests for all workspace UI components
+  - Integration tests for workspace management workflow
+  - E2E tests for complete user story 5 workflow
+
+### Added - Phase 6: Offline Mode with Local File Storage
+- **Offline Synchronization**: Online/offline sync service
+  - Sync workspace state between local and remote
+  - Auto-merge on connection restoration
+  - Conflict detection and resolution (remote wins strategy)
+  - Manual conflict resolution support
+- **Conflict Resolution**: Conflict handling system
+  - Conflict detection during sync
+  - Remote wins strategy (configurable)
+  - Export conflicts for manual resolution
+  - Apply local or remote version manually
+- **Auto-Save**: Configurable auto-save functionality
+  - WebSocket real-time save for online mode
+  - Configurable interval auto-save for offline mode (default: 5 minutes)
+  - User-configurable auto-save interval
+  - Auto-save enable/disable toggle
+- **Browser Refresh Handling**: State preservation on refresh
+  - Detect local and remote changes
+  - User choice for handling conflicts on refresh
+  - State persistence across browser sessions
+- **Git Versioning**: Offline version control
+  - Initialize Git repository for workspace
+  - Commit changes with messages
+  - View version history
+  - Checkout specific versions
+  - Export version snapshots
+- **Retry Logic**: Enhanced error handling
+  - Retry failed save operations (5 attempts)
+  - Jitter-based exponential backoff
+  - User manual retry option after max attempts
+  - Data held in memory during retry failures
+- **Offline File Operations**: Enhanced local file handling
+  - Open workspace folder (containing domain subfolders)
+  - Support for workspace folder structure: workspace-folder/domain-folder/tables.yaml and relationships.yaml
+  - Electron file system integration
+  - Browser file picker integration
+- **Tests**: Comprehensive test coverage
+  - Unit tests for sync service and conflict resolver
+  - Unit tests for auto-save functionality
+  - Unit tests for Git versioning service
+  - Integration tests for offline sync workflow
+  - E2E tests for complete user story 4 workflow
+
+### Changed
+- Home page now supports workspace creation and selection
+- ModelEditor includes workspace settings and version history dialogs
+- Workspace store enhanced with auto-save and browser refresh handling
+- Offline mode now supports opening workspace folders (not just single files)
+
 ## [0.3.0] - 2025-01-XX
 
 ### Added - Phase 5: Multi-User Collaboration with Real-Time Updates

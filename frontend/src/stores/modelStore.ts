@@ -7,6 +7,7 @@ import { create } from 'zustand';
 import { tableService } from '@/services/api/tableService';
 import { relationshipService } from '@/services/api/relationshipService';
 import { dataFlowService } from '@/services/api/dataFlowService';
+import { useWorkspaceStore } from '@/stores/workspaceStore';
 import type { Table } from '@/types/table';
 import type { Relationship } from '@/types/relationship';
 import type { Domain, DataFlowDiagram, DataFlowNode, DataFlowConnection } from '@/types/workspace';
@@ -88,35 +89,50 @@ export const useModelStore = create<ModelState>((set) => ({
   setRelationships: (relationships) => set({ relationships }),
   setDomains: (domains) => set({ domains }),
   setDataFlowDiagrams: (diagrams) => set({ dataFlowDiagrams: diagrams }),
-  addTable: (table) =>
-    set((state) => ({
-      tables: [...state.tables, table],
-    })),
+          addTable: (table) => {
+            set((state) => ({
+              tables: [...state.tables, table],
+            }));
+            // Mark workspace as having pending changes
+            useWorkspaceStore.getState().setPendingChanges(true);
+          },
   updateTable: (tableId, updates) =>
     set((state) => ({
       tables: state.tables.map((t) => (t.id === tableId ? { ...t, ...updates } : t)),
     })),
-  removeTable: (tableId) =>
-    set((state) => ({
-      tables: state.tables.filter((t) => t.id !== tableId),
-      selectedTableId: state.selectedTableId === tableId ? null : state.selectedTableId,
-    })),
-  addRelationship: (relationship) =>
-    set((state) => ({
-      relationships: [...state.relationships, relationship],
-    })),
-  updateRelationship: (relationshipId, updates) =>
-    set((state) => ({
-      relationships: state.relationships.map((r) =>
-        r.id === relationshipId ? { ...r, ...updates } : r
-      ),
-    })),
-  removeRelationship: (relationshipId) =>
-    set((state) => ({
-      relationships: state.relationships.filter((r) => r.id !== relationshipId),
-      selectedRelationshipId:
-        state.selectedRelationshipId === relationshipId ? null : state.selectedRelationshipId,
-    })),
+          removeTable: (tableId) => {
+            set((state) => ({
+              tables: state.tables.filter((t) => t.id !== tableId),
+              selectedTableId: state.selectedTableId === tableId ? null : state.selectedTableId,
+            }));
+            // Mark workspace as having pending changes
+            useWorkspaceStore.getState().setPendingChanges(true);
+          },
+          addRelationship: (relationship) => {
+            set((state) => ({
+              relationships: [...state.relationships, relationship],
+            }));
+            // Mark workspace as having pending changes
+            useWorkspaceStore.getState().setPendingChanges(true);
+          },
+          updateRelationship: (relationshipId, updates) => {
+            set((state) => ({
+              relationships: state.relationships.map((r) =>
+                r.id === relationshipId ? { ...r, ...updates } : r
+              ),
+            }));
+            // Mark workspace as having pending changes
+            useWorkspaceStore.getState().setPendingChanges(true);
+          },
+          removeRelationship: (relationshipId) => {
+            set((state) => ({
+              relationships: state.relationships.filter((r) => r.id !== relationshipId),
+              selectedRelationshipId:
+                state.selectedRelationshipId === relationshipId ? null : state.selectedRelationshipId,
+            }));
+            // Mark workspace as having pending changes
+            useWorkspaceStore.getState().setPendingChanges(true);
+          },
   addDataFlowDiagram: (diagram) =>
     set((state) => ({
       dataFlowDiagrams: [...state.dataFlowDiagrams, diagram],

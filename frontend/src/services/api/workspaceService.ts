@@ -29,12 +29,101 @@ class WorkspaceService {
   /**
    * Create a new workspace (email-based)
    */
-  async createWorkspace(email: string, domain: string): Promise<{ workspace_path: string; message: string }> {
+  async createWorkspace(
+    email: string,
+    domain: string,
+    type: 'personal' | 'shared' = 'personal'
+  ): Promise<{ workspace_path: string; message: string }> {
     const response = await apiClient.getClient().post<{ workspace_path: string; message: string }>(
       '/workspace/create',
-      { email, domain }
+      { email, domain, type }
     );
     return response.data;
+  }
+
+  /**
+   * Update workspace (rename)
+   */
+  async updateWorkspace(
+    workspaceId: string,
+    updates: { name?: string }
+  ): Promise<{ workspace_path: string; email: string }> {
+    const response = await apiClient.getClient().put<{ workspace_path: string; email: string }>(
+      `/api/v1/workspaces/${workspaceId}`,
+      updates
+    );
+    return response.data;
+  }
+
+  /**
+   * Delete workspace
+   */
+  async deleteWorkspace(workspaceId: string): Promise<void> {
+    await apiClient.getClient().delete(`/api/v1/workspaces/${workspaceId}`);
+  }
+
+  /**
+   * Convert personal workspace to shared
+   */
+  async convertToShared(workspaceId: string): Promise<{ workspace_path: string; email: string; type: string }> {
+    const response = await apiClient.getClient().post<{ workspace_path: string; email: string; type: string }>(
+      `/api/v1/workspaces/${workspaceId}/convert-to-shared`
+    );
+    return response.data;
+  }
+
+  /**
+   * Convert shared workspace to personal
+   */
+  async convertToPersonal(workspaceId: string): Promise<{ workspace_path: string; email: string; type: string }> {
+    const response = await apiClient.getClient().post<{ workspace_path: string; email: string; type: string }>(
+      `/api/v1/workspaces/${workspaceId}/convert-to-personal`
+    );
+    return response.data;
+  }
+
+  /**
+   * Add collaborator to shared workspace
+   */
+  async addCollaborator(
+    workspaceId: string,
+    email: string,
+    accessLevel: 'read' | 'edit'
+  ): Promise<void> {
+    await apiClient.getClient().post(`/api/v1/workspaces/${workspaceId}/collaborators`, {
+      email,
+      access_level: accessLevel,
+    });
+  }
+
+  /**
+   * Remove collaborator from shared workspace
+   */
+  async removeCollaborator(workspaceId: string, email: string): Promise<void> {
+    await apiClient.getClient().delete(`/api/v1/workspaces/${workspaceId}/collaborators/${email}`);
+  }
+
+  /**
+   * Update collaborator access level
+   */
+  async updateCollaboratorAccess(
+    workspaceId: string,
+    email: string,
+    accessLevel: 'read' | 'edit'
+  ): Promise<void> {
+    await apiClient.getClient().put(`/api/v1/workspaces/${workspaceId}/collaborators/${email}`, {
+      access_level: accessLevel,
+    });
+  }
+
+  /**
+   * Get workspace collaborators
+   */
+  async getCollaborators(workspaceId: string): Promise<Array<{ email: string; access_level: 'read' | 'edit' }>> {
+    const response = await apiClient.getClient().get<{
+      collaborators: Array<{ email: string; access_level: 'read' | 'edit' }>;
+    }>(`/api/v1/workspaces/${workspaceId}/collaborators`);
+    return response.data.collaborators;
   }
 
   /**

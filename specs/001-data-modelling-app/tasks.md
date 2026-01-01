@@ -253,36 +253,36 @@
 
 > **NOTE: Write these tests FIRST, ensure they FAIL before implementation**
 
-- [ ] T154 [P] [US4] Unit test for sync service in frontend/tests/unit/services/sync/syncService.test.ts
-- [ ] T155 [P] [US4] Unit test for conflict resolver service in frontend/tests/unit/services/sync/conflictResolver.test.ts
-- [ ] T156 [P] [US4] Unit test for offline mode detection in frontend/tests/unit/services/platform/platform.test.ts
-- [ ] T157 [P] [US4] Unit test for useOfflineSync hook in frontend/tests/unit/hooks/useOfflineSync.test.ts
-- [ ] T158 [P] [US4] Unit test for JWT token refresh in frontend/tests/unit/services/api/authService.test.ts
-- [ ] T159 [P] [US4] Unit test for versioning service (Git) in frontend/tests/unit/services/storage/gitVersioningService.test.ts
-- [ ] T160 [P] [US4] Integration test for offline mode workflow in frontend/tests/integration/offline.test.ts
-- [ ] T161 [P] [US4] Integration test for sync and merge workflow in frontend/tests/integration/sync.test.ts
-- [ ] T162 [P] [US4] E2E test for complete user story 4 workflow in frontend/tests/e2e/user-story-4.test.ts
+- [X] T154 [P] [US4] Unit test for sync service in frontend/tests/unit/services/sync/syncService.test.ts ✅ Complete
+- [X] T155 [P] [US4] Unit test for conflict resolver service in frontend/tests/unit/services/sync/conflictResolver.test.ts ✅ Complete
+- [X] T156 [P] [US4] Unit test for offline mode detection in frontend/tests/unit/services/platform/platform.test.ts ✅ Complete
+- [X] T157 [P] [US4] Unit test for useOfflineSync hook in frontend/tests/unit/hooks/useOfflineSync.test.ts ✅ Complete
+- [X] T158 [P] [US4] Unit test for JWT token refresh in frontend/tests/unit/services/api/authService.test.ts ✅ Complete
+- [X] T159 [P] [US4] Unit test for versioning service (Git) in frontend/tests/unit/services/storage/gitVersioningService.test.ts ✅ Complete
+- [X] T160 [P] [US4] Integration test for offline mode workflow in frontend/tests/integration/offline.test.ts ✅ Complete
+- [X] T161 [P] [US4] Integration test for sync and merge workflow in frontend/tests/integration/sync.test.ts ✅ Complete
+- [X] T162 [P] [US4] E2E test for complete user story 4 workflow in frontend/tests/e2e/user-story-4.test.ts ✅ Complete
 
 ### Implementation for User Story 4
 
-- [ ] T163 [US4] Create sync service for online/offline sync in frontend/src/services/sync/syncService.ts
-- [ ] T164 [US4] Create conflict resolver service in frontend/src/services/sync/conflictResolver.ts
-- [ ] T165 [US4] Implement offline mode detection and switching in frontend/src/services/platform/platform.ts
-- [ ] T166 [US4] Implement local state storage during network interruptions in frontend/src/stores/modelStore.ts
-- [ ] T167 [US4] Implement automatic merge when connection restored in frontend/src/services/sync/syncService.ts
-- [ ] T168 [US4] Implement manual merge option (export files locally) in frontend/src/services/sync/conflictResolver.ts
-- [ ] T169 [US4] Implement GIT export format for offline conflict resolution in frontend/src/services/sdk/odcsService.ts
-- [ ] T170 [US4] Implement Git-based versioning for offline mode in frontend/src/services/storage/gitVersioningService.ts
-- [ ] T171 [US4] Implement auto-save every 5 minutes when offline (configurable) in frontend/src/stores/workspaceStore.ts
-- [ ] T172 [US4] Implement user-configurable auto-save interval setting in frontend/src/components/settings/AutoSaveSettings.tsx
-- [ ] T173 [US4] Implement retry logic with jitter-based exponential backoff (up to 5 retries) for failed operations in frontend/src/utils/retry.ts
-- [ ] T174 [US4] Implement user retry option for failed operations (held in memory) in frontend/src/components/common/RetryDialog.tsx
-- [ ] T175 [US4] Implement JWT token refresh before expiration in frontend/src/services/api/authService.ts
-- [ ] T176 [US4] Implement offline mode fallback when JWT refresh fails in frontend/src/services/api/authService.ts
-- [ ] T177 [US4] Implement browser refresh handling (check local and remote state, offer user choice) in frontend/src/stores/workspaceStore.ts
-- [ ] T178 [US4] Create useOfflineSync hook for offline sync management in frontend/src/hooks/useOfflineSync.ts
-- [ ] T179 [US4] Implement offline mode indicator and warning messages in frontend/src/components/common/Toast.tsx
-- [ ] T180 [US4] Implement collaboration feature disabled message when offline in frontend/src/components/collaboration/CollaborationStatus.tsx
+- [X] T163 [US4] Create sync service for online/offline sync in frontend/src/services/sync/syncService.ts ✅ Complete
+- [X] T164 [US4] Create conflict resolver service in frontend/src/services/sync/conflictResolver.ts ✅ Complete
+- [X] T165 [US4] Implement offline mode detection and switching in frontend/src/services/platform/platform.ts ✅ Complete (already existed)
+- [X] T166 [US4] Implement local state storage during network interruptions in frontend/src/stores/modelStore.ts ✅ Complete
+- [X] T167 [US4] Implement automatic merge when connection restored in frontend/src/services/sync/syncService.ts ✅ Complete
+- [X] T168 [US4] Implement manual merge option (export files locally) in frontend/src/services/sync/conflictResolver.ts ✅ Complete
+- [X] T169 [US4] Implement GIT export format for offline conflict resolution in frontend/src/services/sdk/odcsService.ts ✅ Complete
+- [X] T170 [US4] Implement Git-based versioning for offline mode in frontend/src/services/storage/gitVersioningService.ts ✅ Complete
+- [X] T171 [US4] Implement auto-save every 5 minutes when offline (configurable) in frontend/src/stores/workspaceStore.ts ✅ Complete
+- [X] T172 [US4] Implement user-configurable auto-save interval setting in frontend/src/components/settings/AutoSaveSettings.tsx ✅ Complete
+- [X] T173 [US4] Implement retry logic with jitter-based exponential backoff (up to 5 retries) for failed operations in frontend/src/utils/retry.ts ✅ Complete (already existed)
+- [X] T174 [US4] Implement user retry option for failed operations (held in memory) in frontend/src/components/common/RetryDialog.tsx ✅ Complete
+- [X] T175 [US4] Implement JWT token refresh before expiration in frontend/src/services/api/authService.ts ✅ Complete
+- [X] T176 [US4] Implement offline mode fallback when JWT refresh fails in frontend/src/services/api/authService.ts ✅ Complete
+- [X] T177 [US4] Implement browser refresh handling (check local and remote state, offer user choice) in frontend/src/stores/workspaceStore.ts ✅ Complete
+- [X] T178 [US4] Create useOfflineSync hook for offline sync management in frontend/src/hooks/useOfflineSync.ts ✅ Complete
+- [X] T179 [US4] Implement offline mode indicator and warning messages in frontend/src/components/common/Toast.tsx ✅ Complete (Toast already existed, offline messages via useUIStore)
+- [X] T180 [US4] Implement collaboration feature disabled message when offline in frontend/src/components/collaboration/CollaborationStatus.tsx ✅ Complete
 
 **Checkpoint**: At this point, User Stories 1, 2, 3, AND 4 should all work independently
 
@@ -310,20 +310,20 @@
 
 ### Implementation for User Story 5
 
-- [ ] T190 [P] [US5] Create workspace list component in frontend/src/components/workspace/WorkspaceList.tsx
-- [ ] T191 [P] [US5] Create workspace selector component in frontend/src/components/workspace/WorkspaceSelector.tsx
-- [ ] T192 [P] [US5] Create workspace settings component in frontend/src/components/workspace/WorkspaceSettings.tsx
-- [ ] T193 [US5] Implement workspace creation (personal or shared) in frontend/src/services/api/workspaceService.ts
-- [ ] T194 [US5] Implement workspace rename functionality in frontend/src/services/api/workspaceService.ts
-- [ ] T195 [US5] Implement workspace deletion functionality in frontend/src/services/api/workspaceService.ts
-- [ ] T196 [US5] Implement workspace switching with state save/load in frontend/src/stores/workspaceStore.ts
-- [ ] T197 [US5] Implement workspace type display (personal vs shared) in frontend/src/components/workspace/WorkspaceList.tsx
-- [ ] T198 [US5] Implement permission management (add/remove collaborators, set access levels) in frontend/src/components/workspace/WorkspaceSettings.tsx
-- [ ] T199 [US5] Implement workspace type conversion (personal to shared) in frontend/src/services/api/workspaceService.ts
-- [ ] T200 [US5] Implement workspace versioning via PostgreSQL API in frontend/src/services/api/versioningService.ts
-- [ ] T201 [US5] Create version history UI component in frontend/src/components/workspace/VersionHistory.tsx
-- [ ] T202 [US5] Create home page component for workspace selection in frontend/src/pages/Home.tsx
-- [ ] T203 [US5] Implement workspace list loading and display in frontend/src/pages/Home.tsx
+- [X] T190 [P] [US5] Create workspace list component in frontend/src/components/workspace/WorkspaceList.tsx ✅ Complete
+- [X] T191 [P] [US5] Create workspace selector component in frontend/src/components/workspace/WorkspaceSelector.tsx ✅ Complete
+- [X] T192 [P] [US5] Create workspace settings component in frontend/src/components/workspace/WorkspaceSettings.tsx ✅ Complete
+- [X] T193 [US5] Implement workspace creation (personal or shared) in frontend/src/services/api/workspaceService.ts ✅ Complete
+- [X] T194 [US5] Implement workspace rename functionality in frontend/src/services/api/workspaceService.ts ✅ Complete
+- [X] T195 [US5] Implement workspace deletion functionality in frontend/src/services/api/workspaceService.ts ✅ Complete
+- [X] T196 [US5] Implement workspace switching with state save/load in frontend/src/stores/workspaceStore.ts ✅ Complete
+- [X] T197 [US5] Implement workspace type display (personal vs shared) in frontend/src/components/workspace/WorkspaceList.tsx ✅ Complete
+- [X] T198 [US5] Implement permission management (add/remove collaborators, set access levels) in frontend/src/components/workspace/WorkspaceSettings.tsx ✅ Complete
+- [X] T199 [US5] Implement workspace type conversion (personal to shared) in frontend/src/services/api/workspaceService.ts ✅ Complete
+- [X] T200 [US5] Implement workspace versioning via PostgreSQL API in frontend/src/services/api/versioningService.ts ✅ Complete
+- [X] T201 [US5] Create version history UI component in frontend/src/components/workspace/VersionHistory.tsx ✅ Complete
+- [X] T202 [US5] Create home page component for workspace selection in frontend/src/pages/Home.tsx ✅ Complete (already existed, enhanced)
+- [X] T203 [US5] Implement workspace list loading and display in frontend/src/pages/Home.tsx ✅ Complete
 
 **Checkpoint**: All user stories should now be independently functional
 

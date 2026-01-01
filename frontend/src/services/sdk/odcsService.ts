@@ -346,6 +346,42 @@ class ODCSService {
       };
     }
   }
+
+  /**
+   * Export workspace as Git diff format for conflict resolution
+   * Creates a diff-friendly format that can be used with Git merge tools
+   */
+  async exportAsGitDiff(workspace: ODCSWorkspace, baseWorkspace?: ODCSWorkspace): Promise<string> {
+    const currentYAML = await this.toYAML(workspace);
+    
+    if (!baseWorkspace) {
+      // No base workspace - return current as diff
+      return `--- /dev/null\n+++ workspace.yaml\n@@ -0,0 +1,${currentYAML.split('\n').length} @@\n${currentYAML}`;
+    }
+
+    const baseYAML = await this.toYAML(baseWorkspace);
+    const currentLines = currentYAML.split('\n');
+    const baseLines = baseYAML.split('\n');
+
+    // Simple diff format (in a real implementation, use a proper diff library)
+    let diff = '--- base/workspace.yaml\n+++ current/workspace.yaml\n';
+    
+    // Add context lines and changes
+    const maxLines = Math.max(currentLines.length, baseLines.length);
+    for (let i = 0; i < maxLines; i++) {
+      const currentLine = currentLines[i] || '';
+      const baseLine = baseLines[i] || '';
+      
+      if (currentLine !== baseLine) {
+        if (baseLine) diff += `-${baseLine}\n`;
+        if (currentLine) diff += `+${currentLine}\n`;
+      } else {
+        diff += ` ${currentLine}\n`;
+      }
+    }
+
+    return diff;
+  }
 }
 
 // Export singleton instance

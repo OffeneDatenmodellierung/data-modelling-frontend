@@ -25,6 +25,8 @@ import { PresenceIndicator } from '@/components/collaboration/PresenceIndicator'
 import { CollaborationStatus } from '@/components/collaboration/CollaborationStatus';
 import { ConflictResolver } from '@/components/collaboration/ConflictResolver';
 import { useCollaborationStore } from '@/stores/collaborationStore';
+import { WorkspaceSettings } from '@/components/workspace/WorkspaceSettings';
+import { VersionHistory } from '@/components/workspace/VersionHistory';
 
 const ModelEditor: React.FC = () => {
   const { workspaceId, domainId } = useParams<{ workspaceId: string; domainId?: string }>();
@@ -53,6 +55,8 @@ const ModelEditor: React.FC = () => {
   const [viewMode, setViewMode] = useState<'model' | 'dataflow'>('model');
   const [showCreateDiagramDialog, setShowCreateDiagramDialog] = useState(false);
   const [showConflictResolver, setShowConflictResolver] = useState(false);
+  const [showWorkspaceSettings, setShowWorkspaceSettings] = useState(false);
+  const [showVersionHistory, setShowVersionHistory] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
   // Initialize collaboration
@@ -67,6 +71,43 @@ const ModelEditor: React.FC = () => {
       setShowConflictResolver(true);
     }
   }, [conflicts.length]);
+
+  // Initialize auto-save when workspace is loaded
+  useEffect(() => {
+    if (!workspaceId) {
+      return;
+    }
+
+    const workspaceStore = useWorkspaceStore.getState();
+    workspaceStore.startAutoSave();
+
+    return () => {
+      workspaceStore.stopAutoSave();
+    };
+  }, [workspaceId]);
+
+  // Handle browser refresh
+  useEffect(() => {
+    const handleBeforeUnload = async (e: BeforeUnloadEvent) => {
+      const { handleBrowserRefresh } = useWorkspaceStore.getState();
+      const { pendingChanges } = useWorkspaceStore.getState();
+      
+      if (pendingChanges) {
+        const result = await handleBrowserRefresh();
+        if (result.hasLocalChanges || result.hasRemoteChanges) {
+          e.preventDefault();
+          e.returnValue = 'You have unsaved changes. Are you sure you want to leave?';
+          return e.returnValue;
+        }
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [workspaceId]);
 
   // Load workspace and domain on mount
   useEffect(() => {
@@ -235,6 +276,25 @@ const ModelEditor: React.FC = () => {
                     <PresenceIndicator workspaceId={workspaceId} />
                   </>
                 )}
+                {/* Workspace Actions */}
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setShowWorkspaceSettings(!showWorkspaceSettings)}
+                    className="px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
+                    aria-label="Workspace Settings"
+                  >
+                    Settings
+                  </button>
+                  {mode === 'online' && workspaceId && (
+                    <button
+                      onClick={() => setShowVersionHistory(!showVersionHistory)}
+                      className="px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
+                      aria-label="Version History"
+                    >
+                      History
+                    </button>
+                  )}
+                </div>
                 {/* View Mode Toggle */}
             <div className="flex items-center gap-2 border rounded-lg p-1">
               <button
@@ -381,6 +441,48 @@ const ModelEditor: React.FC = () => {
         isOpen={showConflictResolver}
         onClose={() => setShowConflictResolver(false)}
       />
+
+      {/* Workspace Settings Dialog */}
+      {showWorkspaceSettings && workspaceId && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold">Workspace Settings</h2>
+              <button
+                onClick={() => setShowWorkspaceSettings(false)}
+                className="text-gray-400 hover:text-gray-600"
+                aria-label="Close"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <WorkspaceSettings workspaceId={workspaceId} />
+          </div>
+        </div>
+      )}
+
+      {/* Version History Dialog */}
+      {showVersionHistory && workspaceId && mode === 'online' && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold">Version History</h2>
+              <button
+                onClick={() => setShowVersionHistory(false)}
+                className="text-gray-400 hover:text-gray-600"
+                aria-label="Close"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <VersionHistory workspaceId={workspaceId} />
+          </div>
+        </div>
+      )}
     </div>
   );
 };
