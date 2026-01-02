@@ -271,12 +271,12 @@ const Home: React.FC = () => {
                 } else {
                   // Browser: Use web OAuth flow
                   try {
-                    // Dynamically determine the frontend URL (origin + callback path)
+                    // Dynamically determine the frontend URL (origin only - API will append /auth/complete)
                     const frontendOrigin = window.location.origin;
-                    const callbackUrl = `${frontendOrigin}/auth/complete`;
                     
                     // Use relative URL which will be proxied by Nginx
-                    const authEndpoint = `/api/v1/auth/github/login?redirect_uri=${encodeURIComponent(callbackUrl)}`;
+                    // Pass only the origin - API will append /auth/complete to it
+                    const authEndpoint = `/api/v1/auth/github/login?redirect_uri=${encodeURIComponent(frontendOrigin)}`;
                     
                     const response = await fetch(authEndpoint, {
                       method: 'HEAD',

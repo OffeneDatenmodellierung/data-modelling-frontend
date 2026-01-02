@@ -90,13 +90,12 @@ export const OnlineOfflineToggle: React.FC = () => {
                     }
                   } else {
                     // Browser: Use web OAuth flow
-                    // Dynamically determine the frontend URL (origin + callback path)
+                    // Dynamically determine the frontend URL (origin only - API will append /auth/complete)
                     const frontendOrigin = window.location.origin;
-                    const callbackUrl = `${frontendOrigin}/auth/complete`;
                     
                     // Use relative URL which will be proxied by Nginx in Docker
-                    // Pass redirect_uri as query parameter so API knows where to redirect back
-                    window.location.href = `/api/v1/auth/github/login?redirect_uri=${encodeURIComponent(callbackUrl)}`;
+                    // Pass only the origin - API will append /auth/complete to it
+                    window.location.href = `/api/v1/auth/github/login?redirect_uri=${encodeURIComponent(frontendOrigin)}`;
                   }
                   
                   setIsChecking(false);
