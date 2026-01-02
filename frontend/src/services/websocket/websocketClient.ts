@@ -40,11 +40,19 @@ class WebSocketClient {
       return; // Already connected
     }
 
-    // Use relative WebSocket URL if VITE_WS_BASE_URL is empty (Docker/proxied)
-    // Otherwise use the configured URL or default to localhost
-    const wsBaseUrl = import.meta.env.VITE_WS_BASE_URL || 
-      (typeof window !== 'undefined' && window.location.protocol === 'https:' ? 'wss://' : 'ws://') + 
-      (typeof window !== 'undefined' ? window.location.host : 'localhost:8081');
+    // Construct WebSocket URL:
+    // - If VITE_WS_BASE_URL is set, use it
+    // - Otherwise, use relative URL (ws:// or wss:// based on current protocol + host)
+    let wsBaseUrl: string;
+    if (import.meta.env.VITE_WS_BASE_URL) {
+      wsBaseUrl = import.meta.env.VITE_WS_BASE_URL;
+    } else if (typeof window !== 'undefined') {
+      // Use relative URL - will be proxied by Nginx in Docker
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      wsBaseUrl = `${protocol}//${window.location.host}`;
+    } else {
+      wsBaseUrl = 'ws://localhost:8081';
+    }
     const wsUrl = `${wsBaseUrl}/api/v1/ws/${this.workspaceId}?token=${encodeURIComponent(this.accessToken)}`;
 
     try {
