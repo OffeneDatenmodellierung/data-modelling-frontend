@@ -39,13 +39,15 @@ class SDKModeDetector {
         healthUrl = '/api/v1/health';
       }
       
-      console.log('[SDKMode] Checking API availability at:', healthUrl);
+      console.log('[SDKMode] Checking API availability at:', healthUrl, 'env VITE_API_BASE_URL:', import.meta.env.VITE_API_BASE_URL);
       const response = await fetch(healthUrl, {
         method: 'GET',
-        signal: AbortSignal.timeout(2000), // 2 second timeout
+        mode: 'cors', // Explicitly allow CORS
+        credentials: 'omit', // Don't send cookies
+        signal: AbortSignal.timeout(5000), // 5 second timeout (increased from 2s)
       });
       const isOk = response.ok;
-      console.log('[SDKMode] API health check result:', isOk, 'status:', response.status);
+      console.log('[SDKMode] API health check result:', isOk, 'status:', response.status, 'statusText:', response.statusText);
       return isOk;
     } catch (error) {
       console.error('[SDKMode] API health check failed:', error);

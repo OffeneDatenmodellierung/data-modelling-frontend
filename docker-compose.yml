@@ -57,8 +57,9 @@ services:
       args:
         # Build-time variables (embedded in the app)
         # Use empty string to force relative URLs (proxied by Nginx)
-        VITE_API_BASE_URL: 
-        VITE_WS_BASE_URL: 
+        # Note: Empty values in docker-compose need to be quoted or omitted
+        VITE_API_BASE_URL: ""
+        VITE_WS_BASE_URL: "" 
     container_name: data-modelling-frontend
     ports:
       - "5173:80"
