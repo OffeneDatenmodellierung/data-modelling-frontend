@@ -227,7 +227,6 @@ const Home: React.FC = () => {
               if (isCheckingLogin) return; // Prevent multiple clicks
               
               setIsCheckingLogin(true);
-              const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8081';
               
               try {
                 // First check health endpoint
@@ -236,7 +235,7 @@ const Home: React.FC = () => {
                 if (!isOnline) {
                   addToast({
                     type: 'error',
-                    message: 'API server is not available. Please start the API server on ' + apiBaseUrl + ' or switch to offline mode.',
+                    message: 'API server is not available. Please switch to offline mode or ensure the API server is running.',
                   });
                   setIsCheckingLogin(false);
                   return;
@@ -276,8 +275,8 @@ const Home: React.FC = () => {
                     const frontendOrigin = window.location.origin;
                     const callbackUrl = `${frontendOrigin}/auth/complete`;
                     
-                    // Pass redirect_uri as query parameter so API knows where to redirect back
-                    const authEndpoint = `${apiBaseUrl}/api/v1/auth/github/login?redirect_uri=${encodeURIComponent(callbackUrl)}`;
+                    // Use relative URL which will be proxied by Nginx
+                    const authEndpoint = `/api/v1/auth/github/login?redirect_uri=${encodeURIComponent(callbackUrl)}`;
                     
                     const response = await fetch(authEndpoint, {
                       method: 'HEAD',
@@ -314,7 +313,7 @@ const Home: React.FC = () => {
                 // Network error or timeout - API is likely not available
                 addToast({
                   type: 'error',
-                  message: 'Cannot connect to API server. Please start the API server on ' + apiBaseUrl + ' or switch to offline mode.',
+                  message: 'Cannot connect to API server. Please switch to offline mode or ensure the API server is running.',
                 });
                 console.error('API check failed:', error);
                 setIsCheckingLogin(false);

@@ -52,9 +52,8 @@ const AuthCallback: React.FC = () => {
           return;
         }
 
-        // Exchange code for tokens
-        const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8081';
-        const response = await fetch(`${apiBaseUrl}/api/v1/auth/exchange`, {
+        // Exchange code for tokens (use relative URL, proxied by Nginx)
+        const response = await fetch('/api/v1/auth/exchange', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

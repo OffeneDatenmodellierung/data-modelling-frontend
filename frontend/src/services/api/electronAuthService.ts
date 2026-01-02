@@ -29,11 +29,8 @@ class ElectronAuthService {
 
     // For desktop, we still need a callback URL for the API to redirect to
     // Use a custom protocol or localhost - the API will handle this differently for desktop
-    const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8081';
-    
-    // For desktop OAuth, we can use a special redirect_uri or let the API handle it
-    // The desktop flow uses polling, so the redirect_uri is less critical
-    const response = await fetch(`${apiBaseUrl}/api/v1/auth/github/login/desktop`, {
+    // Use relative URL which will be proxied by Nginx in Docker
+    const response = await fetch('/api/v1/auth/github/login/desktop', {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -56,14 +53,14 @@ class ElectronAuthService {
    * Returns the auth code when completed
    */
   async pollAuthStatus(stateId: string, timeout: number = 300000): Promise<string> {
-    const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8081';
+    // Use relative URL which will be proxied by Nginx in Docker
     const startTime = Date.now();
     const pollInterval = 2000; // Poll every 2 seconds
 
     return new Promise((resolve, reject) => {
       const poll = async () => {
         try {
-          const response = await fetch(`${apiBaseUrl}/api/v1/auth/poll/${stateId}`, {
+          const response = await fetch(`/api/v1/auth/poll/${stateId}`, {
             method: 'GET',
             headers: {
               'Content-Type': 'application/json',
@@ -112,8 +109,8 @@ class ElectronAuthService {
    * Exchange auth code for tokens
    */
   async exchangeCodeForTokens(code: string): Promise<AuthTokens> {
-    const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8081';
-    const response = await fetch(`${apiBaseUrl}/api/v1/auth/exchange`, {
+    // Use relative URL which will be proxied by Nginx in Docker
+    const response = await fetch('/api/v1/auth/exchange', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

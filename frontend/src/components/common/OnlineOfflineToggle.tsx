@@ -93,10 +93,10 @@ export const OnlineOfflineToggle: React.FC = () => {
                     // Dynamically determine the frontend URL (origin + callback path)
                     const frontendOrigin = window.location.origin;
                     const callbackUrl = `${frontendOrigin}/auth/complete`;
-                    const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8081';
                     
+                    // Use relative URL which will be proxied by Nginx in Docker
                     // Pass redirect_uri as query parameter so API knows where to redirect back
-                    window.location.href = `${apiBaseUrl}/api/v1/auth/github/login?redirect_uri=${encodeURIComponent(callbackUrl)}`;
+                    window.location.href = `/api/v1/auth/github/login?redirect_uri=${encodeURIComponent(callbackUrl)}`;
                   }
                   
                   setIsChecking(false);
