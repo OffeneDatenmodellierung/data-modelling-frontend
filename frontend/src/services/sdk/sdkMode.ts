@@ -24,8 +24,21 @@ class SDKModeDetector {
    */
   async checkOnlineMode(): Promise<boolean> {
     try {
-      // Try to ping the API
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8081'}/api/v1/health`, {
+      // Determine API URL:
+      // - If VITE_API_BASE_URL is set and is a full URL, use it
+      // - Otherwise, use relative URL which will be proxied by Nginx (Docker) or direct (dev)
+      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL;
+      let healthUrl: string;
+      
+      if (apiBaseUrl && (apiBaseUrl.startsWith('http://') || apiBaseUrl.startsWith('https://'))) {
+        // Full URL provided (development mode or explicit config)
+        healthUrl = `${apiBaseUrl}/api/v1/health`;
+      } else {
+        // Relative URL - will be proxied by Nginx in Docker or hit directly in dev
+        healthUrl = '/api/v1/health';
+      }
+      
+      const response = await fetch(healthUrl, {
         method: 'GET',
         signal: AbortSignal.timeout(2000), // 2 second timeout
       });
