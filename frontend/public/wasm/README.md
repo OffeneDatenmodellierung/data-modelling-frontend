@@ -8,8 +8,44 @@ Copyright (c) 2025 Mark Olliver - Licensed under MIT
 
 - **Storage Backends**: File system, browser storage (IndexedDB/localStorage), and HTTP API
 - **Model Loading/Saving**: Load and save models from various storage backends
-- **Import/Export**: Import from SQL, ODCL, JSON Schema, AVRO, Protobuf; Export to various formats
+- **Import/Export**: Import from SQL (PostgreSQL, MySQL, SQLite, Generic, Databricks), ODCS, ODCL, JSON Schema, AVRO, Protobuf, CADS, ODPS, BPMN, DMN, OpenAPI; Export to various formats
+- **Business Domain Schema**: Organize systems, CADS nodes, and ODCS nodes within business domains
+- **Universal Converter**: Convert any format to ODCS v3.1.0 format
+- **OpenAPI to ODCS Converter**: Convert OpenAPI schema components to ODCS table definitions
 - **Validation**: Table and relationship validation (naming conflicts, circular dependencies)
+- **Schema Reference**: JSON Schema definitions for all supported formats in `schemas/` directory
+
+## File Structure
+
+The SDK organizes files using a domain-based directory structure:
+
+```
+base_directory/
+├── .git/                     # Git folder (if present)
+├── README.md                 # Repository files
+├── domain1/                  # Domain directory
+│   ├── domain.yaml          # Domain definition
+│   ├── table1.odcs.yaml      # ODCS table files
+│   ├── table2.odcs.yaml
+│   ├── product1.odps.yaml   # ODPS product files
+│   ├── model1.cads.yaml     # CADS asset files
+│   ├── api1.openapi.yaml    # OpenAPI specification files
+│   ├── process1.bpmn.xml    # BPMN process model files
+│   └── decision1.dmn.xml     # DMN decision model files
+├── domain2/                  # Another domain directory
+│   ├── domain.yaml
+│   └── ...
+└── tables/                    # Legacy: tables not in any domain (backward compatibility)
+```
+
+Each domain directory contains:
+- `domain.yaml`: The domain definition with systems, CADS nodes, ODCS nodes, and connections
+- `*.odcs.yaml`: ODCS table files referenced by ODCSNodes in the domain
+- `*.odps.yaml`: ODPS product files for data products in the domain
+- `*.cads.yaml`: CADS asset files referenced by CADSNodes in the domain
+- `*.openapi.yaml` / `*.openapi.json`: OpenAPI specification files (can be referenced by CADS assets)
+- `*.bpmn.xml`: BPMN 2.0 process model files (can be referenced by CADS assets)
+- `*.dmn.xml`: DMN 1.3 decision model files (can be referenced by CADS assets)
 
 ## Usage
 
@@ -46,6 +82,90 @@ let loader = ModelLoader::new(storage);
 let result = loader.load_model("workspace_path").await?;
 ```
 
+### WASM Bindings (Browser/Offline Mode)
+
+The SDK exposes WASM bindings for parsing and export operations, enabling offline functionality in web applications.
+
+**Build the WASM module**:
+```bash
+wasm-pack build --target web --out-dir pkg --features wasm
+```
+
+**Use in JavaScript/TypeScript**:
+```javascript
+import init, { parseOdcsYaml, exportToOdcsYaml } from './pkg/data_modelling_sdk.js';
+
+// Initialize the module
+await init();
+
+// Parse ODCS YAML
+const yaml = `apiVersion: v3.1.0
+kind: DataContract
+name: users
+schema:
+  fields:
+    - name: id
+      type: bigint`;
+
+const resultJson = parseOdcsYaml(yaml);
+const result = JSON.parse(resultJson);
+console.log('Parsed tables:', result.tables);
+
+// Export to ODCS YAML
+const workspace = {
+  tables: [{
+    id: "550e8400-e29b-41d4-a716-446655440000",
+    name: "users",
+    columns: [{ name: "id", data_type: "bigint", nullable: false, primary_key: true }]
+  }],
+  relationships: []
+};
+
+const exportedYaml = exportToOdcsYaml(JSON.stringify(workspace));
+console.log('Exported YAML:', exportedYaml);
+```
+
+**Available WASM Functions**:
+
+**Import/Export**:
+- `parseOdcsYaml(yamlContent: string): string` - Parse ODCS YAML to workspace structure
+- `exportToOdcsYaml(workspaceJson: string): string` - Export workspace to ODCS YAML
+- `importFromSql(sqlContent: string, dialect: string): string` - Import from SQL (supported dialects: "postgres"/"postgresql", "mysql", "sqlite", "generic", "databricks")
+- `importFromAvro(avroContent: string): string` - Import from AVRO schema
+- `importFromJsonSchema(jsonSchemaContent: string): string` - Import from JSON Schema
+- `importFromProtobuf(protobufContent: string): string` - Import from Protobuf
+- `importFromCads(yamlContent: string): string` - Import CADS (Compute Asset Description Specification) YAML
+- `importFromOdps(yamlContent: string): string` - Import ODPS (Open Data Product Standard) YAML
+- `importBpmnModel(domainId: string, xmlContent: string, modelName?: string): string` - Import BPMN 2.0 XML model
+- `importDmnModel(domainId: string, xmlContent: string, modelName?: string): string` - Import DMN 1.3 XML model
+- `importOpenapiSpec(domainId: string, content: string, apiName?: string): string` - Import OpenAPI 3.1.1 specification
+- `exportToSql(workspaceJson: string, dialect: string): string` - Export to SQL (supported dialects: "postgres"/"postgresql", "mysql", "sqlite", "generic", "databricks")
+- `exportToAvro(workspaceJson: string): string` - Export to AVRO schema
+- `exportToJsonSchema(workspaceJson: string): string` - Export to JSON Schema
+- `exportToProtobuf(workspaceJson: string): string` - Export to Protobuf
+- `exportToCads(workspaceJson: string): string` - Export to CADS YAML
+- `exportToOdps(workspaceJson: string): string` - Export to ODPS YAML
+- `exportBpmnModel(xmlContent: string): string` - Export BPMN model to XML
+- `exportDmnModel(xmlContent: string): string` - Export DMN model to XML
+- `exportOpenapiSpec(content: string, sourceFormat: string, targetFormat?: string): string` - Export OpenAPI spec with optional format conversion
+- `convertToOdcs(input: string, format?: string): string` - Universal converter: convert any format to ODCS v3.1.0
+- `convertOpenapiToOdcs(openapiContent: string, componentName: string, tableName?: string): string` - Convert OpenAPI schema component to ODCS table
+- `analyzeOpenapiConversion(openapiContent: string, componentName: string): string` - Analyze OpenAPI component conversion feasibility
+- `migrateDataflowToDomain(dataflowYaml: string, domainName?: string): string` - Migrate DataFlow YAML to Domain schema format
+
+**Domain Operations**:
+- `createDomain(name: string): string` - Create a new business domain
+- `addSystemToDomain(workspaceJson: string, domainId: string, systemJson: string): string` - Add a system to a domain
+- `addCadsNodeToDomain(workspaceJson: string, domainId: string, nodeJson: string): string` - Add a CADS node to a domain
+- `addOdcsNodeToDomain(workspaceJson: string, domainId: string, nodeJson: string): string` - Add an ODCS node to a domain
+
+**Filtering**:
+- `filterNodesByOwner(workspaceJson: string, owner: string): string` - Filter tables by owner
+- `filterRelationshipsByOwner(workspaceJson: string, owner: string): string` - Filter relationships by owner
+- `filterNodesByInfrastructureType(workspaceJson: string, infrastructureType: string): string` - Filter tables by infrastructure type
+- `filterRelationshipsByInfrastructureType(workspaceJson: string, infrastructureType: string): string` - Filter relationships by infrastructure type
+- `filterByTags(workspaceJson: string, tag: string): string` - Filter nodes and relationships by tag (supports Simple, Pair, and List tag formats)
+
 ## Development
 
 ### Pre-commit Hooks
@@ -78,12 +198,44 @@ GitHub Actions workflows automatically run on push and pull requests:
 - **Build**: Release build verification
 - **Publish**: Automatic publishing to crates.io on main branch (after all checks pass)
 
+## Documentation
+
+- **[Architecture Guide](docs/ARCHITECTURE.md)**: Comprehensive guide to project architecture, design decisions, and use cases
+- **[Schema Overview Guide](docs/SCHEMA_OVERVIEW.md)**: Detailed documentation of all supported schemas
+
+The SDK supports:
+- **ODCS v3.1.0**: Primary format for data contracts (tables)
+- **ODCL v1.2.1**: Legacy data contract format (backward compatibility)
+- **ODPS**: Data products linking to ODCS Tables
+- **CADS v1.0**: Compute assets (AI/ML models, applications, pipelines)
+- **BPMN 2.0**: Business Process Model and Notation (process models stored in native XML)
+- **DMN 1.3**: Decision Model and Notation (decision models stored in native XML)
+- **OpenAPI 3.1.1**: API specifications (stored in native YAML or JSON)
+- **Business Domain Schema**: Organize systems, CADS nodes, and ODCS nodes
+- **Universal Converter**: Convert any format to ODCS v3.1.0
+- **OpenAPI to ODCS Converter**: Convert OpenAPI schema components to ODCS table definitions
+
+### Schema Reference Directory
+
+The SDK maintains JSON Schema definitions for all supported formats in the `schemas/` directory:
+
+- **ODCS v3.1.0**: `schemas/odcs-json-schema-v3.1.0.json` - Primary format for data contracts
+- **ODCL v1.2.1**: `schemas/odcl-json-schema-1.2.1.json` - Legacy data contract format
+- **ODPS**: `schemas/odps-json-schema-latest.json` - Data products linking to ODCS tables
+- **CADS v1.0**: `schemas/cads.schema.json` - Compute assets (AI/ML models, applications, pipelines)
+
+These schemas serve as authoritative references for validation, documentation, and compliance. See [schemas/README.md](schemas/README.md) for detailed information about each schema.
+
 ## Status
 
-The SDK structure is in place. The actual implementation of import/export/validation logic is being migrated incrementally from the parent crate. Currently, the SDK provides:
+The SDK provides comprehensive support for multiple data modeling formats:
 
 - ✅ Storage backend abstraction and implementations
 - ✅ Model loader/saver structure
-- ✅ Import/export module structure
+- ✅ Full import/export implementation for all supported formats
 - ✅ Validation module structure
-- ⏳ Full implementation of parsers/exporters (in progress)
+- ✅ Business Domain schema support
+- ✅ Universal format converter
+- ✅ Enhanced tag support (Simple, Pair, List)
+- ✅ Full ODCS/ODCL field preservation
+- ✅ Schema reference directory (`schemas/`) with JSON Schema definitions for all supported formats

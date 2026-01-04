@@ -82,9 +82,16 @@ export const WorkspaceList: React.FC<WorkspaceListProps> = ({ className = '', on
                   {workspace.type === 'shared' ? 'Shared' : 'Personal'}
                 </span>
               </div>
-              <p className="text-sm text-gray-500 mt-1">
-                Last modified: {new Date(workspace.last_modified_at).toLocaleDateString()}
-              </p>
+              <div className="flex items-center gap-4 mt-1">
+                <p className="text-sm text-gray-500">
+                  Last modified: {new Date(workspace.last_modified_at).toLocaleDateString()}
+                </p>
+                {workspace.domains && workspace.domains.length > 0 && (
+                  <p className="text-sm text-gray-500">
+                    {workspace.domains.length} {workspace.domains.length === 1 ? 'domain' : 'domains'}
+                  </p>
+                )}
+              </div>
             </div>
             <button
               onClick={(e) => handleDelete(workspace.id, e)}

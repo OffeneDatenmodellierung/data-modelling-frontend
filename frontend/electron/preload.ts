@@ -10,6 +10,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   writeFile: async (path: string, data: string): Promise<void> => {
     return await ipcRenderer.invoke('write-file', path, data);
   },
+  ensureDirectory: async (path: string): Promise<boolean> => {
+    return await ipcRenderer.invoke('ensure-directory', path);
+  },
+  readDirectory: async (path: string): Promise<Array<{ name: string; path: string }>> => {
+    return await ipcRenderer.invoke('read-directory', path);
+  },
   showOpenDialog: async (options: {
     title?: string;
     defaultPath?: string;
@@ -28,6 +34,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Open external URL in system browser
   openExternal: async (url: string): Promise<void> => {
     shell.openExternal(url);
+  },
+  // Close the application
+  closeApp: async (): Promise<void> => {
+    return await ipcRenderer.invoke('close-app');
   },
 });
 

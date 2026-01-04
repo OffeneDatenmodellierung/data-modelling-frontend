@@ -5,6 +5,7 @@ import path from 'path';
 // https://vitejs.dev/config/
 // Use absolute paths for web/Docker, relative paths for Electron
 // VITE_BASE_PATH can be set to './' for Electron builds, '/' for web builds
+// Check if we're building for Electron by checking if VITE_ELECTRON_BUILD is set
 const basePath = process.env.VITE_BASE_PATH || (process.env.VITE_ELECTRON_BUILD === 'true' ? './' : '/');
 
 export default defineConfig({
@@ -15,8 +16,12 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  // Content Security Policy for bpmn-js/dmn-js inline styles
   server: {
     port: 5173,
+    headers: {
+      'Content-Security-Policy': "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:;",
+    },
     proxy: {
       '/api': {
         target: 'http://localhost:8081',
@@ -35,9 +40,11 @@ export default defineConfig({
     copyPublicDir: true,
     rollupOptions: {
       output: {
-        // Preserve WASM files in the build
+        // Preserve WASM files in the build at the root wasm/ directory
+        // This ensures they're accessible via ./wasm/ from dist/index.html
         assetFileNames: (assetInfo) => {
-          if (assetInfo.name && assetInfo.name.endsWith('.wasm')) {
+          // Keep WASM files and their JS loaders in wasm/ directory (no hash for easier path resolution)
+          if (assetInfo.name && (assetInfo.name.endsWith('.wasm') || assetInfo.name.includes('data_modelling_sdk'))) {
             return 'wasm/[name][extname]';
           }
           return 'assets/[name]-[hash][extname]';

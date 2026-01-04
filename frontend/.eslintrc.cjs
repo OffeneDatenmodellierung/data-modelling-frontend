@@ -5,6 +5,12 @@ module.exports = {
     es2020: true,
     node: true,
   },
+  globals: {
+    console: 'readonly',
+    crypto: 'readonly',
+    setInterval: 'readonly',
+    clearInterval: 'readonly',
+  },
   extends: [
     'eslint:recommended',
     'plugin:@typescript-eslint/recommended',
@@ -13,7 +19,7 @@ module.exports = {
     'plugin:jsx-a11y/recommended',
     'prettier',
   ],
-  ignorePatterns: ['dist', '.eslintrc.cjs', 'node_modules'],
+  ignorePatterns: ['dist', '.eslintrc.cjs', 'node_modules', '**/bpmn-js/**', '**/dmn-js/**'],
   parser: '@typescript-eslint/parser',
   plugins: ['react-refresh', '@typescript-eslint', 'react', 'react-hooks', 'jsx-a11y'],
   rules: {

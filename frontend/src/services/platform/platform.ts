@@ -46,3 +46,20 @@ export function isBrowser(): boolean {
   return detectPlatform() === 'browser';
 }
 
+/**
+ * Get the correct path for static assets (like logo.svg)
+ * In Electron (file:// protocol), use relative paths
+ * In browser, use absolute paths
+ */
+export function getAssetPath(assetPath: string): string {
+  const isElectronBuild = typeof window !== 'undefined' && window.location.protocol === 'file:';
+  
+  // Remove leading slash for Electron builds
+  if (isElectronBuild && assetPath.startsWith('/')) {
+    return `.${assetPath}`;
+  }
+  
+  // Keep absolute path for browser builds
+  return assetPath;
+}
+

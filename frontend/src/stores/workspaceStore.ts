@@ -9,6 +9,7 @@ import { workspaceService } from '@/services/api/workspaceService';
 import { useSDKModeStore } from '@/services/sdk/sdkMode';
 import { localFileService } from '@/services/storage/localFileService';
 import { getPlatform } from '@/services/platform/platform';
+import axios from 'axios';
 import type { Workspace } from '@/types/workspace';
 import type { CreateWorkspaceRequest } from '@/types/api';
 
@@ -44,6 +45,7 @@ interface WorkspaceState {
   
   // Auto-save
   autoSave: () => Promise<void>;
+  manualSave: () => Promise<void>; // Manual save (same as autoSave but always shows feedback)
   startAutoSave: () => void;
   stopAutoSave: () => void;
   
@@ -106,22 +108,55 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         fetchWorkspaces: async () => {
           set({ isLoading: true, error: null });
           try {
+            const mode = useSDKModeStore.getState().mode;
+            if (mode === 'offline') {
+              // In offline mode, workspaces are local files, not fetched from API
+              set({ workspaces: [], isLoading: false });
+              return;
+            }
+
+            // Use the API endpoint: GET /workspace/profiles
+            // This returns email/domain combinations (profiles)
             const profiles = await workspaceService.listProfiles();
-            // Convert profiles to workspaces format (simplified for now)
-            const workspaces = profiles.map((profile, index) => ({
-              id: `workspace-${index}`,
-              name: profile.email,
-              type: 'personal' as const,
-              owner_id: profile.email,
-              created_at: new Date().toISOString(),
-              last_modified_at: new Date().toISOString(),
-            }));
+            
+            // Ensure profiles is an array
+            if (!profiles || !Array.isArray(profiles)) {
+              console.warn('Invalid profiles response:', profiles);
+              set({ workspaces: [], isLoading: false });
+              return;
+            }
+            
+            // Convert profiles to workspace objects
+            const workspaces: Workspace[] = profiles.flatMap((profile) => {
+              // Ensure profile has required fields
+              if (!profile || !profile.email || !Array.isArray(profile.domains)) {
+                console.warn('Invalid profile structure:', profile);
+                return [];
+              }
+              
+              return profile.domains.map((domain) => ({
+                id: `${profile.email}:${domain}`,
+                name: `${profile.email} - ${domain}`,
+                type: 'personal' as const,
+                owner_id: profile.email,
+                created_at: new Date().toISOString(),
+                last_modified_at: new Date().toISOString(),
+              }));
+            });
+            
             set({ workspaces, isLoading: false });
           } catch (error) {
-            set({
-              error: error instanceof Error ? error.message : 'Failed to fetch workspaces',
-              isLoading: false,
-            });
+            // If endpoint doesn't exist (404), return empty array instead of error
+            if (axios.isAxiosError(error) && error.response?.status === 404) {
+              console.warn('/workspace/profiles endpoint not available - workspace management not supported');
+              set({ workspaces: [], isLoading: false });
+            } else {
+              set({
+                error: error instanceof Error ? error.message : 'Failed to fetch workspaces',
+                isLoading: false,
+              });
+              throw error;
+            }
           }
         },
 
@@ -163,27 +198,121 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         createWorkspace: async (request: CreateWorkspaceRequest) => {
           set({ isLoading: true, error: null });
           try {
-            // API expects email and domain
-            const email = request.name || 'user@example.com';
-            const domain = 'default';
-            const workspaceType = request.type || 'personal';
-            const result = await workspaceService.createWorkspace(email, domain, workspaceType);
-            const workspace = {
-              id: result.workspace_path,
-              name: request.name || email,
-              type: workspaceType,
-              owner_id: email,
+            const mode = useSDKModeStore.getState().mode;
+            if (mode === 'offline') {
+              // In offline mode, create workspace with default domain
+              const modelStoreModule = await import('@/stores/modelStore');
+              const { generateUUID } = await import('@/utils/validation');
+              const defaultDomain = {
+                id: generateUUID(),
+                workspace_id: generateUUID(),
+                name: request.name || 'Default Domain',
+                is_primary: true,
+                created_at: new Date().toISOString(),
+                last_modified_at: new Date().toISOString(),
+              };
+              
+              const newWorkspace: Workspace = {
+                id: generateUUID(),
+                name: request.name || 'Untitled Workspace',
+                type: request.type || 'personal',
+                owner_id: 'offline-user',
+                created_at: new Date().toISOString(),
+                last_modified_at: new Date().toISOString(),
+                domains: [defaultDomain],
+              };
+              
+              modelStoreModule.useModelStore.getState().setDomains([defaultDomain]);
+              set((state) => ({
+                workspaces: [...state.workspaces, newWorkspace],
+                currentWorkspaceId: newWorkspace.id,
+                isLoading: false,
+              }));
+              return newWorkspace;
+            }
+
+            // API expects email and domain (not name and type)
+            // Get user email from auth service or workspace info
+            let userEmail: string | null = null;
+            
+            // Try to get email from auth service first
+            try {
+              const authServiceModule = await import('@/services/api/authService');
+              const user = await authServiceModule.authService.getCurrentUser();
+              console.log('[WorkspaceStore] Creating workspace - user from auth:', user);
+              
+              if (user && user.email) {
+                userEmail = user.email;
+              }
+            } catch (authError) {
+              console.warn('[WorkspaceStore] Failed to get user from auth service:', authError);
+            }
+            
+            // If no email from auth, try to get it from workspace info
+            if (!userEmail) {
+              try {
+                const workspaceInfo = await workspaceService.getWorkspaceInfo();
+                console.log('[WorkspaceStore] Creating workspace - workspace info:', workspaceInfo);
+                if (workspaceInfo && workspaceInfo.email) {
+                  userEmail = workspaceInfo.email;
+                }
+              } catch (infoError) {
+                console.warn('[WorkspaceStore] Failed to get email from workspace info:', infoError);
+              }
+            }
+            
+            if (!userEmail) {
+              const errorMsg = 'User email not available. Please ensure you are authenticated and try again.';
+              console.error('[WorkspaceStore]', errorMsg);
+              set({
+                error: errorMsg,
+                isLoading: false,
+              });
+              throw new Error(errorMsg);
+            }
+
+            // Use the workspace name as the domain name
+            // The API creates a workspace for email/domain combination
+            const domain = request.name.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+            console.log('[WorkspaceStore] Creating workspace with email:', userEmail, 'domain:', domain);
+            
+            let result;
+            try {
+              result = await workspaceService.createWorkspace(userEmail, domain);
+              console.log('[WorkspaceStore] Workspace created successfully:', result);
+            } catch (apiError) {
+              console.error('[WorkspaceStore] API error creating workspace:', apiError);
+              // Re-throw with more context
+              if (axios.isAxiosError(apiError)) {
+                const apiErrorMessage = apiError.response?.data?.error || 
+                                        apiError.response?.data?.message || 
+                                        apiError.message || 
+                                        'API error creating workspace';
+                throw new Error(`API error: ${apiErrorMessage} (Status: ${apiError.response?.status})`);
+              }
+              throw apiError;
+            }
+            
+            // Create workspace object from API response
+            const workspace: Workspace = {
+              id: `${result.email}:${result.domain}`,
+              name: `${result.email} - ${result.domain}`,
+              type: 'personal' as const,
+              owner_id: result.email,
               created_at: new Date().toISOString(),
               last_modified_at: new Date().toISOString(),
             };
+            
             set((state) => ({
               workspaces: [...state.workspaces, workspace],
               isLoading: false,
             }));
             return workspace;
           } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Failed to create workspace';
+            console.error('[WorkspaceStore] Workspace creation failed:', errorMessage, error);
             set({
-              error: error instanceof Error ? error.message : 'Failed to create workspace',
+              error: errorMessage,
               isLoading: false,
             });
             throw error;
@@ -200,6 +329,26 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         },
 
         deleteWorkspaceRemote: async (workspaceId: string) => {
+          // In offline mode, handle domain-based file structure
+          const mode = useSDKModeStore.getState().mode;
+          if (mode === 'offline') {
+            const workspace = get().workspaces.find((w) => w.id === workspaceId);
+            if (workspace && workspace.domains) {
+              // Clear domains from model store
+              const modelStoreModule = await import('@/stores/modelStore');
+              modelStoreModule.useModelStore.getState().setDomains([]);
+              modelStoreModule.useModelStore.getState().setTables([]);
+              modelStoreModule.useModelStore.getState().setRelationships([]);
+            }
+            // Remove from local state
+            set((state) => ({
+              workspaces: state.workspaces.filter((w) => w.id !== workspaceId),
+              currentWorkspaceId: state.currentWorkspaceId === workspaceId ? null : state.currentWorkspaceId,
+            }));
+            return;
+          }
+          
+          // Online mode - use API
           // Workspace deletion is not supported by the API (email-based workspaces)
           // Use local state update instead
           set((state) => ({
@@ -225,23 +374,117 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             const uiStoreModule = await import('@/stores/uiStore');
             
             if (mode === 'offline') {
-              // Save to local file in offline mode
+              // Save domains to their folders in offline mode
+              const modelStoreModule = await import('@/stores/modelStore');
+              const { tables, relationships, domains, products, computeAssets, bpmnProcesses, dmnDecisions, systems } = modelStoreModule.useModelStore.getState();
+              
               if (getPlatform() === 'electron') {
-                // In Electron, we'd save to the workspace file
-                // For now, just mark as saved
-                set({ pendingChanges: false, lastSavedAt: new Date().toISOString() });
-                uiStoreModule.useUIStore.getState().addToast({
-                  type: 'success',
-                  message: 'Workspace saved locally',
-                });
+                const electronFileServiceModule = await import('@/services/storage/electronFileService');
+                const electronPlatformModule = await import('@/services/platform/electron');
+                
+                // Save each domain to its folder
+                let allDomainsSaved = true;
+                let needsWorkspacePath = false;
+                let workspacePath: string | null = null;
+                
+                for (const domain of domains) {
+                  // Determine domain folder path
+                  let domainPath: string | null = null;
+                  
+                  if (domain.folder_path) {
+                    // Use stored folder path
+                    domainPath = domain.folder_path;
+                  } else if (domain.workspace_path) {
+                    // Use workspace path + domain name
+                    domainPath = `${domain.workspace_path}/${domain.name}`;
+                  } else {
+                    // Need to prompt for workspace path (only once)
+                    if (!workspacePath) {
+                      needsWorkspacePath = true;
+                      const result = await electronPlatformModule.electronFileService.showOpenDialog({
+                        properties: ['openDirectory'],
+                        title: 'Select Workspace Folder for Auto-Save',
+                        message: 'Select the workspace folder where domains should be saved. This will be remembered for future auto-saves.',
+                      });
+                      
+                      if (result.canceled || !result.filePaths || result.filePaths.length === 0) {
+                        // User cancelled - skip auto-save for this cycle
+                        allDomainsSaved = false;
+                        break;
+                      }
+                      
+                      workspacePath = result.filePaths[0];
+                      
+                      // Update all domains with workspace path
+                      for (const d of domains) {
+                        if (!d.workspace_path) {
+                          modelStoreModule.useModelStore.getState().updateDomain(d.id, {
+                            workspace_path: workspacePath,
+                            folder_path: `${workspacePath}/${d.name}`,
+                          });
+                        }
+                      }
+                    }
+                    
+                    domainPath = `${workspacePath}/${domain.name}`;
+                  }
+                  
+                  if (domainPath) {
+                    try {
+                      // Get all domain assets
+                      const domainTables = tables.filter((t) => t.domain_id === domain.id || t.primary_domain_id === domain.id);
+                      const domainProducts = products.filter((p) => p.domain_id === domain.id);
+                      const domainAssets = computeAssets.filter((a) => a.domain_id === domain.id);
+                      const domainBpmnProcesses = bpmnProcesses.filter((p) => p.domain_id === domain.id);
+                      const domainDmnDecisions = dmnDecisions.filter((d) => d.domain_id === domain.id);
+                      const domainSystems = systems.filter((s) => s.domain_id === domain.id);
+                      const domainRelationships = relationships.filter((r) => r.domain_id === domain.id);
+                      
+                      // Convert domain to DomainType format
+                      const domainType = {
+                        id: domain.id,
+                        workspace_id: domain.workspace_id || '',
+                        name: domain.name,
+                        description: domain.description,
+                        owner: domain.owner,
+                        model_type: domain.model_type || 'conceptual',
+                        is_primary: domain.is_primary || false,
+                        created_at: domain.created_at,
+                        last_modified_at: new Date().toISOString(),
+                      } as any;
+                      
+                      // Save domain folder
+                      await electronFileServiceModule.electronFileService.saveDomainFolder(
+                        domainPath,
+                        domainType,
+                        domainTables,
+                        domainProducts,
+                        domainAssets,
+                        domainBpmnProcesses,
+                        domainDmnDecisions,
+                        domainSystems,
+                        domainRelationships
+                      );
+                    } catch (error) {
+                      console.error(`Failed to auto-save domain ${domain.name}:`, error);
+                      allDomainsSaved = false;
+                    }
+                  }
+                }
+                
+                if (allDomainsSaved && domains.length > 0) {
+                  set({ pendingChanges: false, lastSavedAt: new Date().toISOString() });
+                  // Silent auto-save - don't show toast to avoid interrupting user
+                } else if (domains.length === 0) {
+                  // No domains to save - just mark as saved
+                  set({ pendingChanges: false, lastSavedAt: new Date().toISOString() });
+                }
               } else {
-                // Browser: trigger download
-                await localFileService.saveFile(workspace, `${workspace.name || 'workspace'}.yaml`);
+                // Browser: Don't auto-trigger downloads - user should manually save
+                // Auto-save downloads are annoying in browser mode
+                // Just mark as saved in memory (localStorage persists the state)
                 set({ pendingChanges: false, lastSavedAt: new Date().toISOString() });
-                uiStoreModule.useUIStore.getState().addToast({
-                  type: 'success',
-                  message: 'Workspace saved to file',
-                });
+                // Don't show toast - silent auto-save in browser mode
               }
             } else {
               // In online mode, sync to remote
@@ -266,6 +509,40 @@ export const useWorkspaceStore = create<WorkspaceState>()(
               message: `Auto-save failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
             });
             // Don't throw - auto-save failures shouldn't interrupt user
+          }
+        },
+
+        manualSave: async () => {
+          // Same as autoSave but always shows feedback
+          const state = get();
+          if (!state.currentWorkspaceId) {
+            const uiStoreModule = await import('@/stores/uiStore');
+            uiStoreModule.useUIStore.getState().addToast({
+              type: 'warning',
+              message: 'No workspace selected. Please select a workspace first.',
+            });
+            return;
+          }
+
+          // Force pendingChanges to true to ensure save happens
+          set({ pendingChanges: true });
+          
+          // Call autoSave which will handle the actual save
+          await get().autoSave();
+          
+          const uiStoreModule = await import('@/stores/uiStore');
+          const mode = await useSDKModeStore.getState().getMode();
+          
+          if (mode === 'offline' && getPlatform() === 'electron') {
+            uiStoreModule.useUIStore.getState().addToast({
+              type: 'success',
+              message: 'Domains saved successfully',
+            });
+          } else if (mode === 'online') {
+            uiStoreModule.useUIStore.getState().addToast({
+              type: 'success',
+              message: 'Workspace synced to server',
+            });
           }
         },
 

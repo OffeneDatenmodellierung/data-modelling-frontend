@@ -45,6 +45,7 @@ export function isFocusable(element: HTMLElement): boolean {
 
 /**
  * Trap focus within an element
+ * Does NOT auto-focus any element - just traps Tab navigation
  */
 export function trapFocus(element: HTMLElement): () => void {
   const focusableElements = Array.from(
@@ -130,4 +131,5 @@ export function handleArrowKeyNavigation(
 
   return null;
 }
+
 

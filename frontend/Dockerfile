@@ -35,6 +35,12 @@ COPY --from=builder /app/dist /usr/share/nginx/html
 # Copy nginx configuration
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
+# Add WASM MIME type to mime.types file (if not already present)
+RUN if ! grep -q "application/wasm" /etc/nginx/mime.types; then \
+        sed -i '/^}$/i\    application/wasm wasm;' /etc/nginx/mime.types || \
+        echo "    application/wasm wasm;" >> /etc/nginx/mime.types; \
+    fi
+
 # Expose port 80
 EXPOSE 80
 

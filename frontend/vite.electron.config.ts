@@ -13,7 +13,7 @@ export default defineConfig({
       formats: ['cjs'],
     },
     rollupOptions: {
-      external: ['electron', 'fs/promises', 'path', 'url', 'module'],
+      external: ['electron', 'fs', 'fs/promises', 'path', 'url', 'module'],
       output: {
         entryFileNames: '[name].cjs', // Use .cjs extension for CommonJS in ES module project
       },

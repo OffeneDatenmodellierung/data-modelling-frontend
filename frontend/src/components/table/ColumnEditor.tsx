@@ -4,11 +4,14 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import type { Column } from '@/types/table';
+import type { Column, CompoundKey } from '@/types/table';
 import { isValidColumnName } from '@/utils/validation';
+import { Tooltip } from '@/components/common/Tooltip';
 
 export interface ColumnEditorProps {
   column: Column;
+  compoundKeys?: CompoundKey[];
+  allColumns?: Column[]; // All columns in the table (for showing compound key member names)
   onChange: (updates: Partial<Column>) => void;
   onDelete?: () => void;
 }
@@ -26,7 +29,7 @@ const DATA_TYPES = [
   'BLOB',
 ];
 
-export const ColumnEditor: React.FC<ColumnEditorProps> = ({ column, onChange, onDelete }) => {
+export const ColumnEditor: React.FC<ColumnEditorProps> = ({ column, compoundKeys = [], allColumns = [], onChange, onDelete }) => {
   const [name, setName] = useState(column.name);
   const [dataType, setDataType] = useState(column.data_type);
   const [nullable, setNullable] = useState(column.nullable);
@@ -35,12 +38,14 @@ export const ColumnEditor: React.FC<ColumnEditorProps> = ({ column, onChange, on
   const [nameError, setNameError] = useState<string | null>(null);
 
   useEffect(() => {
+    // Only update state if the column prop actually changed
+    // This prevents unnecessary re-renders and state conflicts
     setName(column.name);
     setDataType(column.data_type);
     setNullable(column.nullable);
     setIsPrimaryKey(column.is_primary_key);
     setIsForeignKey(column.is_foreign_key);
-  }, [column]);
+  }, [column.id, column.name, column.data_type, column.nullable, column.is_primary_key, column.is_foreign_key]);
 
   const handleNameChange = (newName: string) => {
     setName(newName);
@@ -63,12 +68,16 @@ export const ColumnEditor: React.FC<ColumnEditorProps> = ({ column, onChange, on
   };
 
   const handlePrimaryKeyChange = (newIsPrimaryKey: boolean) => {
-    setIsPrimaryKey(newIsPrimaryKey);
+    console.log('[ColumnEditor] handlePrimaryKeyChange called:', { columnId: column.id, columnName: column.name, newIsPrimaryKey });
+    // Don't update local state here - let the parent handle it and sync via useEffect
+    // This prevents race conditions when multiple columns are updated
     onChange({ is_primary_key: newIsPrimaryKey });
   };
 
   const handleForeignKeyChange = (newIsForeignKey: boolean) => {
-    setIsForeignKey(newIsForeignKey);
+    console.log('[ColumnEditor] handleForeignKeyChange called:', { columnId: column.id, columnName: column.name, newIsForeignKey });
+    // Don't update local state here - let the parent handle it and sync via useEffect
+    // This prevents race conditions when multiple columns are updated
     onChange({ is_foreign_key: newIsForeignKey });
   };
 
@@ -112,7 +121,7 @@ export const ColumnEditor: React.FC<ColumnEditorProps> = ({ column, onChange, on
             <label className="flex items-center gap-1 text-sm">
               <input
                 type="checkbox"
-                checked={nullable}
+                checked={column.nullable} // Use prop value directly, not local state
                 onChange={(e) => handleNullableChange(e.target.checked)}
                 className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                 aria-label="Nullable"
@@ -121,11 +130,11 @@ export const ColumnEditor: React.FC<ColumnEditorProps> = ({ column, onChange, on
             </label>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 flex-wrap">
             <label className="flex items-center gap-1 text-sm">
               <input
                 type="checkbox"
-                checked={isPrimaryKey}
+                checked={column.is_primary_key} // Use prop value directly, not local state
                 onChange={(e) => handlePrimaryKeyChange(e.target.checked)}
                 className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                 aria-label="Primary key"
@@ -136,13 +145,51 @@ export const ColumnEditor: React.FC<ColumnEditorProps> = ({ column, onChange, on
             <label className="flex items-center gap-1 text-sm">
               <input
                 type="checkbox"
-                checked={isForeignKey}
+                checked={column.is_foreign_key} // Use prop value directly, not local state
                 onChange={(e) => handleForeignKeyChange(e.target.checked)}
                 className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                 aria-label="Foreign key"
               />
               <span className="text-gray-600">Foreign Key</span>
             </label>
+
+            {/* Compound Key Tag Display */}
+            {column.compound_key_tag && (() => {
+              const compoundKey = compoundKeys.find(ck => ck.id === column.compound_key_id);
+              if (!compoundKey) return null;
+              
+              // Get column names in the compound key
+              const compoundKeyColumns = compoundKey.column_ids
+                .map(colId => allColumns.find(c => c.id === colId))
+                .filter(Boolean) as Column[];
+              
+              return (
+                <Tooltip
+                  text={
+                    <div>
+                      <div className="font-semibold mb-1">Compound Key: {column.compound_key_tag}</div>
+                      <div className="text-xs">
+                        {compoundKey.is_primary && <div className="mb-1 text-yellow-300 font-semibold">Primary Key</div>}
+                        <div className="mb-1">Columns in this compound key ({compoundKeyColumns.length}):</div>
+                        <ul className="list-disc list-inside space-y-0.5">
+                          {compoundKeyColumns.map((col, idx) => (
+                            <li key={col.id}>
+                              {col.name}
+                              {col.id === column.id && <span className="ml-1 text-blue-300">(this column)</span>}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                  }
+                  title="Compound Key"
+                >
+                  <span className="inline-flex items-center gap-1 text-xs bg-purple-100 text-purple-800 px-2 py-0.5 rounded cursor-help">
+                    CK - {column.compound_key_tag}
+                  </span>
+                </Tooltip>
+              );
+            })()}
           </div>
         </div>
 
@@ -159,4 +206,5 @@ export const ColumnEditor: React.FC<ColumnEditorProps> = ({ column, onChange, on
     </div>
   );
 };
+
 

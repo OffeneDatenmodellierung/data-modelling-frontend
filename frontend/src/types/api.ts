@@ -2,7 +2,18 @@
  * Type definitions for API requests and responses
  */
 
-import type { Workspace, Domain, DataFlowDiagram } from './workspace';
+import type { Workspace } from './workspace';
+import type { Domain } from './domain';
+// Legacy data flow types - deprecated, replaced by BPMN processes
+export interface DataFlowDiagram {
+  id: string;
+  workspace_id: string;
+  domain_id: string;
+  name: string;
+  description?: string;
+  created_at: string;
+  last_modified_at: string;
+}
 import type { Table } from './table';
 import type { Relationship } from './relationship';
 

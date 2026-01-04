@@ -9,18 +9,20 @@ import { FileUpload } from './FileUpload';
 import { UrlImport } from './UrlImport';
 import { PasteImport } from './PasteImport';
 import { importExportService } from '@/services/sdk/importExportService';
-import { odcsService } from '@/services/sdk/odcsService';
+import { odcsService, type ODCSWorkspace } from '@/services/sdk/odcsService';
 import { useModelStore } from '@/stores/modelStore';
+import { useWorkspaceStore } from '@/stores/workspaceStore';
 import { useUIStore } from '@/stores/uiStore';
+import type { Table } from '@/types/table';
 
 export interface ImportExportDialogProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-type ImportFormat = 'odcs' | 'sql' | 'avro' | 'json-schema' | 'protobuf';
-type ExportFormat = 'odcs' | 'sql' | 'avro' | 'json-schema' | 'protobuf';
-type SQLDialect = 'postgresql' | 'mysql' | 'sqlite' | 'mssql';
+type ImportFormat = 'odcs' | 'sql' | 'avro' | 'json-schema' | 'protobuf' | 'odps' | 'cads' | 'bpmn' | 'dmn' | 'openapi';
+type ExportFormat = 'odcs' | 'sql' | 'avro' | 'json-schema' | 'protobuf' | 'odps' | 'cads' | 'bpmn' | 'dmn' | 'openapi';
+type SQLDialect = 'postgresql' | 'mysql' | 'sqlite' | 'mssql' | 'databricks';
 
 export const ImportExportDialog: React.FC<ImportExportDialogProps> = ({
   isOpen,
@@ -44,6 +46,8 @@ export const ImportExportDialog: React.FC<ImportExportDialogProps> = ({
         type: 'success',
         message: `Successfully imported from ${file.name}`,
       });
+      // Close dialog after successful import
+      onClose();
     } catch (error) {
       addToast({
         type: 'error',
@@ -62,6 +66,8 @@ export const ImportExportDialog: React.FC<ImportExportDialogProps> = ({
         type: 'success',
         message: 'Successfully imported from URL',
       });
+      // Close dialog after successful import
+      onClose();
     } catch (error) {
       addToast({
         type: 'error',
@@ -80,6 +86,8 @@ export const ImportExportDialog: React.FC<ImportExportDialogProps> = ({
         type: 'success',
         message: 'Successfully imported from pasted content',
       });
+      // Close dialog after successful import
+      onClose();
     } catch (error) {
       addToast({
         type: 'error',
@@ -90,41 +98,277 @@ export const ImportExportDialog: React.FC<ImportExportDialogProps> = ({
     }
   };
 
-  const handleImportContent = async (_content: string, format: ImportFormat) => {
-    // TODO: Implement import when SDK is available
-    switch (format) {
-      case 'odcs':
-        // await odcsService.parseYAML(content);
-        break;
-      case 'sql':
-        // await importExportService.importFromSQL(content, sqlDialect);
-        break;
-      case 'avro':
-        // await importExportService.importFromAVRO(content);
-        break;
-      case 'json-schema':
-        // await importExportService.importFromJSONSchema(content);
-        break;
-      case 'protobuf':
-        // await importExportService.importFromProtobuf(content);
-        break;
-      default:
-        throw new Error(`Unsupported import format: ${format}`);
-    }
+  const handleImportContent = async (content: string, format: ImportFormat) => {
+    console.log('[ImportExportDialog] handleImportContent called with format:', format);
+    console.log('[ImportExportDialog] Content length:', content.length);
+    console.log('[ImportExportDialog] Content preview:', content.substring(0, 200));
+    
+    const { setTables, setRelationships, setDomains, selectedDomainId: initialSelectedDomainId, selectedSystemId, systems, updateSystem, tables: existingTables, domains } = useModelStore.getState();
+    
+    try {
+      let workspace: ODCSWorkspace | null = null;
+      
+      switch (format) {
+        case 'odcs':
+          workspace = await odcsService.parseYAML(content);
+          break;
+        case 'sql':
+          workspace = await importExportService.importFromSQL(content, sqlDialect);
+          break;
+        case 'avro':
+          workspace = await importExportService.importFromAVRO(content);
+          break;
+        case 'json-schema':
+          workspace = await importExportService.importFromJSONSchema(content);
+          break;
+        case 'protobuf':
+          workspace = await importExportService.importFromProtobuf(content);
+          break;
+        case 'odps':
+          const { odpsService } = await import('@/services/sdk/odpsService');
+          const odpsProduct = await odpsService.parseYAML(content);
+          // Add product to store
+          useModelStore.getState().addProduct(odpsProduct);
+          addToast({
+            type: 'success',
+            message: `Successfully imported ODPS product: ${odpsProduct.name}`,
+          });
+          onClose();
+          return;
+        case 'cads':
+          const { cadsService } = await import('@/services/sdk/cadsService');
+          const cadsAsset = await cadsService.parseYAML(content);
+          // Add asset to store
+          useModelStore.getState().addComputeAsset(cadsAsset);
+          addToast({
+            type: 'success',
+            message: `Successfully imported CADS asset: ${cadsAsset.name}`,
+          });
+          onClose();
+          return;
+        case 'bpmn':
+          const { bpmnService } = await import('@/services/sdk/bpmnService');
+          const bpmnProcess = await bpmnService.parseXML(content);
+          // Add process to store
+          useModelStore.getState().addBPMNProcess(bpmnProcess);
+          addToast({
+            type: 'success',
+            message: `Successfully imported BPMN process: ${bpmnProcess.name}`,
+          });
+          onClose();
+          return;
+        case 'dmn':
+          const { dmnService } = await import('@/services/sdk/dmnService');
+          const dmnDecision = await dmnService.parseXML(content);
+          // Add decision to store
+          useModelStore.getState().addDMNDecision(dmnDecision);
+          addToast({
+            type: 'success',
+            message: `Successfully imported DMN decision: ${dmnDecision.name}`,
+          });
+          onClose();
+          return;
+        case 'openapi':
+          const { openapiService } = await import('@/services/sdk/openapiService');
+          const openapiSpec = await openapiService.parse(content, 'yaml');
+          // Convert OpenAPI spec to workspace structure
+          const openapiTables = await openapiService.toODCSTables(openapiSpec);
+          workspace = { tables: openapiTables, relationships: [], domains: [] };
+          break;
+        default:
+          throw new Error(`Unsupported import format: ${format}`);
+      }
 
-    // Update store with imported data
-    // TODO: Map workspace to tables and relationships when SDK is integrated
+      // Update store with imported data (only for formats that return workspace)
+      if (workspace && workspace.tables && workspace.tables.length > 0) {
+        console.log('[ImportExportDialog] Imported workspace:', workspace);
+        console.log('[ImportExportDialog] Imported tables:', workspace.tables);
+        
+        // Map imported tables to current domain if available
+        // Normalize UUIDs to ensure they're valid (critical for exports)
+        // Import validation utilities once before processing tables
+        const { normalizeWorkspaceUUIDs, normalizeUUID, isValidUUID } = await import('@/utils/validation');
+        
+        // Get current selected domain ID, or use first available domain
+        let currentDomainId = initialSelectedDomainId;
+        
+        // If no domain is selected, try to use the first available domain
+        if (!currentDomainId && domains.length > 0) {
+          currentDomainId = domains[0].id;
+          useModelStore.getState().setSelectedDomain(currentDomainId);
+          console.log('[ImportExportDialog] No domain selected, using first available domain:', currentDomainId);
+        }
+        
+        // Validate that we have a domain ID (even if invalid UUID, we'll normalize it)
+        if (!currentDomainId) {
+          throw new Error('No domain available. Please create a domain before importing tables.');
+        }
+        
+        // Normalize the domain ID if it's not a valid UUID (instead of rejecting it)
+        if (!isValidUUID(currentDomainId)) {
+          console.warn('[ImportExportDialog] Domain ID is not a valid UUID, normalizing:', currentDomainId);
+          const domainToUpdate = domains.find(d => d.id === currentDomainId);
+          if (domainToUpdate) {
+            const normalizedId = normalizeUUID(currentDomainId);
+            useModelStore.getState().updateDomain(currentDomainId, { id: normalizedId });
+            if (initialSelectedDomainId === currentDomainId) {
+              useModelStore.getState().setSelectedDomain(normalizedId);
+            }
+            currentDomainId = normalizedId;
+          } else {
+            currentDomainId = normalizeUUID(currentDomainId);
+          }
+        }
+        
+        // Use normalized domain ID for the rest of the function
+        const selectedDomainId = currentDomainId;
+        
+        // Clear primary_domain_id from tables before normalization so we can set it to current domain
+        const workspaceWithClearedDomainIds = {
+          ...workspace,
+          domain_id: undefined, // Don't use workspace domain_id - we'll set it per table
+          tables: workspace.tables.map((table: any) => ({
+            ...table,
+            primary_domain_id: undefined, // Clear it so normalizeWorkspaceUUIDs doesn't normalize it
+          })),
+        };
+        const normalizedWorkspace = normalizeWorkspaceUUIDs(workspaceWithClearedDomainIds);
+        
+        // Always use the current selectedDomainId (the domain where we're importing)
+        // This ensures imported tables belong to the current domain and are editable
+        // currentDomainId is already normalized above, so we can use it directly
+        
+        // Ensure all required fields are preserved, especially name and columns
+        const tablesWithDomain = normalizedWorkspace.tables.map((table, index) => {
+          console.log(`[ImportExportDialog] Processing table ${index}:`, table);
+          console.log(`[ImportExportDialog] Table name: "${table.name}", columns:`, table.columns);
+          
+          // Cast to any to access potential alternative property names
+          const tableAny = table as any;
+          
+          // Preserve name - don't override if it exists, try alternative property names
+          // The normalizeTable should have already set the name, but double-check
+          const finalName = table.name || tableAny.table_name || tableAny.entity_name || tableAny.label || `Table_${index + 1}`;
+          
+          // Preserve columns if they exist, ensure it's an array
+          const finalColumns = Array.isArray(table.columns) ? table.columns : (table.columns ? [table.columns] : []);
+          
+          console.log(`[ImportExportDialog] Final name: "${finalName}", final columns count: ${finalColumns.length}`);
+        
+        // Ensure table has required fields - preserve original data first
+        // Don't spread table first, as we want to ensure our resolved values are used
+        const mappedTable: Table = {
+          ...table,
+          // Use the resolved name (normalizeTable should have set it, but ensure it's not empty)
+          name: finalName.trim() || `Table_${index + 1}`,
+          // Use the resolved columns (normalizeTable should have set them)
+          columns: finalColumns,
+          // Ensure required fields are set and normalize UUIDs
+          id: normalizeUUID(table.id),
+          workspace_id: normalizeUUID(table.workspace_id || useWorkspaceStore.getState().currentWorkspaceId || 'offline-workspace'),
+          // Always override with current domain ID - never use what's in the imported table
+          // selectedDomainId is already normalized above
+          primary_domain_id: selectedDomainId,
+          visible_domains: [selectedDomainId], // Also set visible_domains to current domain
+            // Ensure position and size are set - try alternative property names
+            position_x: table.position_x ?? tableAny.x ?? (index * 250),
+            position_y: table.position_y ?? tableAny.y ?? 0,
+            width: table.width ?? 200,
+            height: table.height ?? 150,
+          // Ensure timestamps are set
+          created_at: table.created_at || new Date().toISOString(),
+          last_modified_at: table.last_modified_at || new Date().toISOString(),
+        };
+        
+        // Normalize all UUIDs in the table (columns, compound keys, etc.)
+        const normalizedTable = normalizeWorkspaceUUIDs({ tables: [mappedTable] }).tables[0];
+        
+        console.log(`[ImportExportDialog] Mapped table:`, normalizedTable);
+        return normalizedTable;
+        });
+        
+        console.log('[ImportExportDialog] Setting tables:', tablesWithDomain);
+        
+        // Merge with existing tables instead of replacing them
+        const existingTableIds = new Set((existingTables || []).map(t => t.id));
+        
+        // Filter out duplicates and merge
+        const newTables = tablesWithDomain.filter(t => !existingTableIds.has(t.id));
+        const mergedTables = [...(existingTables || []), ...newTables];
+        
+        setTables(mergedTables);
+        
+        // If a system is selected, add imported tables to that system
+        if (selectedSystemId && newTables.length > 0) {
+          const selectedSystem = systems.find(s => s.id === selectedSystemId);
+          if (selectedSystem) {
+            const newTableIds = newTables.map(t => t.id);
+            const updatedTableIds = [...(selectedSystem.table_ids || []), ...newTableIds];
+            // Remove duplicates
+            const uniqueTableIds = Array.from(new Set(updatedTableIds));
+            updateSystem(selectedSystemId, { table_ids: uniqueTableIds });
+          }
+        }
+        
+        addToast({
+          type: 'success',
+          message: `Successfully imported ${workspace.tables.length} table(s)${selectedSystemId ? ' into selected system' : ''}`,
+        });
+        
+        // Small delay to ensure store updates propagate before closing
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        // Close dialog after successful import
+        onClose();
+      } else {
+        addToast({
+          type: 'warning',
+          message: format === 'sql' 
+            ? `No tables found in imported SQL content. Please ensure your SQL contains CREATE TABLE statements and that the dialect "${sqlDialect}" is correct.`
+            : `No tables found in imported ${format.toUpperCase()} content.`,
+        });
+      }
+      
+      if (workspace && workspace.relationships && workspace.relationships.length > 0) {
+        // Map imported relationships to current domain if available
+        const relationshipsWithDomain = workspace.relationships.map((rel) => ({
+          ...rel,
+          workspace_id: useWorkspaceStore.getState().currentWorkspaceId || 'offline-workspace',
+          domain_id: selectedDomainId || 'default-domain',
+        }));
+        setRelationships(relationshipsWithDomain);
+      }
+      
+      // If workspace has domains, add them (but don't replace existing ones)
+      if (workspace && workspace.domains && Array.isArray(workspace.domains) && workspace.domains.length > 0) {
+        const existingDomains = useModelStore.getState().domains || [];
+        const newDomains = workspace.domains.filter(
+          (domain: any) => !existingDomains.some((d) => d.id === domain.id)
+        );
+        if (newDomains.length > 0) {
+          setDomains([...existingDomains, ...newDomains]);
+        }
+      }
+    } catch (error) {
+      throw new Error(
+        `Failed to import ${format}: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
   };
 
   const handleExport = async () => {
     setIsProcessing(true);
     try {
-      // Get current workspace data including data flow diagrams
-      const { dataFlowDiagrams } = useModelStore.getState();
+      // Get current workspace data including all domain assets
+      const { products, computeAssets, bpmnProcesses, dmnDecisions, domains } = useModelStore.getState();
       const workspace = {
         tables,
         relationships,
-        data_flow_diagrams: dataFlowDiagrams,
+        domains,
+        products,
+        compute_assets: computeAssets,
+        bpmn_processes: bpmnProcesses,
+        dmn_decisions: dmnDecisions,
       };
 
       let content: string;
@@ -156,6 +400,64 @@ export const ImportExportDialog: React.FC<ImportExportDialogProps> = ({
           content = await importExportService.exportToProtobuf(workspace as any);
           filename = 'workspace.proto';
           mimeType = 'text/plain';
+          break;
+        case 'odps':
+          if (products.length === 0) {
+            throw new Error('No data products to export');
+          }
+          const { odpsService } = await import('@/services/sdk/odpsService');
+          const productToExport = products[0];
+          if (!productToExport) {
+            throw new Error('No data products to export');
+          }
+          content = await odpsService.toYAML(productToExport);
+          filename = `${productToExport.name || 'product'}.odps.yaml`;
+          mimeType = 'application/yaml';
+          break;
+        case 'cads':
+          if (computeAssets.length === 0) {
+            throw new Error('No compute assets to export');
+          }
+          const { cadsService } = await import('@/services/sdk/cadsService');
+          const assetToExport = computeAssets[0];
+          if (!assetToExport) {
+            throw new Error('No compute assets to export');
+          }
+          content = await cadsService.toYAML(assetToExport);
+          filename = `${assetToExport.name || 'asset'}.cads.yaml`;
+          mimeType = 'application/yaml';
+          break;
+        case 'bpmn':
+          if (bpmnProcesses.length === 0) {
+            throw new Error('No BPMN processes to export');
+          }
+          const { bpmnService } = await import('@/services/sdk/bpmnService');
+          const processToExport = bpmnProcesses[0];
+          if (!processToExport) {
+            throw new Error('No BPMN processes to export');
+          }
+          content = await bpmnService.toXML(processToExport);
+          filename = `${processToExport.name || 'process'}.bpmn`;
+          mimeType = 'application/xml';
+          break;
+        case 'dmn':
+          if (dmnDecisions.length === 0) {
+            throw new Error('No DMN decisions to export');
+          }
+          const { dmnService } = await import('@/services/sdk/dmnService');
+          const decisionToExport = dmnDecisions[0];
+          if (!decisionToExport) {
+            throw new Error('No DMN decisions to export');
+          }
+          content = await dmnService.toXML(decisionToExport);
+          filename = `${decisionToExport.name || 'decision'}.dmn`;
+          mimeType = 'application/xml';
+          break;
+        case 'openapi':
+          const { openapiService } = await import('@/services/sdk/openapiService');
+          content = await openapiService.toFormat(workspace as any, 'yaml');
+          filename = 'workspace.openapi.yaml';
+          mimeType = 'application/yaml';
           break;
         default:
           throw new Error(`Unsupported export format: ${exportFormat}`);
@@ -230,6 +532,11 @@ export const ImportExportDialog: React.FC<ImportExportDialogProps> = ({
                 <option value="avro">AVRO Schema</option>
                 <option value="json-schema">JSON Schema</option>
                 <option value="protobuf">Protobuf Schema</option>
+                <option value="odps">ODPS (Data Product)</option>
+                <option value="cads">CADS (Compute Asset)</option>
+                <option value="bpmn">BPMN 2.0</option>
+                <option value="dmn">DMN 1.3</option>
+                <option value="openapi">OpenAPI</option>
               </select>
             </div>
 
@@ -247,6 +554,7 @@ export const ImportExportDialog: React.FC<ImportExportDialogProps> = ({
                   <option value="mysql">MySQL</option>
                   <option value="sqlite">SQLite</option>
                   <option value="mssql">SQL Server</option>
+                  <option value="databricks">Databricks</option>
                 </select>
               </div>
             )}
@@ -254,7 +562,15 @@ export const ImportExportDialog: React.FC<ImportExportDialogProps> = ({
             <div className="space-y-4">
               <FileUpload
                 onFileSelect={handleFileImport}
-                accept={importFormat === 'odcs' ? '.yaml,.yml' : importFormat === 'sql' ? '.sql' : '.json'}
+                accept={
+                  importFormat === 'odcs' || importFormat === 'odps' || importFormat === 'cads' || importFormat === 'openapi'
+                    ? '.yaml,.yml'
+                    : importFormat === 'sql'
+                    ? '.sql'
+                    : importFormat === 'bpmn' || importFormat === 'dmn'
+                    ? '.xml,.bpmn,.dmn'
+                    : '.json'
+                }
                 label="Upload File"
               />
               <UrlImport onImport={handleUrlImport} />
@@ -280,6 +596,11 @@ export const ImportExportDialog: React.FC<ImportExportDialogProps> = ({
                 <option value="avro">AVRO Schema</option>
                 <option value="json-schema">JSON Schema</option>
                 <option value="protobuf">Protobuf Schema</option>
+                <option value="odps">ODPS (Data Product)</option>
+                <option value="cads">CADS (Compute Asset)</option>
+                <option value="bpmn">BPMN 2.0</option>
+                <option value="dmn">DMN 1.3</option>
+                <option value="openapi">OpenAPI</option>
               </select>
             </div>
 
@@ -297,6 +618,7 @@ export const ImportExportDialog: React.FC<ImportExportDialogProps> = ({
                   <option value="mysql">MySQL</option>
                   <option value="sqlite">SQLite</option>
                   <option value="mssql">SQL Server</option>
+                  <option value="databricks">Databricks</option>
                 </select>
               </div>
             )}

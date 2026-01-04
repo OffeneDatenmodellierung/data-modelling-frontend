@@ -70,16 +70,23 @@ export const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = ({ className 
                 ${currentWorkspaceId === workspace.id ? 'bg-blue-50' : ''}
               `}
             >
-              <div className="flex items-center justify-between">
-                <span className="font-medium text-gray-900">{workspace.name}</span>
-                <span
-                  className={`
-                    px-2 py-1 text-xs rounded
-                    ${workspace.type === 'shared' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}
-                  `}
-                >
-                  {workspace.type === 'shared' ? 'Shared' : 'Personal'}
-                </span>
+              <div className="flex flex-col gap-1">
+                <div className="flex items-center justify-between">
+                  <span className="font-medium text-gray-900">{workspace.name}</span>
+                  <span
+                    className={`
+                      px-2 py-1 text-xs rounded
+                      ${workspace.type === 'shared' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}
+                    `}
+                  >
+                    {workspace.type === 'shared' ? 'Shared' : 'Personal'}
+                  </span>
+                </div>
+                {workspace.domains && workspace.domains.length > 0 && (
+                  <span className="text-xs text-gray-500">
+                    {workspace.domains.length} {workspace.domains.length === 1 ? 'domain' : 'domains'}
+                  </span>
+                )}
               </div>
             </button>
           ))}

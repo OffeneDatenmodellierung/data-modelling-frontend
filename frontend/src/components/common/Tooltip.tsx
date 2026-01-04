@@ -34,6 +34,7 @@ export const Tooltip: React.FC<TooltipProps> = ({
     const triggerRect = triggerRef.current.getBoundingClientRect();
     const tooltipRect = tooltipRef.current.getBoundingClientRect();
     const gap = 8;
+    const padding = 8; // Padding from viewport edges
 
     let top = 0;
     let left = 0;
@@ -57,17 +58,30 @@ export const Tooltip: React.FC<TooltipProps> = ({
         break;
     }
 
-    // Keep tooltip within viewport
+    // Keep tooltip within viewport with padding
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
 
-    if (left < 0) left = gap;
-    if (left + tooltipRect.width > viewportWidth) {
-      left = viewportWidth - tooltipRect.width - gap;
+    // Constrain horizontal position
+    if (left < padding) {
+      left = padding;
+    } else if (left + tooltipRect.width > viewportWidth - padding) {
+      left = viewportWidth - tooltipRect.width - padding;
     }
-    if (top < 0) top = gap;
-    if (top + tooltipRect.height > viewportHeight) {
-      top = viewportHeight - tooltipRect.height - gap;
+
+    // Constrain vertical position
+    if (top < padding) {
+      top = padding;
+      // If tooltip would go off top, try positioning below instead
+      if (position === 'top' && triggerRect.bottom + gap + tooltipRect.height <= viewportHeight - padding) {
+        top = triggerRect.bottom + gap;
+      }
+    } else if (top + tooltipRect.height > viewportHeight - padding) {
+      top = viewportHeight - tooltipRect.height - padding;
+      // If tooltip would go off bottom, try positioning above instead
+      if (position === 'bottom' && triggerRect.top - gap - tooltipRect.height >= padding) {
+        top = triggerRect.top - tooltipRect.height - gap;
+      }
     }
 
     setTooltipPosition({ top, left });
@@ -128,7 +142,7 @@ export const Tooltip: React.FC<TooltipProps> = ({
           ref={tooltipRef}
           id={tooltipId}
           role="tooltip"
-          className="absolute z-50 px-3 py-2 text-sm text-white bg-gray-900 rounded shadow-lg pointer-events-none"
+          className="fixed z-50 px-3 py-2 text-sm text-white bg-gray-900 rounded shadow-lg pointer-events-none max-w-xs"
           style={{
             top: `${tooltipPosition.top}px`,
             left: `${tooltipPosition.left}px`,

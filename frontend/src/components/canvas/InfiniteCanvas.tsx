@@ -65,7 +65,7 @@ export const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({ workspaceId, dom
       id: table.id,
       type: 'table',
       position: { x: table.position_x, y: table.position_y },
-      data: { table },
+      data: { table, modelType: 'conceptual' },
       selected: selectedTableId === table.id,
     }));
   }, [visibleTables, selectedTableId]);

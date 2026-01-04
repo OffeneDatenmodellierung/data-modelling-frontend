@@ -21,7 +21,7 @@ class TableService {
    */
   async listTables(domain: string): Promise<Table[]> {
     const response = await apiClient.getClient().get<ListTablesResponse>(
-      `/workspace/domains/${domain}/tables`
+      `/api/v1/workspace/domains/${domain}/tables`
     );
     return response.data.tables;
   }
@@ -31,7 +31,7 @@ class TableService {
    */
   async getTable(domain: string, tableId: string): Promise<Table> {
     const response = await apiClient.getClient().get<GetTableResponse>(
-      `/workspace/domains/${domain}/tables/${tableId}`
+      `/api/v1/workspace/domains/${domain}/tables/${tableId}`
     );
     return response.data.table;
   }
@@ -46,7 +46,7 @@ class TableService {
     }
 
     const response = await apiClient.getClient().post<CreateTableResponse>(
-      `/workspace/domains/${domain}/tables`,
+      `/api/v1/workspace/domains/${domain}/tables`,
       request
     );
     return response.data.table;
@@ -61,7 +61,7 @@ class TableService {
     updates: UpdateTableRequest
   ): Promise<Table> {
     const response = await apiClient.getClient().put<UpdateTableResponse>(
-      `/workspace/domains/${domain}/tables/${tableId}`,
+      `/api/v1/workspace/domains/${domain}/tables/${tableId}`,
       updates
     );
     return response.data.table;
@@ -76,7 +76,7 @@ class TableService {
     position: { x: number; y: number }
   ): Promise<void> {
     await apiClient.getClient().put(
-      `/workspace/domains/${domain}/tables/${tableId}/position`,
+      `/api/v1/workspace/domains/${domain}/tables/${tableId}/position`,
       { position }
     );
   }
@@ -85,7 +85,7 @@ class TableService {
    * Delete a table
    */
   async deleteTable(domain: string, tableId: string): Promise<void> {
-    await apiClient.getClient().delete(`/workspace/domains/${domain}/tables/${tableId}`);
+    await apiClient.getClient().delete(`/api/v1/workspace/domains/${domain}/tables/${tableId}`);
   }
 }
 

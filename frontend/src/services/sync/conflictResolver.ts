@@ -87,7 +87,8 @@ class ConflictResolver {
       workspace_id: workspaceId,
       tables: modelStore.tables,
       relationships: modelStore.relationships,
-      data_flow_diagrams: modelStore.dataFlowDiagrams,
+      // Legacy data flow diagrams - deprecated, replaced by BPMN processes
+      data_flow_diagrams: [],
     };
 
     // Create remote workspace data (from conflicts)
@@ -140,8 +141,9 @@ class ConflictResolver {
       const remoteRelationship = conflict.remoteVersion as any;
       modelStore.updateRelationship(conflict.elementId, remoteRelationship);
     } else if (conflict.elementType === 'data_flow_diagram') {
-      const remoteDiagram = conflict.remoteVersion as any;
-      modelStore.updateDataFlowDiagram(conflict.elementId, remoteDiagram);
+      // Legacy data flow diagrams - deprecated, replaced by BPMN processes
+      // Data flow diagrams are no longer supported in SDK 1.5.0
+      console.warn('Data flow diagram conflicts are no longer supported - use BPMN processes instead');
     }
   }
 

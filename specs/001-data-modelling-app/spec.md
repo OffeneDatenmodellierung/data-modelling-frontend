@@ -19,6 +19,14 @@
 - Q: What happens when a user's session expires while editing? → A: Actively refresh the JWT. If refresh fails, switch to offline mode offering the user the option to save locally (same as if connection had dropped).
 - Q: How does the system handle browser refresh during active editing? → A: All updates happen component by component so full refresh should not be needed. If in online mode and a full refresh is ordered, check local and remote state and offer the user to pick which they want.
 
+### Session 2025-01-27
+
+- Q: How should domains be defined in the SDK 1.5.0 migrated system - as model types (Conceptual/Logical/Physical) or as business domains containing all asset types? → A: Replace model-type domains with business domains; view modes (Systems/ETL/Operational/Analytical) are filters/views of the same domain data
+- Q: How should existing data flow diagrams be handled in the SDK 1.5.0 migration? → A: Deprecate data flow diagrams entirely, require manual recreation as BPMN processes
+- Q: Where should users access BPMN/DMN editors? → A: Multiple access points (Edit BPMN button in Compute Asset View, Edit Process button in ETL View, clickable links in domain asset lists, Create BPMN/DMN buttons). BPMN/DMN diagrams are primarily relevant to CADS (compute asset) nodes to show the logic within them.
+- Q: How should existing workspaces with Conceptual/Logical/Physical model types be handled during SDK 1.5.0 migration? → A: Completely discard old model type structure, require users to manually reorganize tables into new business domains
+- Q: How should users create and manage ODPS products and CADS assets (AI/ML/Apps)? → A: Full CRUD support - users can create/edit/delete ODPS products and CADS assets through dedicated views (Data Product View, Compute Asset View) with forms/editors, similar to table editing
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Create and Edit Data Models on Infinite Canvas (Priority: P1)
@@ -27,7 +35,7 @@ A data architect needs to create conceptual, logical, and physical data models b
 
 **Why this priority**: The table editor and infinite canvas are the most important aspects of the application. Without these core modeling capabilities, the application cannot deliver its primary value proposition.
 
-**Independent Test**: Can be fully tested by creating a new workspace, adding a conceptual model with 3 tables, defining relationships between them using crow's feet notation, and editing table properties. This delivers a complete data modeling experience without requiring collaboration or advanced features.
+**Independent Test**: Can be fully tested by creating a new workspace, adding a business domain with 3 tables, defining relationships between them using crow's feet notation, and editing table properties. This delivers a complete data modeling experience without requiring collaboration or advanced features.
 
 **Acceptance Scenarios**:
 
@@ -35,27 +43,28 @@ A data architect needs to create conceptual, logical, and physical data models b
 2. **Given** a table is selected on the canvas, **When** the user opens the table editor, **Then** they can add columns, set data types, and define primary keys
 3. **Given** two tables exist on the canvas, **When** the user creates a relationship between them, **Then** a connection line appears with crow's feet notation showing cardinality
 4. **Given** a user creates a circular relationship between tables, **When** the relationship is established, **Then** the system displays a warning that circular relationships are present
-5. **Given** a user is editing a conceptual model, **When** they switch to logical or physical model view, **Then** the same tables are shown with appropriate notation for each model type
+5. **Given** a user is viewing a domain in Systems View, **When** they switch to ETL View or Operational/Analytical Levels View, **Then** the same domain tables are shown with appropriate notation/filtering for each view mode
 6. **Given** a user has created a data model, **When** they save the workspace, **Then** the model is persisted in ODCS 3.1.0 format (YAML for tables, SDK format for relationships)
 7. **Given** a workspace has many tables (100+), **When** the user views the workspace, **Then** tables are organized into domain-based canvas tabs that can be switched between
 8. **Given** a table exists on multiple domain canvases, **When** a user attempts to edit it on a non-primary domain, **Then** the table is read-only and editing is only allowed on the primary domain
 
 ---
 
-### User Story 2 - Create Data Flow Diagrams (Priority: P2)
+### User Story 2 - Create BPMN Process Diagrams (Priority: P2)
 
-A data engineer needs to create data flow diagrams showing how data moves between systems (e.g., source database → Kafka topic → target database). These flows can be related to conceptual tables, showing the physical implementation of conceptual entities.
+A data engineer needs to create BPMN process diagrams showing how data moves between systems (e.g., source database → Kafka topic → target database). These processes can be related to domain tables, showing the physical implementation of data transformations. Users create BPMN processes using the integrated bpmn-js editor in a popout modal.
 
-**Why this priority**: Data flow diagrams are essential for documenting data architectures and showing how conceptual models map to physical implementations. This extends the core modeling capability.
+**Why this priority**: BPMN process diagrams are essential for documenting data architectures and showing how domain models map to physical implementations. This extends the core modeling capability with standard BPMN 2.0 notation.
 
-**Independent Test**: Can be fully tested by creating a data flow diagram with source database, Kafka topic, and target database nodes, connecting them with flow arrows, and linking the flow to a conceptual table. This delivers complete data flow documentation capability.
+**Independent Test**: Can be fully tested by creating a BPMN process diagram with source database, Kafka topic, and target database nodes, connecting them with BPMN flow elements, and linking the process to domain tables. This delivers complete process documentation capability.
 
 **Acceptance Scenarios**:
 
-1. **Given** a user is viewing a workspace, **When** they switch to data flow diagram mode, **Then** they can add abstract icons representing data sources, processing systems, and targets
-2. **Given** a data flow diagram with multiple nodes, **When** the user connects them with flow arrows, **Then** the connections show data flow direction and can be labeled
-3. **Given** a conceptual table exists in the workspace, **When** the user links a data flow to that table, **Then** the relationship is established and visible in both views
-4. **Given** a user has created a data flow diagram, **When** they save the workspace, **Then** the diagram is persisted along with its relationships to conceptual models
+1. **Given** a user is viewing a domain in Systems View or ETL View, **When** they click "Create BPMN Process" or click on an existing BPMN process link, **Then** a popout modal opens with the bpmn-js editor
+2. **Given** a BPMN editor is open, **When** the user adds BPMN elements (tasks, gateways, events) and connects them, **Then** the process diagram is created with proper BPMN 2.0 notation
+3. **Given** a domain table exists in the workspace, **When** the user links a BPMN process to that table, **Then** the relationship is established and visible in both views
+4. **Given** a user has edited a BPMN process in the popout editor, **When** they click "Save", **Then** the BPMN XML is saved to the domain folder and the process is persisted
+5. **Given** a user has an existing data flow diagram from a pre-migration workspace, **When** they open the workspace, **Then** they are notified that data flow diagrams are deprecated and must be recreated as BPMN processes
 
 ---
 
@@ -118,7 +127,9 @@ A user needs to manage multiple workspaces - some personal (only they can access
 - **Concurrent editing conflicts**: In collaboration mode, each canvas has a primary owner. Other users are granted read or edit access. When multiple users with edit access modify the same element simultaneously, the last change wins (conflict resolution via WebSocket updates). In offline mode, GIT repository serves as the master for conflict resolution.
 - **Network interruptions during collaboration**: System stores changes in local state, warns the user about the interruption, and attempts to merge changes automatically when connection is restored. Users can also export files locally for manual merging if automatic merge fails.
 - **Cross-device offline model access**: Models saved offline use ODCS YAML format for tables and the relationship format from the SDK, ensuring compatibility across devices when files are transferred.
-- **Very large models (hundreds of tables)**: System organizes canvases into multiple domain-based tabs. Users switch between domain canvases. Tables can appear on multiple domains but are only editable on their primary domain. This prevents canvas overload and maintains clear ownership boundaries.
+- **Very large models (hundreds of tables)**: System organizes canvases into multiple business domain-based tabs. Users switch between domain canvases. Tables can appear on multiple domains but are only editable on their primary domain. This prevents canvas overload and maintains clear ownership boundaries.
+- **Legacy data flow diagrams**: Existing data flow diagrams from pre-migration workspaces are deprecated. Users are notified upon opening migrated workspaces and must manually recreate diagrams as BPMN processes using the integrated bpmn-js editor.
+- **Legacy model type domains**: Existing workspaces with Conceptual/Logical/Physical model-type domains are incompatible with SDK 1.5.0 architecture. Users must manually reorganize tables into new business domains. The system provides migration guidance but does not automatically convert old domain structures. Old model types (Conceptual/Logical/Physical) are completely discarded in favor of business domains with view modes (Systems/ETL/Operational/Analytical).
 - **Circular relationships**: System allows circular relationships between tables (acceptable in certain data modeling scenarios) but displays a warning to the user when created.
 - **Invalid ODCS 3.1.0 format**: System validates all files and formats before loading. Invalid files are rejected with clear error messages indicating the validation failure.
 - **Simultaneous table deletion**: When multiple users attempt to delete the same table, the first deletion succeeds. Subsequent attempts warn the user that the table has already been deleted and the operation continues without error.
@@ -132,10 +143,18 @@ A user needs to manage multiple workspaces - some personal (only they can access
 
 - **FR-001**: System MUST provide an infinite canvas where users can place and arrange data model elements (tables, relationships, data flow nodes)
 - **FR-002**: System MUST provide a table editor that allows users to add, edit, and delete columns with data types and constraints
-- **FR-003**: System MUST support three model types: Conceptual, Logical, and Physical, with appropriate notation for each
+- **FR-003**: System MUST support multiple view modes per domain: Systems View (high-level data flow), ETL View (detailed ETL processes), Operational/Analytical Levels (Bronze/Silver/Gold/Operational filtering), Data Product View (ODPS products), and Compute Asset View (CADS assets). These are views/filters of the same domain data, not separate domains.
 - **FR-004**: System MUST display relationships between tables using crow's feet notation showing cardinality (one-to-one, one-to-many, many-to-many)
-- **FR-005**: System MUST allow users to create data flow diagrams with abstract icons representing data sources, processing systems, and targets
-- **FR-006**: System MUST enable linking data flow elements to conceptual tables to show physical implementation relationships
+- **FR-005**: System MUST allow users to create BPMN process diagrams using the integrated bpmn-js editor in popout modals, representing data flows and transformations between systems
+- **FR-006**: System MUST enable linking BPMN process elements to domain tables to show physical implementation relationships
+- **FR-039**: System MUST provide BPMN 2.0 and DMN 1.3 editors (bpmn-js and dmn-js) accessible via popout modals. Access points include: "Edit BPMN" button in Compute Asset View (for CADS assets), "Edit Process" button in ETL View, clickable links in domain asset lists, and "Create BPMN/DMN" buttons in relevant views
+- **FR-040**: System MUST save BPMN processes as BPMN XML files (.bpmn) and DMN decisions as DMN XML files (.dmn) in domain folders
+- **FR-041**: System MUST notify users that legacy data flow diagrams are deprecated and must be manually recreated as BPMN processes
+- **FR-042**: System MUST prioritize BPMN/DMN editing for CADS (compute asset) nodes, as these diagrams primarily show the logic within compute assets (AI/ML models, applications)
+- **FR-043**: System MUST notify users when opening pre-migration workspaces that the old Conceptual/Logical/Physical model type structure is deprecated and tables must be manually reorganized into new business domains
+- **FR-044**: System MUST provide migration guidance/tooling to help users reorganize tables from old model-type domains into new business domains, but migration is manual (no automatic conversion)
+- **FR-045**: System MUST provide full CRUD (Create, Read, Update, Delete) support for ODPS products through the Data Product View, including forms/editors for creating and editing products
+- **FR-046**: System MUST provide full CRUD support for CADS assets (AI/ML/Apps) through the Compute Asset View, including forms/editors for creating and editing assets with metadata (owner, engineering team, source repo, BPMN/DMN links)
 - **FR-007**: System MUST support multi-user collaboration with real-time updates via WebSocket connections when online
 - **FR-008**: System MUST show presence indicators displaying which users are online and what they're currently editing
 - **FR-009**: System MUST allow users to work in personal workspaces (private) or shared workspaces (collaborative)
@@ -153,7 +172,7 @@ A user needs to manage multiple workspaces - some personal (only they can access
 - **FR-021**: System MUST assign a primary owner to each canvas in collaboration mode, with other users granted read or edit access
 - **FR-022**: System MUST store changes locally during network interruptions and attempt automatic merge when connection is restored
 - **FR-023**: System MUST allow users to export files locally for manual merging when automatic merge is not possible
-- **FR-024**: System MUST organize large models into multiple domain-based canvas tabs, allowing users to switch between domain canvases
+- **FR-024**: System MUST organize large models into multiple business domain-based canvas tabs, allowing users to switch between domain canvases. Each domain supports multiple view modes (Systems, ETL, Operational/Analytical, Products) as filters of the same data.
 - **FR-025**: System MUST allow tables to appear on multiple domain canvases but only be editable on their primary domain
 - **FR-026**: System MUST allow circular relationships between tables but display a warning when created
 - **FR-027**: System MUST validate all ODCS 3.1.0 files and formats before loading, rejecting invalid files with clear error messages
@@ -171,9 +190,9 @@ A user needs to manage multiple workspaces - some personal (only they can access
 
 ### Key Entities *(include if feature involves data)*
 
-- **Workspace**: Represents a collection of data models and diagrams. Has properties: name, type (personal/shared), owner, creation date, last modified date. Contains domains (conceptual/logical/physical models) and data flow diagrams.
+- **Workspace**: Represents a collection of data models and diagrams. Has properties: name, type (personal/shared), owner, creation date, last modified date. Contains business domains, each containing ODCS tables, ODPS products, CADS assets, BPMN processes, and DMN decisions.
 
-- **Domain**: Represents a model type (Conceptual, Logical, or Physical) within a workspace. Contains tables and relationships. Has properties: name, model type, tables collection, relationships collection, primary domain flag. Each domain has its own canvas tab. Tables can appear on multiple domains but are only editable on their primary domain.
+- **Domain**: Represents a business domain (e.g., "Customer Service", "Order Processing") within a workspace. Contains all asset types: ODCS tables, ODPS products, CADS assets (AI/ML/Apps), BPMN processes, DMN decisions. Has properties: name, description, owner, tables collection, products collection, assets collection, processes collection, decisions collection, primary domain flag. Each domain has its own canvas with multiple view modes (Systems, ETL, Operational/Analytical Levels, Data Product View). Tables can appear on multiple domains but are only editable on their primary domain. View modes (Systems, ETL, Operational, Analytical, Products) are filters/views of the same domain data, not separate domains.
 
 - **Table**: Represents a data entity in a model. Has properties: name, alias, columns collection, position on canvas (x, y), size (width, height), model type, primary domain. Can be linked to data flow elements. Can appear on multiple domain canvases but is only editable on its primary domain.
 
@@ -181,11 +200,13 @@ A user needs to manage multiple workspaces - some personal (only they can access
 
 - **Relationship**: Represents a connection between two tables. Has properties: source table, target table, cardinality (one-to-one, one-to-many, many-to-many), optionality, name. Displayed with crow's feet notation.
 
-- **Data Flow Diagram**: Represents a data architecture flow. Has properties: name, nodes collection, connections collection, links to conceptual tables.
+- **BPMN Process**: Represents a business process or data flow using BPMN 2.0 notation. Has properties: id, domain_id, name, bpmn_xml (BPMN 2.0 XML content), linked_assets (references to CADS assets), transformation_links (metadata linking to ODCS tables). Stored as .bpmn files in domain folders.
 
-- **Data Flow Node**: Represents an element in a data flow (source, processor, target). Has properties: type (database, Kafka topic, API, etc.), name, position, icon representation.
+- **DMN Decision**: Represents a decision model using DMN 1.3 notation. Has properties: id, domain_id, name, dmn_xml (DMN 1.3 XML content). Stored as .dmn files in domain folders.
 
-- **Data Flow Connection**: Represents a data movement between nodes. Has properties: source node, target node, label, direction.
+- **ODPS Data Product**: Represents a data product linking multiple ODCS tables. Has properties: id, domain_id, name, description, linked_tables (references to ODCS table IDs). Stored as .odps.yaml files in domain folders.
+
+- **CADS Compute Asset**: Represents an AI/ML model or application (also referred to as CARD nodes). Has properties: id, domain_id, name, type ('ai' | 'ml' | 'app'), description, owner, engineering_team, source_repo, bpmn_link (reference to BPMN process showing logic within the asset), dmn_link (optional reference to DMN decision). Stored as .cads.yaml files in domain folders. BPMN/DMN diagrams are primarily used to document the logic and decision-making within these compute assets.
 
 - **User Session**: Represents a user's active editing session. Has properties: user ID, workspace ID, current selection, cursor position, presence status.
 

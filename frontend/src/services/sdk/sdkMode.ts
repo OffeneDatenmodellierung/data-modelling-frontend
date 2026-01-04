@@ -21,8 +21,23 @@ interface SDKModeState {
 class SDKModeDetector {
   /**
    * Check if we're online and API is available
+   * NOTE: This method should NOT be called directly - use the store's checkOnlineMode() which respects manual override
    */
   async checkOnlineMode(): Promise<boolean> {
+    // Check manual override before making API call
+    const state = useSDKModeStore.getState();
+    if (state.isManualOverride && state.mode === 'offline') {
+      console.log('[SDKMode] Skipping API check - manually set to offline mode');
+      return false;
+    }
+    
+    // Also check if we're in Electron offline mode (production build with file:// protocol)
+    if (typeof window !== 'undefined' && window.location.protocol === 'file:') {
+      // In Electron production build, we're in offline mode
+      console.log('[SDKMode] Electron offline mode detected (file:// protocol) - skipping API check');
+      return false;
+    }
+
     try {
       // Determine API URL:
       // - If VITE_API_BASE_URL is set and is a full URL (starts with http:// or https://), use it
@@ -61,9 +76,20 @@ class SDKModeDetector {
   async getMode(): Promise<SDKMode> {
     const state = useSDKModeStore.getState();
     
-    // If user manually set mode, use that
-    if (state.isManualOverride) {
-      return state.mode;
+    // If user manually set mode to offline, return immediately without API check
+    if (state.isManualOverride && state.mode === 'offline') {
+      return 'offline';
+    }
+    
+    // If user manually set mode to online, verify API is available
+    if (state.isManualOverride && state.mode === 'online') {
+      const isOnline = await this.checkOnlineMode();
+      if (!isOnline) {
+        console.warn('[SDKMode] Manual online mode but API unavailable - switching to offline');
+        useSDKModeStore.setState({ mode: 'offline', isManualOverride: false });
+        return 'offline';
+      }
+      return 'online';
     }
     
     // Otherwise, check API availability
@@ -102,8 +128,20 @@ class SDKModeDetector {
   async initialize(): Promise<void> {
     const state = useSDKModeStore.getState();
     
-    // If manual override exists, use it
-    if (state.isManualOverride) {
+    // If manual override exists and mode is offline, skip API check
+    if (state.isManualOverride && state.mode === 'offline') {
+      console.log('[SDKMode] Using manual offline mode override - skipping API check');
+      return;
+    }
+    
+    // If manual override exists but mode is online, still check API availability
+    if (state.isManualOverride && state.mode === 'online') {
+      // Verify API is actually available
+      const isOnline = await this.checkOnlineMode();
+      if (!isOnline) {
+        console.warn('[SDKMode] Manual online mode set but API unavailable - switching to offline');
+        useSDKModeStore.setState({ mode: 'offline', isManualOverride: false });
+      }
       return;
     }
     
@@ -124,11 +162,21 @@ export const useSDKModeStore = create<SDKModeState>()(
       },
       
       checkOnlineMode: async () => {
+        const state = useSDKModeStore.getState();
+        // If manually set to offline, don't check API
+        if (state.isManualOverride && state.mode === 'offline') {
+          return false;
+        }
         const detector = new SDKModeDetector();
         return detector.checkOnlineMode();
       },
       
       getMode: async () => {
+        // Check store state first - if manually set to offline, return immediately
+        const state = useSDKModeStore.getState();
+        if (state.isManualOverride && state.mode === 'offline') {
+          return 'offline';
+        }
         const detector = new SDKModeDetector();
         return detector.getMode();
       },

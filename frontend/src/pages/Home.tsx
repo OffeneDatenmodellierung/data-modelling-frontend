@@ -12,10 +12,13 @@ import { sdkModeDetector } from '@/services/sdk/sdkMode';
 import { OnlineOfflineToggle } from '@/components/common/OnlineOfflineToggle';
 import { localFileService } from '@/services/storage/localFileService';
 import { useUIStore } from '@/stores/uiStore';
-import { isElectron } from '@/services/platform/platform';
+import { isElectron, getAssetPath } from '@/services/platform/platform';
 import { electronAuthService } from '@/services/api/electronAuthService';
 import { WorkspaceList } from '@/components/workspace/WorkspaceList';
 import { WorkspaceSelector } from '@/components/workspace/WorkspaceSelector';
+import { workspaceService } from '@/services/api/workspaceService';
+import { apiClient } from '@/services/api/apiClient';
+import { authService } from '@/services/api/authService';
 
 const Home: React.FC = () => {
   const navigate = useNavigate();
@@ -25,6 +28,10 @@ const Home: React.FC = () => {
   const { mode, initialize } = useSDKModeStore();
   const [modeLoading, setModeLoading] = useState(true);
   const [isCheckingLogin, setIsCheckingLogin] = useState(false);
+  const [hasFetchedWorkspaces, setHasFetchedWorkspaces] = useState(false);
+  const [selectedProfileEmail, setSelectedProfileEmail] = useState<string | null>(null);
+  const [availableProfiles, setAvailableProfiles] = useState<Array<{ email: string; domains: string[] }>>([]);
+  const [availableEmails, setAvailableEmails] = useState<string[]>([]);
   const { addToast } = useUIStore();
 
   // Initialize mode on mount
@@ -36,12 +43,68 @@ const Home: React.FC = () => {
     initMode();
   }, [initialize]);
 
-  // Load workspaces when authenticated and online
+  // Load available emails from session when authenticated and online (only once)
+  // This happens right after authentication, before workspace selection
   useEffect(() => {
-    if (isAuthenticated && mode === 'online' && !workspacesLoading) {
-      fetchWorkspaces();
+    if (isAuthenticated && mode === 'online' && availableEmails.length === 0 && !selectedProfileEmail) {
+      const loadEmails = async () => {
+        try {
+          // Get available emails from auth status (session)
+          const emails = await authService.getAvailableEmails();
+          if (emails && emails.length > 0) {
+            setAvailableEmails(emails);
+            // If only one email, auto-select it and proceed
+            if (emails.length === 1 && emails[0]) {
+              setSelectedProfileEmail(emails[0]);
+            }
+            // If multiple emails, show selection UI (don't proceed yet)
+          } else {
+            // No emails available, proceed normally
+            setHasFetchedWorkspaces(true);
+            fetchWorkspaces();
+          }
+        } catch (error) {
+          console.error('Failed to load available emails:', error);
+          // On error, proceed normally
+          setHasFetchedWorkspaces(true);
+          fetchWorkspaces();
+        }
+      };
+      loadEmails();
     }
-  }, [isAuthenticated, mode, fetchWorkspaces, workspacesLoading]);
+  }, [isAuthenticated, mode, availableEmails.length, selectedProfileEmail, fetchWorkspaces]);
+
+  // Load profiles when email is selected (for workspace selection)
+  useEffect(() => {
+    if (isAuthenticated && mode === 'online' && selectedProfileEmail && !hasFetchedWorkspaces && !workspacesLoading && availableProfiles.length === 0) {
+      const loadProfiles = async () => {
+        try {
+          const profiles = await workspaceService.listProfiles();
+          if (profiles && profiles.length > 0) {
+            setAvailableProfiles(profiles);
+          }
+          // Fetch workspaces after profiles are loaded
+          setHasFetchedWorkspaces(true);
+          fetchWorkspaces();
+        } catch (error) {
+          console.error('Failed to load profiles:', error);
+          // On error, proceed normally
+          setHasFetchedWorkspaces(true);
+          fetchWorkspaces();
+        }
+      };
+      loadProfiles();
+    }
+  }, [isAuthenticated, mode, selectedProfileEmail, hasFetchedWorkspaces, workspacesLoading, availableProfiles.length, fetchWorkspaces]);
+
+  // When email is selected, proceed to workspace selection
+  // This triggers profile loading and workspace fetching
+  useEffect(() => {
+    if (selectedProfileEmail && !hasFetchedWorkspaces && !workspacesLoading) {
+      // Email is selected, now we can fetch workspaces
+      // The profile loading effect will handle this
+    }
+  }, [selectedProfileEmail, hasFetchedWorkspaces, workspacesLoading]);
 
   // Show loading while checking mode and auth
   if (isLoading || modeLoading) {
@@ -70,6 +133,117 @@ const Home: React.FC = () => {
 
       const workspace = await localFileService.loadWorkspaceFromFolder(files);
       
+      // Populate model store with loaded data
+      const { useModelStore } = await import('@/stores/modelStore');
+      const modelStore = useModelStore.getState();
+      
+      // Set domains
+      if ((workspace as any).domains) {
+        modelStore.setDomains((workspace as any).domains);
+      }
+      
+      // Set tables
+      if ((workspace as any).tables) {
+        const tablesToSet = (workspace as any).tables;
+        console.log(`[Home] Setting ${tablesToSet.length} table(s) in model store:`, tablesToSet.map((t: any) => ({ 
+          id: t.id, 
+          name: t.name, 
+          primary_domain_id: t.primary_domain_id, 
+          visible_domains: t.visible_domains 
+        })));
+        modelStore.setTables(tablesToSet);
+        // Wait a tick to ensure state update
+        await new Promise(resolve => setTimeout(resolve, 0));
+        const tablesAfterSet = useModelStore.getState().tables;
+        console.log(`[Home] Tables in store after setting: ${tablesAfterSet.length}`, tablesAfterSet.map((t: any) => ({ 
+          id: t.id, 
+          name: t.name, 
+          primary_domain_id: t.primary_domain_id, 
+          visible_domains: t.visible_domains 
+        })));
+        if (tablesAfterSet.length === 0) {
+          console.error(`[Home] ERROR: Tables were not persisted! Expected ${tablesToSet.length}, got ${tablesAfterSet.length}`);
+        }
+      } else {
+        console.log(`[Home] No tables found in workspace object`);
+        console.log(`[Home] Workspace object keys:`, Object.keys(workspace as any));
+      }
+      
+      // Set relationships
+      if ((workspace as any).relationships) {
+        modelStore.setRelationships((workspace as any).relationships);
+      }
+      
+      // Set systems
+      if ((workspace as any).systems) {
+        const systemsToSet = (workspace as any).systems;
+        console.log(`[Home] Setting ${systemsToSet.length} system(s) in model store:`, systemsToSet.map((s: any) => ({ id: s.id, name: s.name })));
+        modelStore.setSystems(systemsToSet);
+        // Wait a tick to ensure state update
+        await new Promise(resolve => setTimeout(resolve, 0));
+        const systemsAfterSet = useModelStore.getState().systems;
+        console.log(`[Home] Systems in store after setting: ${systemsAfterSet.length}`, systemsAfterSet.map((s: any) => ({ id: s.id, name: s.name })));
+        if (systemsAfterSet.length === 0) {
+          console.error(`[Home] ERROR: Systems were not persisted! Expected ${systemsToSet.length}, got ${systemsAfterSet.length}`);
+        }
+      } else {
+        console.log(`[Home] No systems found in workspace object`);
+      }
+      
+      // Set relationships
+      if ((workspace as any).relationships) {
+        console.log(`[Home] Setting ${(workspace as any).relationships.length} relationship(s) in model store`);
+        modelStore.setRelationships((workspace as any).relationships);
+      } else {
+        console.log(`[Home] No relationships found in workspace object`);
+      }
+      
+      // Set products
+      if ((workspace as any).products) {
+        console.log(`[Home] Setting ${(workspace as any).products.length} product(s) in model store`);
+        modelStore.setProducts((workspace as any).products);
+      }
+      
+      // Set assets
+      if ((workspace as any).assets) {
+        console.log(`[Home] Setting ${(workspace as any).assets.length} asset(s) in model store`);
+        modelStore.setComputeAssets((workspace as any).assets);
+      }
+      
+      // Set BPMN processes
+      if ((workspace as any).bpmnProcesses) {
+        console.log(`[Home] Setting ${(workspace as any).bpmnProcesses.length} BPMN process(es) in model store`);
+        modelStore.setBPMNProcesses((workspace as any).bpmnProcesses);
+      }
+      
+      // Set DMN decisions
+      if ((workspace as any).dmnDecisions) {
+        console.log(`[Home] Setting ${(workspace as any).dmnDecisions.length} DMN decision(s) in model store`);
+        modelStore.setDMNDecisions((workspace as any).dmnDecisions);
+      }
+      
+      console.log(`[Home] Final model store state:`, {
+        domains: modelStore.domains.length,
+        tables: modelStore.tables.length,
+        relationships: modelStore.relationships.length,
+        systems: modelStore.systems.length,
+        products: modelStore.products.length,
+        assets: modelStore.computeAssets.length,
+        bpmnProcesses: modelStore.bpmnProcesses.length,
+        dmnDecisions: modelStore.dmnDecisions.length,
+      });
+      
+      // Select first domain if available
+      if ((workspace as any).domains && (workspace as any).domains.length > 0) {
+        modelStore.setSelectedDomain((workspace as any).domains[0].id);
+      }
+      
+      // Check for legacy structure using migration utilities
+      const { detectLegacyStructure, getMigrationGuidance } = await import('@/utils/migration');
+      const legacyStructure = detectLegacyStructure(workspace);
+      const hasLegacyDataFlow = legacyStructure.hasLegacyDataFlow;
+      const hasLegacyModelTypes = legacyStructure.hasLegacyModelTypes;
+      
       // Add workspace to store if not already present
       const existingWorkspace = workspaces.find((w) => w.id === workspace.id);
       if (!existingWorkspace) {
@@ -79,10 +253,20 @@ const Home: React.FC = () => {
       // Set as current workspace
       setCurrentWorkspace(workspace.id);
       
-      addToast({
-        type: 'success',
-        message: `Opened workspace: ${workspace.name}`,
-      });
+      // Show migration notice if legacy structure detected
+      if (hasLegacyDataFlow || hasLegacyModelTypes) {
+        const guidance = getMigrationGuidance(legacyStructure);
+        addToast({
+          type: 'warning',
+          message: `Legacy workspace structure detected:\n\n${guidance}\n\nPlease use the migration wizard to reorganize your workspace.`,
+          duration: 15000, // Show for 15 seconds
+        });
+      } else {
+        addToast({
+          type: 'success',
+          message: `Opened workspace: ${workspace.name}`,
+        });
+      }
 
       // Navigate to workspace editor
       navigate(`/workspace/${workspace.id}`);
@@ -338,14 +522,68 @@ const Home: React.FC = () => {
     );
   }
 
+  // Show email alias selection if multiple email aliases available and none selected
+  // Use emails from session (availableEmails) instead of profiles
+  const shouldShowEmailSelection = isAuthenticated && availableEmails.length > 1 && !selectedProfileEmail;
+
+  if (shouldShowEmailSelection) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="max-w-md w-full bg-white rounded-lg shadow-md p-8">
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">Select Your Email Alias</h2>
+          <p className="text-gray-600 mb-6">Please select which email alias you want to use for this session:</p>
+          <div className="space-y-2">
+            {availableEmails.map((email) => (
+              <button
+                key={email}
+                onClick={async () => {
+                  setSelectedProfileEmail(email);
+                  // Call /auth/select-email to set the email for workspace operations
+                  // Note: This endpoint may have authentication issues, so we proceed even if it fails
+                  // The selected email is stored locally and will be used for workspace operations
+                  try {
+                    const token = apiClient.getAccessToken();
+                    console.log('[Home] Calling select-email with token:', token ? `Bearer ${token.substring(0, 20)}...` : 'NO TOKEN');
+                    const response = await apiClient.getClient().post('/api/v1/auth/select-email', { email });
+                    console.log('[Home] select-email response:', response.status, response.data);
+                  } catch (err: any) {
+                    // API endpoint may have authentication issues - log but don't block user flow
+                    console.warn('[Home] select-email endpoint returned error (this may be an API issue):', err.response?.status, err.response?.data || err.message);
+                    console.log('[Home] Continuing with locally selected email:', email);
+                    // Store selected email in localStorage as fallback
+                    localStorage.setItem('selected_email', email);
+                  }
+                }}
+                className="w-full py-3 px-4 rounded-lg border-2 border-gray-200 bg-white text-gray-900 hover:border-blue-300 hover:bg-blue-50 transition-colors text-left"
+              >
+                <div className="font-medium">{email}</div>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white shadow">
         <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between">
-            <h1 className="text-3xl font-bold text-gray-900">Data Modelling Application</h1>
+            <div className="flex items-center gap-4">
+              <img 
+                src={getAssetPath('/logo.svg')} 
+                alt="Open Data Modelling" 
+                className="h-10 w-auto"
+                style={{ maxHeight: '40px' }}
+              />
+              <h1 className="text-3xl font-bold text-gray-900">Open Data Modelling</h1>
+            </div>
             <OnlineOfflineToggle />
           </div>
+          {selectedProfileEmail && (
+            <p className="mt-2 text-sm text-gray-600">Using profile: {selectedProfileEmail}</p>
+          )}
         </div>
       </header>
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
@@ -383,9 +621,11 @@ const Home: React.FC = () => {
                       setShowCreateDialog(false);
                       navigate(`/workspace/${workspace.id}`);
                     } catch (error) {
+                      console.error('Workspace creation error:', error);
+                      const errorMessage = error instanceof Error ? error.message : 'Failed to create workspace';
                       addToast({
                         type: 'error',
-                        message: 'Failed to create workspace',
+                        message: errorMessage,
                       });
                     }
                   }}

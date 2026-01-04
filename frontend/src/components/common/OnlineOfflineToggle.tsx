@@ -19,8 +19,19 @@ export const OnlineOfflineToggle: React.FC = () => {
 
   // Check API availability when component mounts
   useEffect(() => {
+    // Skip all API checks if manually set to offline mode
+    if (isManualOverride && mode === 'offline') {
+      return;
+    }
+
     const checkAvailability = async () => {
-      if (!isManualOverride) {
+      // Double-check manual override before making API call
+      const currentState = useSDKModeStore.getState();
+      if (currentState.isManualOverride && currentState.mode === 'offline') {
+        return;
+      }
+      
+      if (!currentState.isManualOverride) {
         setIsChecking(true);
         const isOnline = await checkOnlineMode();
         if (isOnline && mode === 'offline') {
@@ -32,10 +43,19 @@ export const OnlineOfflineToggle: React.FC = () => {
       }
     };
     
-    checkAvailability();
+    // Only check if not manually set to offline
+    if (!(isManualOverride && mode === 'offline')) {
+      checkAvailability();
+    }
     
-    // Check periodically (every 30 seconds)
-    const interval = setInterval(checkAvailability, 30000);
+    // Check periodically (every 30 seconds) - but skip if manually set to offline
+    const interval = setInterval(() => {
+      // Double-check manual override before making API call
+      const currentState = useSDKModeStore.getState();
+      if (!(currentState.isManualOverride && currentState.mode === 'offline')) {
+        checkAvailability();
+      }
+    }, 30000);
     return () => clearInterval(interval);
   }, [mode, isManualOverride, checkOnlineMode, setMode]);
 

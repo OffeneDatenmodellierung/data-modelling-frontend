@@ -20,7 +20,7 @@ WORKDIR /app
 RUN set -euxo pipefail && \
     CARGO_HOME=${CARGO_HOME:-/usr/local/cargo} && \
     echo "Cargo home: $CARGO_HOME" && \
-    cargo install data-modelling-api --version 1.0.1 2>&1 | tee /tmp/install.log && \
+    cargo install data-modelling-api --version 1.1.2 2>&1 | tee /tmp/install.log && \
     echo "Checking installed binaries:" && \
     ls -la "$CARGO_HOME/bin/" && \
     if [ ! -f "$CARGO_HOME/bin/api" ]; then \

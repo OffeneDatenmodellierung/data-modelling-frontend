@@ -18,7 +18,7 @@ done
 
 WASM_OUT_DIR="$FRONTEND_DIR/public/wasm"
 
-echo "Building WASM SDK (requires data-modelling-sdk version 1.0.2)..."
+echo "Building WASM SDK (requires data-modelling-sdk version 1.6.2+)..."
 
 # Check if SDK directory exists
 if [ -z "$SDK_DIR" ]; then
@@ -28,8 +28,8 @@ if [ -z "$SDK_DIR" ]; then
   echo "     - $PROJECT_ROOT/../data-modelling-sdk"
   echo "     - $FRONTEND_DIR/../data-modelling-sdk"
   echo ""
-  echo "   The WASM SDK is optional - offline mode will use a JavaScript YAML parser fallback."
-  echo "   To build the SDK, ensure data-modelling-sdk (version 1.0.2) is available and contains Cargo.toml"
+      echo "   The WASM SDK is optional - offline mode will use a JavaScript YAML parser fallback."
+      echo "   To build the SDK, ensure data-modelling-sdk (version 1.6.2+) is available and contains Cargo.toml"
   exit 0  # Exit successfully - this is not a fatal error
 fi
 
@@ -40,9 +40,13 @@ if [ -f "$SDK_DIR/Cargo.toml" ]; then
   SDK_VERSION=$(grep -E '^version\s*=' "$SDK_DIR/Cargo.toml" | head -1 | sed 's/.*version\s*=\s*"\([^"]*\)".*/\1/' || echo "")
   if [ -n "$SDK_VERSION" ]; then
     echo "   SDK version: $SDK_VERSION"
-    if [ "$SDK_VERSION" != "1.0.2" ]; then
-      echo "   ⚠️  Warning: Expected version 1.0.2, found $SDK_VERSION"
-      echo "   The application requires data-modelling-sdk = \"1.0.2\""
+    # Check if version is 1.6.2 or higher
+    if [ "$(printf '%s\n' "1.6.2" "$SDK_VERSION" | sort -V | head -n1)" != "1.6.2" ]; then
+      echo "   ⚠️  Warning: Expected version 1.6.2+, found $SDK_VERSION"
+      echo "   The application requires data-modelling-sdk >= \"1.6.2\" for enhanced AVRO/Protobuf/JSON Schema export/import support"
+      echo "   Some features may not work correctly with older SDK versions"
+    else
+      echo "   ✅ SDK version $SDK_VERSION meets requirements (>= 1.6.2)"
     fi
   fi
 fi

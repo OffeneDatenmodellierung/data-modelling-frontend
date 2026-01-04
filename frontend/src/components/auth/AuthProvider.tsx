@@ -32,8 +32,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   useEffect(() => {
     const initializeAuth = async () => {
       try {
-        // Check current mode
-        const mode = await useSDKModeStore.getState().getMode();
+        // Check current mode from store directly (don't trigger API check)
+        const state = useSDKModeStore.getState();
+        const mode = state.mode;
         
         // Skip auth initialization in offline mode
         if (mode === 'offline') {
@@ -41,12 +42,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           return;
         }
         
-        // Initialize auth only in online mode
-        authService.initialize();
-        
-        if (authService.isAuthenticated()) {
-          const currentUser = await authService.getCurrentUser();
-          setUser(currentUser);
+        // Only initialize if manually set to online (don't auto-detect)
+        if (state.isManualOverride && mode === 'online') {
+          // Initialize auth only in online mode
+          authService.initialize();
+          
+          if (authService.isAuthenticated()) {
+            const currentUser = await authService.getCurrentUser();
+            setUser(currentUser);
+          }
+        } else {
+          // Not manually set to online, skip auth
+          setIsLoading(false);
         }
       } catch (error) {
         console.error('Failed to initialize auth:', error);
@@ -61,17 +68,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   // Set up token refresh interval (only in online mode)
   useEffect(() => {
     const setupTokenRefresh = async () => {
-      // Check if we're in online mode
-      const mode = await useSDKModeStore.getState().getMode();
-      if (mode === 'offline' || !authService.isAuthenticated()) {
+      // Check if we're in online mode from store (don't trigger API check)
+      const state = useSDKModeStore.getState();
+      if (state.mode === 'offline' || !authService.isAuthenticated()) {
         return;
       }
 
       const refreshInterval = setInterval(async () => {
         try {
-          // Check mode again before refresh
-          const currentMode = await useSDKModeStore.getState().getMode();
-          if (currentMode === 'offline') {
+          // Check mode again before refresh (from store, don't trigger API check)
+          const currentState = useSDKModeStore.getState();
+          if (currentState.mode === 'offline') {
             clearInterval(refreshInterval);
             return;
           }
@@ -103,8 +110,30 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         token_type: 'Bearer',
       });
 
-      const currentUser = await authService.getCurrentUser();
-      setUser(currentUser);
+      // Try to get current user, but don't fail if endpoint doesn't exist
+      try {
+        const currentUser = await authService.getCurrentUser();
+        if (currentUser) {
+          setUser(currentUser);
+        } else {
+          // If /me endpoint doesn't exist or returns null, create a default user
+          // Authentication is still valid based on tokens
+          setUser({
+            id: 'authenticated',
+            email: 'user@example.com',
+            name: 'Authenticated User',
+          });
+        }
+      } catch (userError) {
+        // /me endpoint might not exist - that's okay, we still have valid tokens
+        console.warn('Could not fetch user info, but tokens are valid:', userError);
+        setUser({
+          id: 'authenticated',
+          email: 'user@example.com',
+          name: 'Authenticated User',
+        });
+      }
+
       addToast({
         type: 'success',
         message: 'Successfully logged in',

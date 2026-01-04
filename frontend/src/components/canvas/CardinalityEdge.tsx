@@ -137,7 +137,7 @@ export const CardinalityEdge: React.FC<EdgeProps<CardinalityEdgeData>> = ({
         perpDirX = 0
         perpDirY = 1
         break
-      default:
+      default: {
         const dx = otherTargetX - otherSourceX
         const dy = otherTargetY - otherSourceY
         const len = Math.sqrt(dx * dx + dy * dy)
@@ -145,6 +145,8 @@ export const CardinalityEdge: React.FC<EdgeProps<CardinalityEdgeData>> = ({
           perpDirX = -dy / len
           perpDirY = dx / len
         }
+        break
+      }
     }
     
     const perpX1 = otherSourceX + perpDirX * perpendicularOffset
@@ -171,7 +173,7 @@ export const CardinalityEdge: React.FC<EdgeProps<CardinalityEdgeData>> = ({
         targetPerpDirX = 0
         targetPerpDirY = 1
         break
-      default:
+      default: {
         const dx = otherTargetX - otherSourceX
         const dy = otherTargetY - otherSourceY
         const len = Math.sqrt(dx * dx + dy * dy)
@@ -179,6 +181,8 @@ export const CardinalityEdge: React.FC<EdgeProps<CardinalityEdgeData>> = ({
           targetPerpDirX = dy / len
           targetPerpDirY = -dx / len
         }
+        break
+      }
     }
     
     const perpX2 = otherTargetX + targetPerpDirX * perpendicularOffset
@@ -234,7 +238,7 @@ export const CardinalityEdge: React.FC<EdgeProps<CardinalityEdgeData>> = ({
         perpDirX = 0
         perpDirY = 1   // Go down (perpendicular outward)
         break
-      default:
+      default: {
         // Fallback: calculate perpendicular based on edge direction
         const dx = targetX - sourceX
         const dy = targetY - sourceY
@@ -244,6 +248,8 @@ export const CardinalityEdge: React.FC<EdgeProps<CardinalityEdgeData>> = ({
           perpDirX = -dy / len
           perpDirY = dx / len
         }
+        break
+      }
     }
     
     // First point: extend perpendicular from source
@@ -271,7 +277,7 @@ export const CardinalityEdge: React.FC<EdgeProps<CardinalityEdgeData>> = ({
         targetPerpDirX = 0
         targetPerpDirY = 1    // Coming from bottom (perpendicular inward)
         break
-      default:
+      default: {
         // Fallback: calculate perpendicular based on edge direction
         const dx = targetX - sourceX
         const dy = targetY - sourceY
@@ -281,6 +287,8 @@ export const CardinalityEdge: React.FC<EdgeProps<CardinalityEdgeData>> = ({
           targetPerpDirX = dy / len
           targetPerpDirY = -dx / len
         }
+        break
+      }
     }
     
     // Last point before target: extend perpendicular from target
@@ -340,7 +348,9 @@ export const CardinalityEdge: React.FC<EdgeProps<CardinalityEdgeData>> = ({
         if (otherEdge.type !== 'cardinality') continue // Only check cardinality edges
         
         // Get node connection points for other edge
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const otherSourcePos = (otherEdge as any).sourcePosition ?? 'bottom'
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const otherTargetPos = (otherEdge as any).targetPosition ?? 'top'
         const otherSourcePoint = getNodeConnectionPoint(otherEdge.source, otherSourcePos)
         const otherTargetPoint = getNodeConnectionPoint(otherEdge.target, otherTargetPos)
@@ -491,7 +501,7 @@ export const CardinalityEdge: React.FC<EdgeProps<CardinalityEdgeData>> = ({
   }
   
   // Build path with perpendicular routing
-  const [edgePath] = buildPerpendicularPath()
+  const [edgePath, labelX, labelY] = buildPerpendicularPath()
 
   const relationship = data?.relationship
   
@@ -595,6 +605,7 @@ export const CardinalityEdge: React.FC<EdgeProps<CardinalityEdgeData>> = ({
 
   // Debug logging (reduced - only log if there's an issue)
   if (import.meta.env.DEV && cardinality && !showStartCrowfoot && !showEndCrowfoot && !showStartLine && !showEndLine) {
+    // eslint-disable-next-line no-console
     console.warn('[CardinalityEdge] Cardinality set but no symbols rendered:', {
       id,
       cardinality,
@@ -995,6 +1006,35 @@ export const CardinalityEdge: React.FC<EdgeProps<CardinalityEdgeData>> = ({
       {showEndOptional && renderOptionalCircle(targetX, targetY, targetAngle, showEndCrowfoot, targetPosition)}
       {showEndCrowfoot && renderCrowfoot(targetX, targetY, targetAngle, false, targetPosition, !targetOptional)}
       {showEndLine && renderOneLine(targetX, targetY, targetAngle, showEndOptional, targetPosition)}
+      
+      {/* Relationship label */}
+      {relationship?.label && (
+        <g>
+          {/* Label background */}
+          <rect
+            x={labelX - (relationship.label.length * 3.5)}
+            y={labelY - 10}
+            width={relationship.label.length * 7}
+            height={20}
+            fill="white"
+            stroke="#e5e7eb"
+            strokeWidth={1}
+            rx={4}
+            className="pointer-events-none"
+          />
+          {/* Label text */}
+          <text
+            x={labelX}
+            y={labelY}
+            className="text-xs fill-gray-700 pointer-events-none"
+            textAnchor="middle"
+            dominantBaseline="middle"
+            style={{ fontWeight: 500 }}
+          >
+            {relationship.label}
+          </text>
+        </g>
+      )}
     </>
   )
 }

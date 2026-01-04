@@ -1,17 +1,19 @@
 {
-  "name": "frontend",
+  "name": "open-data-modelling",
   "version": "1.0.0",
-  "description": "",
+  "description": "Open Data Modelling - A domain-centric data modeling application",
   "main": "dist-electron/main.cjs",
   "directories": {
     "test": "tests"
   },
   "scripts": {
-    "build:wasm": "bash scripts/build-wasm.sh || echo 'WASM SDK build skipped (SDK not found or wasm-pack not installed)'",
+    "build:wasm": "sh scripts/build-wasm.sh || echo 'WASM SDK build skipped (SDK not found or wasm-pack not installed)'",
     "prebuild": "npm run build:wasm || true",
     "dev": "vite",
     "build": "tsc && vite build",
     "build:electron": "vite build --config vite.electron.config.ts",
+    "build:electron:frontend": "VITE_ELECTRON_BUILD=true vite build && npm run copy:wasm:electron",
+    "copy:wasm:electron": "mkdir -p dist-electron/wasm && cp -r public/wasm/* dist-electron/wasm/ 2>/dev/null || cp -r dist/wasm/* dist-electron/wasm/ 2>/dev/null || true",
     "preview": "vite preview",
     "test": "vitest",
     "test:ui": "vitest --ui",
@@ -22,9 +24,9 @@
     "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json,css}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx,json,css}\"",
     "type-check": "tsc --noEmit",
-    "electron": "NODE_ENV=production electron .",
+    "electron": "npm run build:electron && npm run build:electron:frontend && NODE_ENV=production electron .",
     "electron:dev": "npm run build:electron && concurrently \"npm run dev\" \"wait-on http://localhost:5173 && NODE_ENV=development electron .\"",
-    "electron:build": "npm run build && npm run build:electron && electron-builder",
+    "electron:build": "npm run build:electron:frontend && npm run build:electron && electron-builder",
     "security:audit": "npm audit",
     "security:fix": "npm audit fix"
   },
@@ -36,6 +38,8 @@
     "@tanstack/react-query": "^5.90.16",
     "@types/js-yaml": "^4.0.9",
     "axios": "^1.13.2",
+    "bpmn-js": "^18.9.1",
+    "dmn-js": "^17.5.0",
     "js-yaml": "^4.1.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",

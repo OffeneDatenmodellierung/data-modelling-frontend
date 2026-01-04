@@ -4,6 +4,60 @@
 
 import type { ModelType } from './workspace';
 
+export type QualityTier = 'operational' | 'bronze' | 'silver' | 'gold';
+
+export interface SLA {
+  latency?: number; // milliseconds
+  uptime?: number; // percentage (0-100)
+  response_time?: number; // milliseconds
+  error_rate?: number; // percentage (0-100)
+  update_frequency?: string; // e.g., "daily", "hourly", "real-time"
+}
+
+export interface Owner {
+  name?: string;
+  email?: string;
+  team?: string;
+  role?: string; // e.g., "Data Owner", "Data Steward"
+}
+
+export interface Role {
+  role: string; // Required: Name of the IAM role that provides access to the dataset
+  description?: string; // Description of the IAM role and its permissions
+  access?: string; // The type of access provided by the IAM role
+  firstLevelApprovers?: string | string[]; // The name(s) of the first-level approver(s) of the role
+  secondLevelApprovers?: string | string[]; // The name(s) of the second-level approver(s) of the role
+  customProperties?: Record<string, unknown>; // Any custom properties
+}
+
+// ODCS v3.0.2 Support and Communication Channels
+export interface SupportChannel {
+  channel: string; // Required: Channel name or identifier
+  url: string; // Required: Access URL using normal URL scheme (https, mailto, etc.)
+  description?: string; // Description of the channel, free text
+  tool?: 'email' | 'slack' | 'teams' | 'discord' | 'ticket' | string; // Name of the tool
+  scope?: 'interactive' | 'announcements' | 'issues'; // Scope of the channel
+  invitationUrl?: string; // Invitation URL for requesting or subscribing
+}
+
+// ODCS v3.0.2 Pricing
+export interface Pricing {
+  priceAmount?: number; // Subscription price per unit of measure in priceUnit
+  priceCurrency?: string; // Currency of the subscription price (e.g., USD, EUR)
+  priceUnit?: string; // Unit of measure for calculating cost (e.g., megabyte, gigabyte)
+}
+
+// ODCS v3.0.2 Team (formerly stakeholders in v2.x)
+export interface TeamMember {
+  username?: string; // The user's username or email
+  role?: string; // The user's job role (e.g., owner, data steward)
+  dateIn?: string; // The date when the user joined the team (ISO date format: YYYY-MM-DD)
+  dateOut?: string; // The date when the user ceased to be part of the team (ISO date format: YYYY-MM-DD)
+  replacedByUsername?: string; // The username of the user who replaced the previous user
+  comment?: string; // Free text comment
+  name?: string; // User's name
+}
+
 export interface Table {
   id: string; // UUID
   workspace_id: string; // UUID
@@ -14,13 +68,35 @@ export interface Table {
   tags?: string[]; // optional tags for categorization
   model_type: ModelType;
   columns: Column[];
+  compoundKeys?: CompoundKey[]; // Array of compound keys (primary or unique)
   position_x: number; // canvas position
   position_y: number; // canvas position
   width: number; // canvas size, default 200
   height: number; // canvas size, default 150
   visible_domains: string[]; // array of domain UUIDs
+  data_level?: 'operational' | 'bronze' | 'silver' | 'gold'; // Data quality tier
+  is_owned_by_domain: boolean; // True if owned by current domain (for cross-domain viewing)
   created_at: string; // ISO timestamp
   last_modified_at: string; // ISO timestamp
+  
+  // ODCS 3.0.2+ fields
+  owner?: Owner;
+  roles?: Role[]; // Array of roles that provide user access to the dataset
+  support?: SupportChannel[]; // Support and communication channels
+  pricing?: Pricing; // Pricing information when billing customers
+  team?: TeamMember[]; // Team members and their history (formerly stakeholders in v2.x)
+  sla?: SLA;
+  metadata?: Record<string, unknown>; // Custom metadata including quality_tier, data_modeling_method, and indexes
+  quality_rules?: Record<string, unknown>; // Table-level quality rules
+}
+
+export interface TableIndex {
+  id: string; // UUID
+  name: string; // Index name
+  column_ids: string[]; // Array of column IDs in order
+  is_unique: boolean; // Whether the index enforces uniqueness
+  is_clustered?: boolean; // Whether the index is clustered (database-specific)
+  description?: string; // Optional description
 }
 
 export interface Column {
@@ -29,12 +105,26 @@ export interface Column {
   name: string; // max 255 chars, unique within table
   data_type: string; // e.g., "VARCHAR", "INTEGER", "BIGINT"
   nullable: boolean; // default false
-  is_primary_key: boolean; // default false
+  is_primary_key: boolean; // default false (single column primary key)
   is_foreign_key: boolean; // default false
   foreign_key_reference?: string; // UUID of referenced Column
+  compound_key_id?: string; // UUID of compound key this column belongs to (for compound primary/unique keys)
+  compound_key_order?: number; // Order within compound key (for compound primary/unique keys)
+  compound_key_tag?: string; // Tag/name to identify which compound key this column belongs to (for display)
   default_value?: string;
-  constraints?: Record<string, unknown>; // JSON object with constraint definitions
+  constraints?: Record<string, unknown>; // JSON object with constraint definitions and quality rules
+  description?: string; // Column description
+  quality_rules?: Record<string, unknown>; // Column-level quality rules (ODCS)
   order: number; // display order
+  created_at: string; // ISO timestamp
+}
+
+export interface CompoundKey {
+  id: string; // UUID
+  table_id: string; // UUID
+  name?: string; // Optional name for the compound key
+  column_ids: string[]; // Array of column IDs in order
+  is_primary: boolean; // true for compound primary key, false for compound unique key
   created_at: string; // ISO timestamp
 }
 

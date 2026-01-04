@@ -21,7 +21,7 @@ class RelationshipService {
    */
   async listRelationships(domain: string): Promise<Relationship[]> {
     const response = await apiClient.getClient().get<ListRelationshipsResponse>(
-      `/workspace/domains/${domain}/relationships`
+      `/api/v1/workspace/domains/${domain}/relationships`
     );
     return response.data.relationships;
   }
@@ -34,7 +34,7 @@ class RelationshipService {
     relationshipId: string
   ): Promise<Relationship> {
     const response = await apiClient.getClient().get<GetRelationshipResponse>(
-      `/workspace/domains/${domain}/relationships/${relationshipId}`
+      `/api/v1/workspace/domains/${domain}/relationships/${relationshipId}`
     );
     return response.data.relationship;
   }
@@ -52,7 +52,7 @@ class RelationshipService {
     }
 
     const response = await apiClient.getClient().post<CreateRelationshipResponse>(
-      `/workspace/domains/${domain}/relationships`,
+      `/api/v1/workspace/domains/${domain}/relationships`,
       request
     );
     return response.data.relationship;
@@ -67,7 +67,7 @@ class RelationshipService {
     targetTableId: string
   ): Promise<{ is_circular: boolean; path?: string[] }> {
     const response = await apiClient.getClient().post<{ is_circular: boolean; path?: string[] }>(
-      `/workspace/domains/${domain}/relationships/check-circular`,
+      `/api/v1/workspace/domains/${domain}/relationships/check-circular`,
       { source_table_id: sourceTableId, target_table_id: targetTableId }
     );
     return response.data;
@@ -82,7 +82,7 @@ class RelationshipService {
     updates: UpdateRelationshipRequest
   ): Promise<Relationship> {
     const response = await apiClient.getClient().put<UpdateRelationshipResponse>(
-      `/workspace/domains/${domain}/relationships/${relationshipId}`,
+      `/api/v1/workspace/domains/${domain}/relationships/${relationshipId}`,
       updates
     );
     return response.data.relationship;
@@ -96,7 +96,7 @@ class RelationshipService {
     relationshipId: string
   ): Promise<void> {
     await apiClient.getClient().delete(
-      `/workspace/domains/${domain}/relationships/${relationshipId}`
+      `/api/v1/workspace/domains/${domain}/relationships/${relationshipId}`
     );
   }
 }

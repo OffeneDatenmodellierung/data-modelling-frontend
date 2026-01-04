@@ -21,6 +21,10 @@ class ApiClient {
   private refreshToken: string | null = null;
 
   constructor() {
+    // Initialize tokens from localStorage if available
+    this.accessToken = localStorage.getItem('access_token');
+    this.refreshToken = localStorage.getItem('refresh_token');
+    
     this.client = axios.create({
       baseURL: API_BASE_URL,
       headers: {
@@ -41,9 +45,14 @@ class ApiClient {
           );
         }
         
-        // Add auth token if available
-        if (this.accessToken && config.headers) {
-          config.headers.Authorization = `Bearer ${this.accessToken}`;
+        // Add auth token if available (check both instance variable and localStorage)
+        const token = this.getAccessToken();
+        if (token && config.headers) {
+          config.headers.Authorization = `Bearer ${token}`;
+          console.log('[ApiClient] Added Authorization header for:', config.url, 'Token length:', token.length);
+        } else {
+          console.warn('[ApiClient] No access token available for request to:', config.url);
+          console.warn('[ApiClient] Instance token:', this.accessToken ? 'exists' : 'null', 'LocalStorage token:', localStorage.getItem('access_token') ? 'exists' : 'null');
         }
         return config;
       },

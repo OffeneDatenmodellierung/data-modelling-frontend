@@ -6,22 +6,37 @@
 import { create } from 'zustand';
 import { tableService } from '@/services/api/tableService';
 import { relationshipService } from '@/services/api/relationshipService';
-import { dataFlowService } from '@/services/api/dataFlowService';
+import { sdkModeDetector } from '@/services/sdk/sdkMode';
 import { useWorkspaceStore } from '@/stores/workspaceStore';
-import type { Table } from '@/types/table';
+import { useDomainStore } from '@/stores/domainStore';
+import type { Table, Column } from '@/types/table';
 import type { Relationship } from '@/types/relationship';
-import type { Domain, DataFlowDiagram, DataFlowNode, DataFlowConnection } from '@/types/workspace';
-import type { CreateTableRequest, CreateRelationshipRequest, CreateDataFlowDiagramRequest, UpdateDataFlowDiagramRequest } from '@/types/api';
+import type { Domain } from '@/types/domain';
+import type { DataProduct } from '@/types/odps';
+import type { ComputeAsset } from '@/types/cads';
+import type { BPMNProcess } from '@/types/bpmn';
+import type { DMNDecision } from '@/types/dmn';
+import type { System } from '@/types/system';
+import type { CreateTableRequest, CreateRelationshipRequest } from '@/types/api';
+
+export type ViewMode = 'systems' | 'process' | 'operational' | 'analytical' | 'products';
+export type DataLevel = 'operational' | 'bronze' | 'silver' | 'gold';
 
 interface ModelState {
   tables: Table[];
   relationships: Relationship[];
   domains: Domain[];
-  dataFlowDiagrams: DataFlowDiagram[];
+  systems: System[];
+  products: DataProduct[];
+  computeAssets: ComputeAsset[];
+  bpmnProcesses: BPMNProcess[];
+  dmnDecisions: DMNDecision[];
   selectedTableId: string | null;
   selectedRelationshipId: string | null;
   selectedDomainId: string | null;
-  selectedDataFlowDiagramId: string | null;
+  selectedSystemId: string | null; // Selected system for drill-down views
+  currentView: ViewMode; // View mode for the current domain
+  selectedDataLevel: DataLevel | null; // Filter by data level (for operational/analytical view)
   isLoading: boolean;
   error: string | null;
 
@@ -29,26 +44,42 @@ interface ModelState {
   setTables: (tables: Table[]) => void;
   setRelationships: (relationships: Relationship[]) => void;
   setDomains: (domains: Domain[]) => void;
-  setDataFlowDiagrams: (diagrams: DataFlowDiagram[]) => void;
+  setSystems: (systems: System[]) => void;
+  setProducts: (products: DataProduct[]) => void;
+  setComputeAssets: (assets: ComputeAsset[]) => void;
+  setBPMNProcesses: (processes: BPMNProcess[]) => void;
+  setDMNDecisions: (decisions: DMNDecision[]) => void;
+  addDomain: (domain: Domain) => void;
+  updateDomain: (domainId: string, updates: Partial<Domain>) => void;
+  removeDomain: (domainId: string) => void;
+  addSystem: (system: System) => void;
+  updateSystem: (systemId: string, updates: Partial<System>) => void;
+  removeSystem: (systemId: string) => void;
   addTable: (table: Table) => void;
   updateTable: (tableId: string, updates: Partial<Table>) => void;
+  updateColumn: (tableId: string, columnId: string, updates: Partial<Column>) => void;
   removeTable: (tableId: string) => void;
   addRelationship: (relationship: Relationship) => void;
   updateRelationship: (relationshipId: string, updates: Partial<Relationship>) => void;
   removeRelationship: (relationshipId: string) => void;
-  addDataFlowDiagram: (diagram: DataFlowDiagram) => void;
-  updateDataFlowDiagram: (diagramId: string, updates: Partial<DataFlowDiagram>) => void;
-  removeDataFlowDiagram: (diagramId: string) => void;
-  addDataFlowNode: (diagramId: string, node: DataFlowNode) => void;
-  updateDataFlowNode: (diagramId: string, nodeId: string, updates: Partial<DataFlowNode>) => void;
-  removeDataFlowNode: (diagramId: string, nodeId: string) => void;
-  addDataFlowConnection: (diagramId: string, connection: DataFlowConnection) => void;
-  updateDataFlowConnection: (diagramId: string, connectionId: string, updates: Partial<DataFlowConnection>) => void;
-  removeDataFlowConnection: (diagramId: string, connectionId: string) => void;
+  addProduct: (product: DataProduct) => void;
+  updateProduct: (productId: string, updates: Partial<DataProduct>) => void;
+  removeProduct: (productId: string) => void;
+  addComputeAsset: (asset: ComputeAsset) => void;
+  updateComputeAsset: (assetId: string, updates: Partial<ComputeAsset>) => void;
+  removeComputeAsset: (assetId: string) => void;
+  addBPMNProcess: (process: BPMNProcess) => void;
+  updateBPMNProcess: (processId: string, updates: Partial<BPMNProcess>) => void;
+  removeBPMNProcess: (processId: string) => void;
+  addDMNDecision: (decision: DMNDecision) => void;
+  updateDMNDecision: (decisionId: string, updates: Partial<DMNDecision>) => void;
+  removeDMNDecision: (decisionId: string) => void;
   setSelectedTable: (tableId: string | null) => void;
   setSelectedRelationship: (relationshipId: string | null) => void;
   setSelectedDomain: (domainId: string | null) => void;
-  setSelectedDataFlowDiagram: (diagramId: string | null) => void;
+  setSelectedSystem: (systemId: string | null) => void;
+  setCurrentView: (view: ViewMode) => void;
+  setSelectedDataLevel: (level: DataLevel | null) => void;
   setLoading: (isLoading: boolean) => void;
   setError: (error: string | null) => void;
 
@@ -57,38 +88,128 @@ interface ModelState {
   fetchRelationships: (domain: string) => Promise<void>;
   createTable: (domain: string, request: CreateTableRequest) => Promise<Table>;
   updateTableRemote: (domain: string, tableId: string, updates: Partial<Table>) => Promise<Table>;
+  updateColumnRemote: (workspaceId: string, tableId: string, columnId: string, updates: Partial<Column>) => Promise<Table>;
   deleteTableRemote: (domain: string, tableId: string) => Promise<void>;
   createRelationship: (domain: string, request: CreateRelationshipRequest) => Promise<Relationship>;
   updateRelationshipRemote: (domain: string, relationshipId: string, updates: Partial<Relationship>) => Promise<Relationship>;
   deleteRelationshipRemote: (domain: string, relationshipId: string) => Promise<void>;
   
-  // Data Flow Diagram CRUD Operations
-  fetchDataFlowDiagrams: (workspaceId: string) => Promise<void>;
-  createDataFlowDiagramRemote: (workspaceId: string, request: CreateDataFlowDiagramRequest) => Promise<DataFlowDiagram>;
-  updateDataFlowDiagramRemote: (workspaceId: string, diagramId: string, request: UpdateDataFlowDiagramRequest) => Promise<DataFlowDiagram>;
-  deleteDataFlowDiagramRemote: (workspaceId: string, diagramId: string) => Promise<void>;
+  // Domain asset loading
+  loadDomainAssets: (workspaceId: string, domainId: string) => Promise<void>;
   
-  // Link data flow to conceptual tables
-  linkDataFlowToTable: (diagramId: string, tableId: string) => void;
-  unlinkDataFlowFromTable: (diagramId: string, tableId: string) => void;
+  // Filtering helpers
+  getFilteredTables: () => Table[]; // Filter by currentView and selectedDataLevel
 }
 
-export const useModelStore = create<ModelState>((set) => ({
+// Helper function to filter tables based on view mode and data level
+const filterTablesByView = (
+  tables: Table[],
+  currentView: ViewMode,
+  selectedDataLevel: DataLevel | null,
+  selectedDomainId: string | null
+): Table[] => {
+  let filtered = tables;
+
+  // Filter by selected domain visibility
+  if (selectedDomainId) {
+    filtered = filtered.filter(
+      (t) => t.primary_domain_id === selectedDomainId || t.visible_domains.includes(selectedDomainId)
+    );
+  }
+
+  // Filter by data level (for operational/analytical view)
+  if (currentView === 'operational' || currentView === 'analytical') {
+    if (selectedDataLevel) {
+      filtered = filtered.filter((t) => t.data_level === selectedDataLevel);
+    } else if (currentView === 'operational') {
+      // Operational view: show only operational tables if no level selected
+      filtered = filtered.filter((t) => t.data_level === 'operational' || !t.data_level);
+    } else {
+      // Analytical view: show bronze/silver/gold if no level selected
+      filtered = filtered.filter((t) => 
+        t.data_level === 'bronze' || t.data_level === 'silver' || t.data_level === 'gold'
+      );
+    }
+  }
+
+  // Filter by view mode
+  // Systems view: show all tables (conceptual level)
+  // Process view: show all tables (logical level)
+  // Operational/Analytical: filtered by data level above
+  // Products view: show tables linked to products
+  if (currentView === 'products') {
+    const state = useModelStore.getState();
+    const productTableIds = new Set(
+      state.products.flatMap((p) => p.linked_tables)
+    );
+    filtered = filtered.filter((t) => productTableIds.has(t.id));
+  }
+
+  return filtered;
+};
+
+export const useModelStore = create<ModelState>((set, get) => ({
   tables: [],
   relationships: [],
   domains: [],
-  dataFlowDiagrams: [],
+  systems: [],
+  products: [],
+  computeAssets: [],
+  bpmnProcesses: [],
+  dmnDecisions: [],
   selectedTableId: null,
   selectedRelationshipId: null,
   selectedDomainId: null,
-  selectedDataFlowDiagramId: null,
+  selectedSystemId: null,
+  currentView: 'systems', // Default view mode
+  selectedDataLevel: null,
   isLoading: false,
   error: null,
 
   setTables: (tables) => set({ tables }),
   setRelationships: (relationships) => set({ relationships }),
   setDomains: (domains) => set({ domains }),
-  setDataFlowDiagrams: (diagrams) => set({ dataFlowDiagrams: diagrams }),
+  setSystems: (systems) => set({ systems }),
+  setProducts: (products) => set({ products }),
+  setComputeAssets: (assets) => set({ computeAssets: assets }),
+  setBPMNProcesses: (processes) => set({ bpmnProcesses: processes }),
+  setDMNDecisions: (decisions) => set({ dmnDecisions: decisions }),
+  addDomain: (domain) => {
+    set((state) => ({
+      domains: [...state.domains, domain],
+    }));
+    useWorkspaceStore.getState().setPendingChanges(true);
+  },
+  updateDomain: (domainId, updates) => {
+    set((state) => ({
+      domains: state.domains.map((d) => (d.id === domainId ? { ...d, ...updates } : d)),
+    }));
+    useWorkspaceStore.getState().setPendingChanges(true);
+  },
+  removeDomain: (domainId) => {
+    set((state) => ({
+      domains: state.domains.filter((d) => d.id !== domainId),
+      selectedDomainId: state.selectedDomainId === domainId ? null : state.selectedDomainId,
+    }));
+    useWorkspaceStore.getState().setPendingChanges(true);
+  },
+  addSystem: (system) => {
+    set((state) => ({
+      systems: [...state.systems, system],
+    }));
+    useWorkspaceStore.getState().setPendingChanges(true);
+  },
+  updateSystem: (systemId, updates) =>
+    set((state) => ({
+      systems: state.systems.map((s) => (s.id === systemId ? { ...s, ...updates } : s)),
+    })),
+  removeSystem: (systemId) => {
+    set((state) => ({
+      systems: state.systems.filter((s) => s.id !== systemId),
+      selectedSystemId: state.selectedSystemId === systemId ? null : state.selectedSystemId,
+    }));
+    useWorkspaceStore.getState().setPendingChanges(true);
+  },
           addTable: (table) => {
             set((state) => ({
               tables: [...state.tables, table],
@@ -96,11 +217,38 @@ export const useModelStore = create<ModelState>((set) => ({
             // Mark workspace as having pending changes
             useWorkspaceStore.getState().setPendingChanges(true);
           },
-  updateTable: (tableId, updates) =>
+  updateTable: (tableId: string, updates: Partial<Table>) =>
+    set((state) => {
+      const updatedTables = state.tables.map((t) => {
+        if (t.id === tableId) {
+          // Deep merge to ensure compoundKeys and metadata are properly updated
+          const merged = { ...t, ...updates };
+          // Explicitly set compoundKeys if provided (even if empty array)
+          if ('compoundKeys' in updates) {
+            merged.compoundKeys = updates.compoundKeys;
+          }
+          // Explicitly merge metadata if provided
+          if ('metadata' in updates && updates.metadata) {
+            merged.metadata = { ...(t.metadata || {}), ...updates.metadata };
+          }
+          return merged;
+        }
+        return t;
+      });
+      return { tables: updatedTables };
+    }),
+  updateColumn: (tableId: string, columnId: string, updates: Partial<Column>) =>
     set((state) => ({
-      tables: state.tables.map((t) => (t.id === tableId ? { ...t, ...updates } : t)),
+      tables: state.tables.map((t) =>
+        t.id === tableId
+          ? {
+              ...t,
+              columns: t.columns.map((c) => (c.id === columnId ? { ...c, ...updates } : c)),
+            }
+          : t
+      ),
     })),
-          removeTable: (tableId) => {
+          removeTable: (tableId: string) => {
             set((state) => ({
               tables: state.tables.filter((t) => t.id !== tableId),
               selectedTableId: state.selectedTableId === tableId ? null : state.selectedTableId,
@@ -133,84 +281,76 @@ export const useModelStore = create<ModelState>((set) => ({
             // Mark workspace as having pending changes
             useWorkspaceStore.getState().setPendingChanges(true);
           },
-  addDataFlowDiagram: (diagram) =>
+  addProduct: (product) => {
     set((state) => ({
-      dataFlowDiagrams: [...state.dataFlowDiagrams, diagram],
-    })),
-  updateDataFlowDiagram: (diagramId, updates) =>
+      products: [...state.products, product],
+    }));
+    useWorkspaceStore.getState().setPendingChanges(true);
+  },
+  updateProduct: (productId, updates) =>
     set((state) => ({
-      dataFlowDiagrams: state.dataFlowDiagrams.map((d) =>
-        d.id === diagramId ? { ...d, ...updates } : d
-      ),
+      products: state.products.map((p) => (p.id === productId ? { ...p, ...updates } : p)),
     })),
-  removeDataFlowDiagram: (diagramId) =>
+  removeProduct: (productId) => {
     set((state) => ({
-      dataFlowDiagrams: state.dataFlowDiagrams.filter((d) => d.id !== diagramId),
-      selectedDataFlowDiagramId:
-        state.selectedDataFlowDiagramId === diagramId ? null : state.selectedDataFlowDiagramId,
-    })),
-  addDataFlowNode: (diagramId, node) =>
+      products: state.products.filter((p) => p.id !== productId),
+    }));
+    useWorkspaceStore.getState().setPendingChanges(true);
+  },
+  addComputeAsset: (asset) => {
     set((state) => ({
-      dataFlowDiagrams: state.dataFlowDiagrams.map((d) =>
-        d.id === diagramId ? { ...d, nodes: [...d.nodes, node] } : d
-      ),
-    })),
-  updateDataFlowNode: (diagramId, nodeId, updates) =>
+      computeAssets: [...state.computeAssets, asset],
+    }));
+    useWorkspaceStore.getState().setPendingChanges(true);
+  },
+  updateComputeAsset: (assetId, updates) =>
     set((state) => ({
-      dataFlowDiagrams: state.dataFlowDiagrams.map((d) =>
-        d.id === diagramId
-          ? {
-              ...d,
-              nodes: d.nodes.map((n) => (n.id === nodeId ? { ...n, ...updates } : n)),
-            }
-          : d
-      ),
+      computeAssets: state.computeAssets.map((a) => (a.id === assetId ? { ...a, ...updates } : a)),
     })),
-  removeDataFlowNode: (diagramId, nodeId) =>
+  removeComputeAsset: (assetId) => {
     set((state) => ({
-      dataFlowDiagrams: state.dataFlowDiagrams.map((d) =>
-        d.id === diagramId
-          ? {
-              ...d,
-              nodes: d.nodes.filter((n) => n.id !== nodeId),
-              connections: d.connections.filter(
-                (c) => c.source_node_id !== nodeId && c.target_node_id !== nodeId
-              ),
-            }
-          : d
-      ),
-    })),
-  addDataFlowConnection: (diagramId, connection) =>
+      computeAssets: state.computeAssets.filter((a) => a.id !== assetId),
+    }));
+    useWorkspaceStore.getState().setPendingChanges(true);
+  },
+  addBPMNProcess: (process) => {
     set((state) => ({
-      dataFlowDiagrams: state.dataFlowDiagrams.map((d) =>
-        d.id === diagramId ? { ...d, connections: [...d.connections, connection] } : d
-      ),
-    })),
-  updateDataFlowConnection: (diagramId, connectionId, updates) =>
+      bpmnProcesses: [...state.bpmnProcesses, process],
+    }));
+    useWorkspaceStore.getState().setPendingChanges(true);
+  },
+  updateBPMNProcess: (processId, updates) =>
     set((state) => ({
-      dataFlowDiagrams: state.dataFlowDiagrams.map((d) =>
-        d.id === diagramId
-          ? {
-              ...d,
-              connections: d.connections.map((c) =>
-                c.id === connectionId ? { ...c, ...updates } : c
-              ),
-            }
-          : d
-      ),
+      bpmnProcesses: state.bpmnProcesses.map((p) => (p.id === processId ? { ...p, ...updates } : p)),
     })),
-  removeDataFlowConnection: (diagramId, connectionId) =>
+  removeBPMNProcess: (processId) => {
     set((state) => ({
-      dataFlowDiagrams: state.dataFlowDiagrams.map((d) =>
-        d.id === diagramId
-          ? { ...d, connections: d.connections.filter((c) => c.id !== connectionId) }
-          : d
-      ),
+      bpmnProcesses: state.bpmnProcesses.filter((p) => p.id !== processId),
+    }));
+    useWorkspaceStore.getState().setPendingChanges(true);
+  },
+  addDMNDecision: (decision) => {
+    set((state) => ({
+      dmnDecisions: [...state.dmnDecisions, decision],
+    }));
+    useWorkspaceStore.getState().setPendingChanges(true);
+  },
+  updateDMNDecision: (decisionId, updates) =>
+    set((state) => ({
+      dmnDecisions: state.dmnDecisions.map((d) => (d.id === decisionId ? { ...d, ...updates } : d)),
     })),
+  removeDMNDecision: (decisionId) => {
+    set((state) => ({
+      dmnDecisions: state.dmnDecisions.filter((d) => d.id !== decisionId),
+    }));
+    useWorkspaceStore.getState().setPendingChanges(true);
+  },
   setSelectedTable: (tableId) => set({ selectedTableId: tableId }),
   setSelectedRelationship: (relationshipId) => set({ selectedRelationshipId: relationshipId }),
   setSelectedDomain: (domainId) => set({ selectedDomainId: domainId }),
-  setSelectedDataFlowDiagram: (diagramId) => set({ selectedDataFlowDiagramId: diagramId }),
+  setSelectedSystem: (systemId) => set({ selectedSystemId: systemId }),
+  setCurrentView: (view) => set({ currentView: view }),
+  setSelectedDataLevel: (level) => set({ selectedDataLevel: level }),
   setLoading: (isLoading) => set({ isLoading }),
   setError: (error) => set({ error }),
 
@@ -244,11 +384,51 @@ export const useModelStore = create<ModelState>((set) => ({
   createTable: async (domain: string, request: CreateTableRequest) => {
     set({ isLoading: true, error: null });
     try {
-      const table = await tableService.createTable(domain, request);
-      set((state) => ({
-        tables: [...state.tables, table],
-        isLoading: false,
-      }));
+      // Check if we're in offline mode
+      const mode = await sdkModeDetector.getMode();
+      
+      let table: Table;
+      if (mode === 'offline') {
+        // Create table locally in offline mode
+        // Always use proper UUID generation to ensure SDK compatibility
+        const { generateUUID } = await import('@/utils/validation');
+        const tableId = generateUUID();
+        // Get workspace_id from workspace store if available
+        const workspaceId = useWorkspaceStore.getState().currentWorkspace?.id || 'offline-workspace';
+        
+        table = {
+          id: tableId,
+          workspace_id: workspaceId,
+          primary_domain_id: domain,
+          name: request.name,
+          alias: request.alias,
+          description: request.description,
+          data_level: request.data_level || 'operational',
+          columns: request.columns || [],
+          position_x: request.position_x,
+          position_y: request.position_y,
+          width: request.width || 200,
+          height: request.height || 150,
+          tags: [],
+          metadata: {},
+          created_at: new Date().toISOString(),
+          last_modified_at: new Date().toISOString(),
+        };
+        
+        // Add to store immediately
+        set((state) => ({
+          tables: [...state.tables, table],
+          isLoading: false,
+        }));
+      } else {
+        // Online mode: use API
+        table = await tableService.createTable(domain, request);
+        set((state) => ({
+          tables: [...state.tables, table],
+          isLoading: false,
+        }));
+      }
+      
       return table;
     } catch (error) {
       set({
@@ -271,6 +451,38 @@ export const useModelStore = create<ModelState>((set) => ({
     } catch (error) {
       set({
         error: error instanceof Error ? error.message : 'Failed to update table',
+        isLoading: false,
+      });
+      throw error;
+    }
+  },
+
+  updateColumnRemote: async (_workspaceId: string, tableId: string, columnId: string, updates: Partial<Column>) => {
+    set({ isLoading: true, error: null });
+    try {
+      // Update column by updating the table with modified columns
+      const currentState = useModelStore.getState();
+      const table = currentState.tables.find((t) => t.id === tableId);
+      if (!table) {
+        throw new Error('Table not found');
+      }
+
+      const updatedColumns = table.columns.map((c) => (c.id === columnId ? { ...c, ...updates } : c));
+
+      // Get domain from table
+      const domain = table.primary_domain_id;
+      // Update table with modified columns - API accepts full table object
+      const updatedTable = { ...table, columns: updatedColumns };
+      const tableResult = await tableService.updateTable(domain, tableId, updatedTable as any);
+
+      set((state) => ({
+        tables: state.tables.map((t) => (t.id === tableId ? tableResult : t)),
+        isLoading: false,
+      }));
+      return tableResult;
+    } catch (error) {
+      set({
+        error: error instanceof Error ? error.message : 'Failed to update column',
         isLoading: false,
       });
       throw error;
@@ -366,107 +578,37 @@ export const useModelStore = create<ModelState>((set) => ({
     }
   },
 
-  // Data Flow Diagram CRUD Operations
-  fetchDataFlowDiagrams: async (workspaceId: string) => {
+  // Domain asset loading
+  loadDomainAssets: async (workspaceId: string, domainId: string) => {
     set({ isLoading: true, error: null });
     try {
-      const diagrams = await dataFlowService.listDataFlowDiagrams(workspaceId);
-      set({ dataFlowDiagrams: diagrams, isLoading: false });
+      await useDomainStore.getState().loadDomainAssets(workspaceId, domainId);
+      const domainState = useDomainStore.getState();
+      set({
+        tables: domainState.tables,
+        products: domainState.products,
+        computeAssets: domainState.computeAssets,
+        bpmnProcesses: domainState.bpmnProcesses,
+        dmnDecisions: domainState.dmnDecisions,
+        isLoading: false,
+      });
     } catch (error) {
       set({
-        error: error instanceof Error ? error.message : 'Failed to fetch data flow diagrams',
+        error: error instanceof Error ? error.message : 'Failed to load domain assets',
         isLoading: false,
       });
     }
   },
 
-  createDataFlowDiagramRemote: async (
-    workspaceId: string,
-    request: CreateDataFlowDiagramRequest
-  ) => {
-    set({ isLoading: true, error: null });
-    try {
-      const diagram = await dataFlowService.createDataFlowDiagram(workspaceId, request);
-      set((state) => ({
-        dataFlowDiagrams: [...state.dataFlowDiagrams, diagram],
-        isLoading: false,
-      }));
-      return diagram;
-    } catch (error) {
-      set({
-        error: error instanceof Error ? error.message : 'Failed to create data flow diagram',
-        isLoading: false,
-      });
-      throw error;
-    }
-  },
-
-  updateDataFlowDiagramRemote: async (
-    workspaceId: string,
-    diagramId: string,
-    request: UpdateDataFlowDiagramRequest
-  ) => {
-    set({ isLoading: true, error: null });
-    try {
-      const diagram = await dataFlowService.updateDataFlowDiagram(workspaceId, diagramId, request);
-      set((state) => ({
-        dataFlowDiagrams: state.dataFlowDiagrams.map((d) => (d.id === diagramId ? diagram : d)),
-        isLoading: false,
-      }));
-      return diagram;
-    } catch (error) {
-      set({
-        error: error instanceof Error ? error.message : 'Failed to update data flow diagram',
-        isLoading: false,
-      });
-      throw error;
-    }
-  },
-
-  deleteDataFlowDiagramRemote: async (workspaceId: string, diagramId: string) => {
-    set({ isLoading: true, error: null });
-    try {
-      await dataFlowService.deleteDataFlowDiagram(workspaceId, diagramId);
-      set((state) => ({
-        dataFlowDiagrams: state.dataFlowDiagrams.filter((d) => d.id !== diagramId),
-        selectedDataFlowDiagramId:
-          state.selectedDataFlowDiagramId === diagramId ? null : state.selectedDataFlowDiagramId,
-        isLoading: false,
-      }));
-    } catch (error) {
-      set({
-        error: error instanceof Error ? error.message : 'Failed to delete data flow diagram',
-        isLoading: false,
-      });
-      throw error;
-    }
-  },
-
-  // Link data flow to conceptual tables
-  linkDataFlowToTable: (diagramId: string, tableId: string) => {
-    set((state) => ({
-      dataFlowDiagrams: state.dataFlowDiagrams.map((d) =>
-        d.id === diagramId
-          ? {
-              ...d,
-              linked_tables: [...(d.linked_tables || []), tableId],
-            }
-          : d
-      ),
-    }));
-  },
-
-  unlinkDataFlowFromTable: (diagramId: string, tableId: string) => {
-    set((state) => ({
-      dataFlowDiagrams: state.dataFlowDiagrams.map((d) =>
-        d.id === diagramId
-          ? {
-              ...d,
-              linked_tables: (d.linked_tables || []).filter((id) => id !== tableId),
-            }
-          : d
-      ),
-    }));
+  // Filtering helpers
+  getFilteredTables: () => {
+    const state = get();
+    return filterTablesByView(
+      state.tables,
+      state.currentView,
+      state.selectedDataLevel,
+      state.selectedDomainId
+    );
   },
 }));
 

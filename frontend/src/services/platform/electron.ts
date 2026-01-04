@@ -33,9 +33,12 @@ declare global {
     electronAPI?: {
       readFile: (path: string) => Promise<string>;
       writeFile: (path: string, data: string) => Promise<void>;
+      ensureDirectory: (path: string) => Promise<boolean>;
+      readDirectory: (path: string) => Promise<Array<{ name: string; path: string }>>;
       showOpenDialog: (options: OpenDialogOptions) => Promise<OpenDialogReturnValue>;
       showSaveDialog: (options: SaveDialogOptions) => Promise<SaveDialogReturnValue>;
       openExternal: (url: string) => Promise<void>;
+      closeApp: () => Promise<void>;
     };
   }
 }
@@ -65,6 +68,26 @@ export const electronFileService = {
   },
 
   /**
+   * Ensure directory exists (create if it doesn't)
+   */
+  async ensureDirectory(path: string): Promise<boolean> {
+    if (!window.electronAPI) {
+      throw new Error('Electron API not available');
+    }
+    return window.electronAPI.ensureDirectory(path);
+  },
+
+  /**
+   * Read directory contents
+   */
+  async readDirectory(path: string): Promise<Array<{ name: string; path: string }>> {
+    if (!window.electronAPI) {
+      throw new Error('Electron API not available');
+    }
+    return window.electronAPI.readDirectory(path);
+  },
+
+  /**
    * Show open file dialog
    */
   async showOpenDialog(options: OpenDialogOptions): Promise<OpenDialogReturnValue> {
@@ -84,6 +107,23 @@ export const electronFileService = {
     return window.electronAPI.showSaveDialog(options);
   },
 };
+
+/**
+ * Close the Electron application
+ */
+export async function closeElectronApp(): Promise<void> {
+  if (!window.electronAPI) {
+    throw new Error('Electron API not available. Please ensure you are running in Electron.');
+  }
+  
+  // Check if closeApp function exists
+  if (typeof window.electronAPI.closeApp !== 'function') {
+    console.error('[closeElectronApp] closeApp function not found on electronAPI. Available methods:', Object.keys(window.electronAPI));
+    throw new Error('closeApp function not available. The Electron preload script may need to be rebuilt. Run: npm run build:electron');
+  }
+  
+  return window.electronAPI.closeApp();
+}
 
 /**
  * Electron platform detection

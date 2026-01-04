@@ -71,3 +71,6 @@ playwright/.cache/
 public/wasm/*.wasm
 !public/wasm/.gitkeep
 
+docker-compose.override.yml
+
+

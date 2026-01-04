@@ -199,6 +199,27 @@ export const WorkspaceSettings: React.FC<WorkspaceSettingsProps> = ({ workspaceI
           />
         </div>
 
+        {/* Domain Information */}
+        {workspace.domains && workspace.domains.length > 0 && (
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Domains ({workspace.domains.length})
+            </label>
+            <div className="space-y-2">
+              {workspace.domains.map((domain) => (
+                <div
+                  key={domain.id}
+                  className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                >
+                  <div>
+                    <span className="font-medium text-gray-900">{domain.name}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Workspace Type Conversion */}
         <div className="mb-6">
           {workspace.type === 'personal' ? (

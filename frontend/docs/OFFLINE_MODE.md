@@ -26,7 +26,7 @@ The `sdkModeDetector` service automatically detects whether to use online or off
 
 ### WASM SDK Build
 
-The SDK (version **1.0.2**) is automatically built as part of the application build process:
+The SDK (version **1.1.0**) is automatically built as part of the application build process:
 
 ```bash
 # Build WASM SDK manually
@@ -37,11 +37,11 @@ npm run build
 ```
 
 The build script (`scripts/build-wasm.sh`):
-1. Locates the `data-modelling-sdk` directory (must be version 1.0.2)
+1. Locates the `data-modelling-sdk` directory (must be version 1.1.0)
 2. Builds the WASM module using `wasm-pack` with `--features wasm`
 3. Copies the built files to `frontend/public/wasm/`
 
-**SDK Version Requirement**: The application requires `data-modelling-sdk = "1.0.2"` crate. The API project (`data-modelling-api`) is available on [crates.io](https://crates.io/crates/data-modelling-api) as version **1.0.1** and uses `data-modelling-sdk = "1.0.2"` with features `["api-backend", "git"]`.
+**SDK Version Requirement**: The application requires `data-modelling-sdk = "1.1.0"` crate. The API project (`data-modelling-api`) is available on [crates.io](https://crates.io/crates/data-modelling-api) as version **1.1.2** and uses `data-modelling-sdk = "1.1.0"` with features `["api-backend", "git"]`.
 
 **Note**: If the SDK is not available, the build will continue successfully and offline mode will use a JavaScript YAML parser fallback.
 

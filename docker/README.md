@@ -1,213 +1,126 @@
 # Docker Setup Guide
 
-This guide explains how to run the Data Modelling application using Docker and Docker Compose.
-
-## Prerequisites
-
-- Docker Engine 20.10+
-- Docker Compose 2.0+
-- Git (to clone the repository)
-
 ## Quick Start
 
-1. **Clone the repository** (if you haven't already):
-   ```bash
-   git clone <repository-url>
-   cd dm
-   ```
-
-2. **Set up environment variables** (optional):
-   ```bash
-   # Copy the example override file
-   cp docker-compose.override.yml.example docker-compose.override.yml
-   
-   # Edit docker-compose.override.yml with your GitHub OAuth credentials
-   # GITHUB_CLIENT_ID=your_client_id
-   # GITHUB_CLIENT_SECRET=your_client_secret
-   # JWT_SECRET=your-secure-secret
-   ```
-
-3. **Start all services**:
-   ```bash
-   docker-compose up -d
-   ```
-
-4. **Check service status**:
-   ```bash
-   docker-compose ps
-   ```
-
-5. **View logs**:
-   ```bash
-   # All services
-   docker-compose logs -f
-   
-   # Specific service
-   docker-compose logs -f api
-   docker-compose logs -f frontend
-   docker-compose logs -f postgres
-   ```
-
-6. **Access the application**:
-   - Frontend: http://localhost:5173
-   - API: http://localhost:8081
-   - PostgreSQL: localhost:5432
-
-## Services
-
-### PostgreSQL Database
-- **Port**: 5432
-- **Database**: data_modelling
-- **User**: data_modelling
-- **Password**: data_modelling_password
-- **Volume**: `postgres_data` (persists data)
-
-### API Service
-- **Port**: 8081
-- **Image**: Built from `Dockerfile.api` (installs from crates.io)
-- **Health Check**: `/api/v1/health`
-- **Dependencies**: PostgreSQL (waits for healthy status)
-
-### Frontend Service
-- **Port**: 5173 (mapped to container port 80)
-- **Image**: Built from `frontend/Dockerfile`
-- **Dependencies**: API (waits for healthy status)
-
-## Environment Variables
-
-### API Service
-- `DATABASE_URL`: PostgreSQL connection string (auto-configured)
-- `RUST_LOG`: Log level (default: `info`)
-- `API_HOST`: API host (default: `0.0.0.0`)
-- `API_PORT`: API port (default: `8081`)
-- `GITHUB_CLIENT_ID`: GitHub OAuth client ID (required for authentication)
-- `GITHUB_CLIENT_SECRET`: GitHub OAuth client secret (required for authentication)
-- `JWT_SECRET`: JWT signing secret (change in production!)
-
-### Frontend Service
-- `VITE_API_BASE_URL`: API base URL (default: `http://localhost:8081`)
-- `VITE_WS_BASE_URL`: WebSocket base URL (default: `ws://localhost:8081`)
-
-### PostgreSQL Service
-- `POSTGRES_USER`: Database user (default: `data_modelling`)
-- `POSTGRES_PASSWORD`: Database password (default: `data_modelling_password`)
-- `POSTGRES_DB`: Database name (default: `data_modelling`)
-
-## Building Images
-
-### Build all services:
 ```bash
-docker-compose build
-```
+# Start all services
+docker-compose up -d
 
-### Build specific service:
-```bash
-docker-compose build api
-docker-compose build frontend
-```
+# View logs
+docker-compose logs -f
 
-### Rebuild without cache:
-```bash
-docker-compose build --no-cache
-```
-
-## Stopping Services
-
-```bash
 # Stop all services
 docker-compose down
 
-# Stop and remove volumes (⚠️ deletes database data)
+# Stop and remove volumes (WARNING: deletes all data)
 docker-compose down -v
 ```
 
-## Database Management
+## PostgreSQL Connection Issues
 
-### Access PostgreSQL:
-```bash
-# Using docker exec
-docker-compose exec postgres psql -U data_modelling -d data_modelling
-
-# Or connect from host
-psql -h localhost -p 5432 -U data_modelling -d data_modelling
+If you see errors like:
+```
+FATAL: password authentication failed for user "postgres"
+DETAIL: Role "postgres" does not exist.
 ```
 
-### Backup database:
+This usually means there's an old PostgreSQL volume with a different user configuration. To fix:
+
 ```bash
-docker-compose exec postgres pg_dump -U data_modelling data_modelling > backup.sql
+# Stop containers
+docker-compose down
+
+# Remove the PostgreSQL volume
+docker volume rm data-modelling-api_postgres_data
+
+# Or remove all volumes
+docker-compose down -v
+
+# Restart containers (will recreate volume with correct user)
+docker-compose up -d
 ```
 
-### Restore database:
-```bash
-docker-compose exec -T postgres psql -U data_modelling data_modelling < backup.sql
+**Note**: Removing volumes will delete all database data. Make sure to backup if needed.
+
+## Configuration
+
+### Environment Variables
+
+Create a `docker-compose.override.yml` file (it's gitignored) to override settings:
+
+```yaml
+services:
+  api:
+    environment:
+      GITHUB_CLIENT_ID: your-client-id
+      GITHUB_CLIENT_SECRET: your-client-secret
+      JWT_SECRET: your-secure-jwt-secret-at-least-32-characters-long
+      RUST_LOG: debug
 ```
 
-## Development Mode
+### PostgreSQL Credentials
 
-For development with hot reload, you can override the frontend service:
+Default credentials (set in `docker-compose.yml`):
+- User: `data_modelling`
+- Password: `data_modelling_password`
+- Database: `data_modelling`
 
-1. Create `docker-compose.override.yml`:
-   ```yaml
-   version: '3.8'
-   services:
-     frontend:
-       volumes:
-         - ./frontend/src:/app/src:ro
-       command: npm run dev
-   ```
-
-2. Run in development mode:
-   ```bash
-   docker-compose up frontend
-   ```
-
-**Note**: For full hot reload, it's recommended to run the frontend locally with `npm run dev` and only use Docker for the API and PostgreSQL.
+To change these, update `docker-compose.yml` and recreate the volume.
 
 ## Troubleshooting
 
-### Services won't start
-- Check logs: `docker-compose logs`
-- Verify ports aren't in use: `lsof -i :5173 -i :8081 -i :5432`
-- Check Docker resources: `docker system df`
-
-### API health check fails
-- Wait longer (API may need time to compile on first run)
+### API won't start
+- Check PostgreSQL is healthy: `docker-compose ps`
 - Check API logs: `docker-compose logs api`
-- Verify PostgreSQL is healthy: `docker-compose ps postgres`
+- Verify `JWT_SECRET` is at least 32 characters
 
 ### Frontend can't connect to API
-- Verify `VITE_API_BASE_URL` is correct
-- Check API is running: `curl http://localhost:8081/api/v1/health`
-- Check network: `docker-compose network ls`
+- Verify API is healthy: `curl http://localhost:8081/api/v1/health`
+- Check Nginx logs: `docker-compose logs frontend`
+- Verify `VITE_API_BASE_URL` is empty (uses relative URLs)
+- Access frontend at: `http://localhost:5173`
 
 ### Database connection errors
-- Verify PostgreSQL is healthy: `docker-compose ps postgres`
-- Check connection string in API logs
-- Verify database credentials match
+- Verify PostgreSQL is running: `docker-compose ps postgres`
+- Check connection string matches credentials
+- Use port 5433 to connect from outside Docker: `postgresql://data_modelling:data_modelling_password@localhost:5433/data_modelling`
+- Recreate volume if user mismatch (see above)
 
-## Production Considerations
+## Network
 
-⚠️ **This setup is for development only!** For production:
+All services are on the `data-modelling-network` bridge network:
+- `postgres:5432` - PostgreSQL database
+- `api:8081` - API service
+- `frontend:80` - Frontend (Nginx)
 
-1. **Change default passwords** in `docker-compose.yml`
-2. **Use secrets management** (Docker secrets, Kubernetes secrets, etc.)
-3. **Enable SSL/TLS** for API and frontend
-4. **Use a reverse proxy** (nginx, Traefik) in front of services
-5. **Set up proper backups** for PostgreSQL
-6. **Configure resource limits** for containers
-7. **Use environment-specific configs** (don't commit secrets)
-8. **Enable monitoring and logging** (Prometheus, Grafana, ELK)
+## Volumes
 
-## Cleanup
+- `postgres_data` - PostgreSQL data directory
+  - Location: `/var/lib/postgresql/data/pgdata`
+  - Persists database data between container restarts
 
-```bash
-# Remove all containers, networks, and volumes
-docker-compose down -v
+## Health Checks
 
-# Remove images
-docker-compose down --rmi all
+- **PostgreSQL**: `pg_isready -U data_modelling` (every 10s)
+- **API**: `curl -f http://localhost:8081/api/v1/health` (every 30s)
+- **Frontend**: Depends on API health check
 
-# Full cleanup (removes everything)
-docker system prune -a --volumes
+## Ports
+
+- `5433` - PostgreSQL (host → container, container port 5432)
+- `8082` - API (host → container, container port 8081)
+- `5174` - Frontend (host → container, mapped to container port 80)
+
+**Note**: These are alternative ports to avoid conflicts with other services. The container internal ports remain unchanged.
+
+## Development
+
+For local development with hot reload, uncomment volumes in `docker-compose.override.yml`:
+
+```yaml
+frontend:
+  volumes:
+    - ./frontend/src:/app/src:ro
 ```
 
+Note: This requires the frontend Dockerfile to support volume mounting.

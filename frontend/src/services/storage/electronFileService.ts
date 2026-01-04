@@ -5,9 +5,42 @@
 
 import { electronFileService as platformFileService, type OpenDialogOptions, type SaveDialogOptions } from '@/services/platform/electron';
 import { odcsService } from '@/services/sdk/odcsService';
+import { odpsService } from '@/services/sdk/odpsService';
+import { cadsService } from '@/services/sdk/cadsService';
+import { bpmnService } from '@/services/sdk/bpmnService';
+import { dmnService } from '@/services/sdk/dmnService';
 import { getPlatform } from '@/services/platform/platform';
-import { useModelStore } from '@/stores/modelStore';
+import * as yaml from 'js-yaml';
+// Legacy data flow diagrams removed - replaced by BPMN processes
 import type { Workspace } from '@/types/workspace';
+import type { Domain as DomainType } from '@/types/domain';
+import type { Table } from '@/types/table';
+import type { DataProduct } from '@/types/odps';
+import type { ComputeAsset } from '@/types/cads';
+import type { BPMNProcess } from '@/types/bpmn';
+import type { DMNDecision } from '@/types/dmn';
+import type { System } from '@/types/system';
+import type { Relationship } from '@/types/relationship';
+// Helper function to join paths
+// Uses simple string concatenation to avoid bundling Node.js 'path' module for browser
+// This file is only used in Electron, but Vite tries to bundle it for browser builds
+const joinPath = (...segments: string[]): string => {
+  // Filter out empty segments and join with '/'
+  const filtered = segments.filter(Boolean);
+  if (filtered.length === 0) return '';
+  
+  // Join segments and normalize separators
+  let result = filtered.join('/');
+  // Normalize path separators (handle both / and \)
+  result = result.replace(/\\/g, '/');
+  // Remove duplicate slashes
+  result = result.replace(/\/+/g, '/');
+  // Remove leading slash if not absolute path
+  if (!segments[0]?.startsWith('/') && !segments[0]?.match(/^[A-Z]:/)) {
+    result = result.replace(/^\//, '');
+  }
+  return result;
+};
 
 class ElectronFileService {
   /**
@@ -23,7 +56,8 @@ class ElectronFileService {
     
     // Update model store with data flow diagrams if present
     if (odcsWorkspace.data_flow_diagrams && odcsWorkspace.data_flow_diagrams.length > 0) {
-      useModelStore.getState().setDataFlowDiagrams(odcsWorkspace.data_flow_diagrams);
+      // Legacy data flow diagrams removed - replaced by BPMN processes
+      // useModelStore.getState().setDataFlowDiagrams(odcsWorkspace.data_flow_diagrams);
     }
     
     return odcsWorkspace as unknown as Workspace;
@@ -37,13 +71,8 @@ class ElectronFileService {
       throw new Error('Electron file service can only be used in Electron environment');
     }
 
-    // Include data flow diagrams from model store
-    const { dataFlowDiagrams } = useModelStore.getState();
-    const workspaceWithDiagrams = {
-      ...workspace,
-      data_flow_diagrams: dataFlowDiagrams,
-    };
-    const yamlContent = await odcsService.toYAML(workspaceWithDiagrams as any);
+    // Legacy data flow diagrams removed - replaced by BPMN processes
+    const yamlContent = await odcsService.toYAML(workspace as any);
     await platformFileService.writeFile(path, yamlContent);
   }
 
@@ -118,6 +147,623 @@ class ElectronFileService {
    */
   async exportWorkspace(workspace: Workspace, options?: SaveDialogOptions): Promise<string | null> {
     return this.saveFile(workspace, options);
+  }
+
+  /**
+   * Load domain definition from domain.yaml
+   * workspacePath: path to workspace root folder
+   * domainName: name of domain folder
+   */
+  async loadDomain(workspacePath: string, domainName: string): Promise<DomainType> {
+    if (getPlatform() !== 'electron') {
+      throw new Error('Electron file service can only be used in Electron environment');
+    }
+
+    const domainYamlPath = joinPath(workspacePath, domainName, 'domain.yaml');
+    const content = await platformFileService.readFile(domainYamlPath);
+    const parsed = await odcsService.parseYAML(content);
+    return parsed as unknown as DomainType;
+  }
+
+  /**
+   * Load ODCS tables from domain folder
+   * Expected: {domain-name}/*.odcs.yaml files
+   */
+  async loadODCSTables(_workspacePath: string, _domainName: string): Promise<Table[]> {
+    // Note: This requires directory listing which may need Electron API extension
+    // For now, return empty array - implementation depends on Electron API capabilities
+    return [];
+  }
+
+  /**
+   * Load ODPS products from domain folder
+   * Expected: {domain-name}/*.odps.yaml files
+   */
+  async loadODPSProducts(_workspacePath: string, _domainName: string): Promise<DataProduct[]> {
+    // Note: This requires directory listing which may need Electron API extension
+    return [];
+  }
+
+  /**
+   * Load CADS assets from domain folder
+   * Expected: {domain-name}/*.cads.yaml files
+   */
+  async loadCADSAssets(_workspacePath: string, _domainName: string): Promise<ComputeAsset[]> {
+    // Note: This requires directory listing which may need Electron API extension
+    return [];
+  }
+
+  /**
+   * Load BPMN processes from domain folder
+   * Expected: {domain-name}/*.bpmn files
+   */
+  async loadBPMNProcesses(_workspacePath: string, _domainName: string): Promise<BPMNProcess[]> {
+    // Note: This requires directory listing which may need Electron API extension
+    return [];
+  }
+
+  /**
+   * Load DMN decisions from domain folder
+   * Expected: {domain-name}/*.dmn files
+   */
+  async loadDMNDecisions(_workspacePath: string, _domainName: string): Promise<DMNDecision[]> {
+    // Note: This requires directory listing which may need Electron API extension
+    return [];
+  }
+
+  /**
+   * Save domain definition to domain.yaml
+   * @param domainPath - Full path to domain folder (e.g., "/path/to/workspace/domain-name")
+   * @param domain - Domain object to save
+   * @param systems - Systems belonging to this domain
+   * @param relationships - Relationships belonging to this domain
+   * @param tables - Tables belonging to this domain
+   * @param products - Products belonging to this domain
+   * @param assets - Assets belonging to this domain
+   * @param bpmnProcesses - BPMN processes belonging to this domain
+   * @param dmnDecisions - DMN decisions belonging to this domain
+   */
+  async saveDomain(
+    domainPath: string,
+    domain: DomainType,
+    systems: System[] = [],
+    relationships: Relationship[] = [],
+    tables: Table[] = [],
+    products: DataProduct[] = [],
+    assets: ComputeAsset[] = [],
+    bpmnProcesses: BPMNProcess[] = [],
+    dmnDecisions: DMNDecision[] = []
+  ): Promise<void> {
+    if (getPlatform() !== 'electron') {
+      throw new Error('Electron file service can only be used in Electron environment');
+    }
+
+    const domainYamlPath = joinPath(domainPath, 'domain.yaml');
+    
+    // Create a domain definition structure for domain.yaml
+    // domain.yaml contains domain metadata and references to asset files
+    const domainDefinition: any = {
+      id: domain.id,
+      workspace_id: domain.workspace_id,
+      name: domain.name,
+      description: domain.description || undefined,
+      owner: domain.owner || undefined,
+      created_at: domain.created_at || new Date().toISOString(),
+      last_modified_at: domain.last_modified_at || new Date().toISOString(),
+    };
+    
+    // Add arrays of IDs for assets (if any exist)
+    if (systems.length > 0) {
+      domainDefinition.systems = systems.map(s => s.id);
+    }
+    if (relationships.length > 0) {
+      domainDefinition.relationships = relationships.map(r => r.id);
+    }
+    if (tables.length > 0) {
+      domainDefinition.tables = tables.map(t => t.id);
+    }
+    if (products.length > 0) {
+      domainDefinition.products = products.map(p => p.id);
+    }
+    if (assets.length > 0) {
+      domainDefinition.assets = assets.map(a => a.id);
+    }
+    if (bpmnProcesses.length > 0) {
+      domainDefinition.processes = bpmnProcesses.map(p => p.id);
+    }
+    if (dmnDecisions.length > 0) {
+      domainDefinition.decisions = dmnDecisions.map(d => d.id);
+    }
+    
+    // Add view_positions if domain has them
+    if ((domain as any).view_positions) {
+      domainDefinition.view_positions = (domain as any).view_positions;
+    }
+    
+    // Remove undefined fields to keep YAML clean
+    Object.keys(domainDefinition).forEach(key => {
+      if (domainDefinition[key] === undefined) {
+        delete domainDefinition[key];
+      }
+    });
+    
+    const yamlContent = yaml.dump(domainDefinition, {
+      indent: 2,
+      lineWidth: -1, // No line width limit
+      quotingType: '"',
+      forceQuotes: false,
+    });
+    
+    await platformFileService.writeFile(domainYamlPath, yamlContent);
+  }
+
+
+  /**
+   * Save ODCS table to {table-name}.odcs.yaml
+   * @param domainPath - Full path to domain folder (e.g., "/path/to/workspace/domain-name")
+   * @param domainName - Domain name (for backward compatibility, not used if domainPath is provided)
+   * @param table - Table object to save
+   */
+  async saveODCSTable(domainPath: string, domainName: string, table: Table): Promise<void> {
+    if (getPlatform() !== 'electron') {
+      throw new Error('Electron file service can only be used in Electron environment');
+    }
+
+    const tableYamlPath = joinPath(domainPath, `${table.name}.odcs.yaml`);
+    const yamlContent = await odcsService.toYAML({ tables: [table] } as any);
+    await platformFileService.writeFile(tableYamlPath, yamlContent);
+  }
+
+  /**
+   * Save ODPS product to {product-name}.odps.yaml
+   * @param domainPath - Full path to domain folder (e.g., "/path/to/workspace/domain-name")
+   * @param domainName - Domain name (for backward compatibility, not used if domainPath is provided)
+   * @param product - Product object to save
+   */
+  async saveODPSProduct(domainPath: string, domainName: string, product: DataProduct): Promise<void> {
+    if (getPlatform() !== 'electron') {
+      throw new Error('Electron file service can only be used in Electron environment');
+    }
+
+    const productYamlPath = joinPath(domainPath, `${product.name}.odps.yaml`);
+    const yamlContent = await odpsService.toYAML(product);
+    await platformFileService.writeFile(productYamlPath, yamlContent);
+  }
+
+  /**
+   * Save CADS asset to {asset-name}.cads.yaml
+   * @param domainPath - Full path to domain folder (e.g., "/path/to/workspace/domain-name")
+   * @param domainName - Domain name (for backward compatibility, not used if domainPath is provided)
+   * @param asset - Asset object to save
+   */
+  async saveCADSAsset(domainPath: string, domainName: string, asset: ComputeAsset): Promise<void> {
+    if (getPlatform() !== 'electron') {
+      throw new Error('Electron file service can only be used in Electron environment');
+    }
+
+    const assetYamlPath = joinPath(domainPath, `${asset.name}.cads.yaml`);
+    const yamlContent = await cadsService.toYAML(asset);
+    await platformFileService.writeFile(assetYamlPath, yamlContent);
+  }
+
+  /**
+   * Save BPMN process to {process-name}.bpmn
+   * @param domainPath - Full path to domain folder (e.g., "/path/to/workspace/domain-name")
+   * @param domainName - Domain name (for backward compatibility, not used if domainPath is provided)
+   * @param process - BPMN process object to save
+   */
+  async saveBPMNProcess(domainPath: string, domainName: string, process: BPMNProcess): Promise<void> {
+    if (getPlatform() !== 'electron') {
+      throw new Error('Electron file service can only be used in Electron environment');
+    }
+
+    const bpmnPath = joinPath(domainPath, `${process.name}.bpmn`);
+    const xmlContent = await bpmnService.toXML(process);
+    await platformFileService.writeFile(bpmnPath, xmlContent);
+  }
+
+  /**
+   * Save DMN decision to {decision-name}.dmn
+   * @param domainPath - Full path to domain folder (e.g., "/path/to/workspace/domain-name")
+   * @param domainName - Domain name (for backward compatibility, not used if domainPath is provided)
+   * @param decision - DMN decision object to save
+   */
+  async saveDMNDecision(domainPath: string, domainName: string, decision: DMNDecision): Promise<void> {
+    if (getPlatform() !== 'electron') {
+      throw new Error('Electron file service can only be used in Electron environment');
+    }
+
+    const dmnPath = joinPath(domainPath, `${decision.name}.dmn`);
+    const xmlContent = await dmnService.toXML(decision);
+    await platformFileService.writeFile(dmnPath, xmlContent);
+  }
+
+  /**
+   * Load domain folder structure
+   * Loads all files from a domain directory
+   */
+  async loadDomainFolder(domainPath: string): Promise<{
+    domain: DomainType;
+    tables: Table[];
+    products: DataProduct[];
+    assets: ComputeAsset[];
+    bpmnProcesses: BPMNProcess[];
+    dmnDecisions: DMNDecision[];
+    systems: System[];
+    relationships: Relationship[];
+  }> {
+    if (getPlatform() !== 'electron') {
+      throw new Error('Electron file service can only be used in Electron environment');
+    }
+
+    // Load domain.yaml - parse as simple YAML, not ODCS
+    const domainYamlPath = joinPath(domainPath, 'domain.yaml');
+    let domain: DomainType;
+    try {
+      const domainContent = await platformFileService.readFile(domainYamlPath);
+      // Parse domain.yaml as simple YAML, not ODCS format
+      const parsed = yaml.load(domainContent) as any;
+      domain = {
+        id: parsed?.id || '',
+        workspace_id: parsed?.workspace_id || '',
+        name: parsed?.name || '',
+        description: parsed?.description,
+        owner: parsed?.owner,
+        created_at: parsed?.created_at || new Date().toISOString(),
+        last_modified_at: parsed?.last_modified_at || new Date().toISOString(),
+        view_positions: parsed?.view_positions || undefined, // Load view-specific positions
+      } as DomainType;
+    } catch (error) {
+      // If domain.yaml doesn't exist, create a basic domain from folder name
+      const pathParts = domainPath.split(/[/\\]/).filter(Boolean);
+      const domainName = pathParts[pathParts.length - 1] || 'Unknown Domain';
+      domain = {
+        id: '',
+        workspace_id: '',
+        name: domainName,
+        created_at: new Date().toISOString(),
+        last_modified_at: new Date().toISOString(),
+      } as DomainType;
+    }
+
+    // Load systems and relationships
+    const systems = await this.loadSystems(domainPath);
+    const relationships = await this.loadRelationships(domainPath);
+
+    // Load individual files from domain folder
+    const tables: Table[] = [];
+    const products: DataProduct[] = [];
+    const assets: ComputeAsset[] = [];
+    const bpmnProcesses: BPMNProcess[] = [];
+    const dmnDecisions: DMNDecision[] = [];
+
+    try {
+      // List all files in the domain directory
+      const files = await platformFileService.readDirectory(domainPath);
+      
+      // Load each file based on its extension
+      for (const file of files) {
+        const fileName = file.name.toLowerCase();
+        
+        try {
+          if (fileName.endsWith('.odcs.yaml') || fileName.endsWith('.odcs.yml')) {
+            // Load ODCS table file
+            const content = await platformFileService.readFile(file.path);
+            console.log(`[ElectronFileService] Loading ODCS file: ${file.name}`);
+            const parsed = await odcsService.parseYAML(content);
+            if (parsed.tables && Array.isArray(parsed.tables)) {
+              console.log(`[ElectronFileService] Loaded ${parsed.tables.length} table(s) from ${file.name}`);
+              
+              // Try to link tables to systems based on filename or metadata
+              const fileNameLower = file.name.toLowerCase();
+              for (const table of parsed.tables) {
+                // Try to find matching system by name in filename
+                for (const system of systems) {
+                  const systemNameLower = system.name.toLowerCase().replace(/\s+/g, '');
+                  // Check if system name appears in filename (e.g., "GlobalBetSystem.odcs.yaml" contains "GlobalBetSystem")
+                  if (fileNameLower.includes(systemNameLower) || fileNameLower.includes(system.name.toLowerCase())) {
+                    if (!system.table_ids) {
+                      system.table_ids = [];
+                    }
+                    if (!system.table_ids.includes(table.id)) {
+                      system.table_ids.push(table.id);
+                      console.log(`[ElectronFileService] Linked table ${table.name || table.id} to system ${system.name} based on filename`);
+                    }
+                  }
+                }
+                
+                // Also check table metadata for system_id
+                if (table.metadata?.system_id) {
+                  const systemId = table.metadata.system_id;
+                  const system = systems.find(s => s.id === systemId);
+                  if (system) {
+                    if (!system.table_ids) {
+                      system.table_ids = [];
+                    }
+                    if (!system.table_ids.includes(table.id)) {
+                      system.table_ids.push(table.id);
+                      console.log(`[ElectronFileService] Linked table ${table.name || table.id} to system ${system.name} based on metadata.system_id`);
+                    }
+                  }
+                }
+              }
+              
+              tables.push(...parsed.tables);
+            } else {
+              console.warn(`[ElectronFileService] No tables found in ${file.name}`);
+            }
+          } else if (fileName.endsWith('.odps.yaml') || fileName.endsWith('.odps.yml')) {
+            // Load ODPS product file
+            const content = await platformFileService.readFile(file.path);
+            console.log(`[ElectronFileService] Loading ODPS file: ${file.name}`);
+            const parsed = await odpsService.parseYAML(content);
+            if (parsed) {
+              console.log(`[ElectronFileService] Loaded product: ${(parsed as DataProduct).name || 'unnamed'}`);
+              products.push(parsed as DataProduct);
+            }
+          } else if (fileName.endsWith('.cads.yaml') || fileName.endsWith('.cads.yml')) {
+            // Load CADS asset file
+            const content = await platformFileService.readFile(file.path);
+            console.log(`[ElectronFileService] Loading CADS file: ${file.name}`);
+            const parsed = await cadsService.parseYAML(content);
+            if (parsed) {
+              console.log(`[ElectronFileService] Loaded asset: ${(parsed as ComputeAsset).name || 'unnamed'}`);
+              assets.push(parsed as ComputeAsset);
+            }
+          } else if (fileName.endsWith('.bpmn')) {
+            // Load BPMN process file
+            const content = await platformFileService.readFile(file.path);
+            console.log(`[ElectronFileService] Loading BPMN file: ${file.name}`);
+            const parsed = await bpmnService.parseXML(content);
+            if (parsed) {
+              console.log(`[ElectronFileService] Loaded BPMN process: ${(parsed as BPMNProcess).name || 'unnamed'}`);
+              bpmnProcesses.push(parsed as BPMNProcess);
+            }
+          } else if (fileName.endsWith('.dmn')) {
+            // Load DMN decision file
+            const content = await platformFileService.readFile(file.path);
+            console.log(`[ElectronFileService] Loading DMN file: ${file.name}`);
+            const parsed = await dmnService.parseXML(content);
+            if (parsed) {
+              console.log(`[ElectronFileService] Loaded DMN decision: ${(parsed as DMNDecision).name || 'unnamed'}`);
+              dmnDecisions.push(parsed as DMNDecision);
+            }
+          }
+          // Skip domain.yaml, systems.yaml, relationships.yaml (already loaded)
+        } catch (fileError) {
+          console.error(`[ElectronFileService] Failed to load file ${file.name}:`, fileError);
+          // Continue loading other files even if one fails
+        }
+      }
+      
+      console.log(`[ElectronFileService] Loaded domain folder summary:`, {
+        tables: tables.length,
+        products: products.length,
+        assets: assets.length,
+        bpmnProcesses: bpmnProcesses.length,
+        dmnDecisions: dmnDecisions.length,
+        systems: systems.length,
+        relationships: relationships.length,
+      });
+    } catch (dirError) {
+      console.warn(`[ElectronFileService] Failed to list directory ${domainPath}:`, dirError);
+      // Continue with empty arrays if directory listing fails
+    }
+
+    return {
+      domain,
+      tables,
+      products,
+      assets,
+      bpmnProcesses,
+      dmnDecisions,
+      systems,
+      relationships,
+    };
+  }
+
+  /**
+   * Save domain folder structure
+   * Saves all domain-related files to a folder
+   */
+  async saveDomainFolder(
+    domainPath: string,
+    domain: DomainType,
+    tables: Table[],
+    products: DataProduct[],
+    assets: ComputeAsset[],
+    bpmnProcesses: BPMNProcess[],
+    dmnDecisions: DMNDecision[],
+    systems: System[] = [],
+    relationships: Relationship[] = []
+  ): Promise<void> {
+    if (getPlatform() !== 'electron') {
+      throw new Error('Electron file service can only be used in Electron environment');
+    }
+
+    // Ensure domain directory exists before saving any files
+    // The write-file handler will create directories recursively, so we just need to ensure
+    // the directory creation is attempted. If ensureDirectory is available, use it;
+    // otherwise, rely on the write-file handler to create directories when we write files.
+    try {
+      // Try to use the dedicated ensureDirectory method if available (requires Electron rebuild)
+      if (window.electronAPI && typeof window.electronAPI.ensureDirectory === 'function') {
+        await platformFileService.ensureDirectory(domainPath);
+        console.log(`[ElectronFileService] Domain directory ensured: ${domainPath}`);
+      } else {
+        // Fallback: The write-file handler will create directories recursively when we write files
+        // So we don't need to do anything here - just log that we're relying on write-file handler
+        console.log(`[ElectronFileService] Relying on write-file handler to create directory: ${domainPath}`);
+      }
+    } catch (error) {
+      // Log the error but don't throw - the write-file handler will attempt to create
+      // the directory when we write the first file, and will throw a proper error if it fails
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.warn(`[ElectronFileService] Could not pre-create directory (will rely on write-file handler): ${domainPath}`, errorMessage);
+    }
+
+    // Save domain.yaml (with systems and relationships IDs)
+    await this.saveDomain(domainPath, domain, systems, relationships, tables, products, assets, bpmnProcesses, dmnDecisions);
+
+    // Save all tables
+    for (const table of tables) {
+      await this.saveODCSTable(domainPath, domain.name, table);
+    }
+
+    // Save all products
+    for (const product of products) {
+      await this.saveODPSProduct(domainPath, domain.name, product);
+    }
+
+    // Save all assets
+    for (const asset of assets) {
+      await this.saveCADSAsset(domainPath, domain.name, asset);
+    }
+
+    // Save all BPMN processes
+    for (const process of bpmnProcesses) {
+      await this.saveBPMNProcess(domainPath, domain.name, process);
+    }
+
+    // Save all DMN decisions
+    for (const decision of dmnDecisions) {
+      await this.saveDMNDecision(domainPath, domain.name, decision);
+    }
+
+    // Save systems to systems.yaml
+    if (systems.length > 0) {
+      await this.saveSystems(domainPath, systems);
+    }
+
+    // Save relationships to relationships.yaml
+    console.log(`[ElectronFileService] saveDomainFolder - relationships to save: ${relationships.length}`);
+    if (relationships.length > 0) {
+      console.log(`[ElectronFileService] Relationship details:`, relationships.map(r => ({
+        id: r.id,
+        source_type: r.source_type,
+        target_type: r.target_type,
+        source_id: r.source_id,
+        target_id: r.target_id,
+        label: r.label,
+      })));
+      await this.saveRelationships(domainPath, relationships);
+    } else {
+      console.log(`[ElectronFileService] No relationships to save for domain: ${domain.name}`);
+    }
+  }
+
+  /**
+   * Save systems to systems.yaml
+   * @param domainPath - Full path to domain folder
+   * @param systems - Systems to save
+   */
+  async saveSystems(domainPath: string, systems: System[]): Promise<void> {
+    if (getPlatform() !== 'electron') {
+      throw new Error('Electron file service can only be used in Electron environment');
+    }
+
+    const systemsYamlPath = joinPath(domainPath, 'systems.yaml');
+    const systemsData = { systems };
+    const yamlContent = yaml.dump(systemsData, {
+      indent: 2,
+      lineWidth: -1,
+      quotingType: '"',
+      forceQuotes: false,
+    });
+    await platformFileService.writeFile(systemsYamlPath, yamlContent);
+  }
+
+  /**
+   * Save relationships to relationships.yaml
+   * @param domainPath - Full path to domain folder
+   * @param relationships - Relationships to save (can include table-to-table, system-to-system, etc.)
+   */
+  async saveRelationships(domainPath: string, relationships: Relationship[]): Promise<void> {
+    if (getPlatform() !== 'electron') {
+      throw new Error('Electron file service can only be used in Electron environment');
+    }
+
+    const relationshipsYamlPath = joinPath(domainPath, 'relationships.yaml');
+    
+    console.log(`[ElectronFileService] Saving ${relationships.length} relationship(s) to relationships.yaml`);
+    console.log(`[ElectronFileService] Relationship types:`, relationships.map(r => ({
+      id: r.id,
+      source_type: r.source_type,
+      target_type: r.target_type,
+      source_id: r.source_id,
+      target_id: r.target_id,
+    })));
+    
+    // Save relationships directly as YAML (not using ODCS service which filters for table-to-table only)
+    // Include all relationship types: table-to-table, system-to-system, system-to-table, etc.
+    const relationshipsData = { relationships };
+    const yamlContent = yaml.dump(relationshipsData, {
+      indent: 2,
+      lineWidth: -1,
+      quotingType: '"',
+      forceQuotes: false,
+    });
+    
+    console.log(`[ElectronFileService] Generated YAML content length: ${yamlContent.length}`);
+    await platformFileService.writeFile(relationshipsYamlPath, yamlContent);
+  }
+
+  /**
+   * Load systems from systems.yaml
+   * @param domainPath - Full path to domain folder
+   */
+  async loadSystems(domainPath: string): Promise<System[]> {
+    if (getPlatform() !== 'electron') {
+      throw new Error('Electron file service can only be used in Electron environment');
+    }
+
+    try {
+      const systemsYamlPath = joinPath(domainPath, 'systems.yaml');
+      const content = await platformFileService.readFile(systemsYamlPath);
+      const parsed = yaml.load(content) as any;
+      return Array.isArray(parsed?.systems) ? parsed.systems : [];
+    } catch (error) {
+      // File doesn't exist or can't be read - return empty array
+      return [];
+    }
+  }
+
+  /**
+   * Load relationships from relationships.yaml
+   * @param domainPath - Full path to domain folder
+   */
+  async loadRelationships(domainPath: string): Promise<Relationship[]> {
+    if (getPlatform() !== 'electron') {
+      throw new Error('Electron file service can only be used in Electron environment');
+    }
+
+    try {
+      const relationshipsYamlPath = joinPath(domainPath, 'relationships.yaml');
+      const content = await platformFileService.readFile(relationshipsYamlPath);
+      
+      // Try parsing as simple YAML first (for system-to-system relationships)
+      try {
+        const parsed = yaml.load(content) as any;
+        if (parsed?.relationships && Array.isArray(parsed.relationships)) {
+          console.log(`[ElectronFileService] Loaded ${parsed.relationships.length} relationship(s) from relationships.yaml`);
+          return parsed.relationships;
+        }
+      } catch (yamlError) {
+        // If simple YAML parsing fails, try ODCS parser (for table-to-table relationships)
+        console.log(`[ElectronFileService] Simple YAML parse failed, trying ODCS parser:`, yamlError);
+        const parsed = await odcsService.parseYAML(content);
+        if (parsed?.relationships && Array.isArray(parsed.relationships)) {
+          console.log(`[ElectronFileService] Loaded ${parsed.relationships.length} relationship(s) via ODCS parser`);
+          return parsed.relationships;
+        }
+      }
+      
+      return [];
+    } catch (error) {
+      // File doesn't exist or can't be read - return empty array
+      console.warn(`[ElectronFileService] Failed to load relationships.yaml:`, error);
+      return [];
+    }
   }
 }
 

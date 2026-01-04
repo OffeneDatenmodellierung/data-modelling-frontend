@@ -57,7 +57,8 @@ class SyncService {
         workspace_id: this.workspaceId,
         tables: modelStore.tables,
         relationships: modelStore.relationships,
-        data_flow_diagrams: modelStore.dataFlowDiagrams,
+        // Legacy data flow diagrams - deprecated, replaced by BPMN processes
+        data_flow_diagrams: [],
       };
 
       // Convert to ODCS YAML
@@ -111,9 +112,10 @@ class SyncService {
       if (workspaceData.relationships) {
         modelStore.setRelationships(workspaceData.relationships);
       }
-      if (workspaceData.data_flow_diagrams) {
-        modelStore.setDataFlowDiagrams(workspaceData.data_flow_diagrams);
-      }
+      // Legacy data flow diagrams - deprecated, replaced by BPMN processes
+      // if (workspaceData.data_flow_diagrams) {
+      //   modelStore.setDataFlowDiagrams(workspaceData.data_flow_diagrams);
+      // }
 
       return { success: true };
     } catch (error) {

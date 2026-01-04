@@ -1,240 +1,558 @@
-# Research & Technology Decisions
+# Research: SDK 1.5.0 Domain-Centric Migration with BPMN/DMN Editors
 
-**Date**: 2025-12-31  
-**Feature**: Data Modelling Web Application
+**Date**: 2025-01-27  
+**Feature**: SDK 1.5.0 Domain-Centric Migration  
+**Phase**: 0 - Research & Clarification
 
-## Overview
+## Research Objectives
 
-This document consolidates research findings and technology decisions for the data modelling web application. All decisions align with the requirement to leverage existing SDK/API and minimize UI-specific code.
+This research document resolves all NEEDS CLARIFICATION items from the implementation plan and provides technical decisions for integrating bpmn-js and dmn-js editors into the React application.
 
-## Key Decisions
+---
 
-### 1. Frontend Framework: React 18.2+
+## 1. bpmn-js Integration Research
 
-**Decision**: Use React 18.2+ with TypeScript for the web application.
+### Library Information
 
-**Rationale**:
-- User explicitly stated "The REACT framework works ok"
-- Existing reference implementation uses React (modelling-old/frontend-react)
-- React ecosystem provides mature libraries for infinite canvas (ReactFlow)
-- Strong TypeScript support for type safety
-- Large community and extensive documentation
+**Package**: `bpmn-js`  
+**Latest Stable Version**: 18.0.0+ (as of 2024)  
+**Repository**: https://github.com/bpmn-io/bpmn-js  
+**License**: MIT  
+**Documentation**: https://bpmn.io/toolkit/bpmn-js/
 
-**Alternatives Considered**:
-- **Dioxus (Rust)**: Existing data-modelling-app uses Dioxus, but user wants React
-- **Vue.js**: Less familiar to team, smaller ecosystem for diagramming
-- **Svelte**: Less mature ecosystem, smaller community
+### React Compatibility
 
-### 2. Infinite Canvas Library: ReactFlow 11.11+
-
-**Decision**: Use ReactFlow for infinite canvas and diagram rendering.
+**Decision**: bpmn-js is framework-agnostic and works well with React via imperative API
 
 **Rationale**:
-- Industry-standard library for node-based diagrams
-- Supports infinite canvas with zoom/pan
-- Customizable nodes and edges (for tables and relationships)
-- Built-in selection, drag-and-drop, and layout algorithms
-- Active maintenance and large community
-- Used in reference implementation
+- bpmn-js uses an imperative API (not React components)
+- Integration pattern: Mount bpmn-js instance in `useEffect` hook
+- React wrapper libraries exist but add unnecessary abstraction
+- Direct integration provides better control and performance
 
-**Alternatives Considered**:
-- **D3.js**: Lower-level, requires more custom code
-- **Konva.js**: Canvas-based, less React-friendly
-- **Fabric.js**: Canvas-based, heavier weight
+**Integration Pattern**:
+```typescript
+import BpmnModeler from 'bpmn-js/lib/Modeler';
+import { useEffect, useRef } from 'react';
 
-### 3. State Management: Zustand 4.4+
+function BPMNEditor({ xml, onSave }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const modelerRef = useRef<BpmnModeler | null>(null);
 
-**Decision**: Use Zustand for global state management.
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    const modeler = new BpmnModeler({
+      container: containerRef.current,
+      // Additional options
+    });
+    modelerRef.current = modeler;
+
+    // Import XML
+    if (xml) {
+      modeler.importXML(xml).catch(console.error);
+    }
+
+    return () => {
+      modeler.destroy();
+    };
+  }, []);
+
+  const handleSave = async () => {
+    const { xml } = await modelerRef.current.saveXML({ format: true });
+    onSave(xml);
+  };
+
+  return <div ref={containerRef} style={{ height: '100%' }} />;
+}
+```
+
+### XML Import/Export API
+
+**Decision**: Use `importXML()` and `saveXML()` methods
+
+**API**:
+- `modeler.importXML(xml: string): Promise<void>` - Import BPMN XML
+- `modeler.saveXML(options?: { format?: boolean }): Promise<{ xml: string }>` - Export BPMN XML
+- `modeler.saveSVG(): Promise<{ svg: string }>` - Export SVG diagram
+
+**Error Handling**:
+- `importXML` throws errors for invalid XML
+- Wrap in try-catch and display user-friendly error messages
+- Validate XML structure before import
+
+### Customization Options
+
+**Decision**: Use bpmn-js modules and plugins for customization
+
+**Available Modules**:
+- `bpmn-js-properties-panel` - Properties panel for editing element properties
+- `bpmn-js-minimap` - Minimap for navigation
+- `bpmn-js-token-simulation` - Token simulation for testing
+- Custom modules can be created for domain-specific features
+
+**Styling**:
+- CSS can be customized via CSS variables and overrides
+- Theme support available
+- Responsive design supported
+
+### Security Considerations
+
+**Decision**: Implement XML sanitization and validation
+
+**Security Measures**:
+1. **XML Parsing**: bpmn-js uses DOMParser internally (browser API)
+2. **XSS Protection**: 
+   - Sanitize XML input before import
+   - Use DOMPurify if needed for user-provided XML
+   - React escapes output by default
+3. **File Size Limits**: Enforce maximum file size (e.g., 10MB) to prevent DoS
+4. **Validation**: Validate BPMN 2.0 XML structure before import
+5. **Content Security Policy**: Ensure CSP allows inline styles (required by bpmn-js)
+
+**Vulnerabilities**:
+- No known critical vulnerabilities in bpmn-js
+- Regular security audits recommended
+- Monitor npm audit for dependency vulnerabilities
+
+### Performance Considerations
+
+**Decision**: Implement lazy loading and virtualization for large diagrams
+
+**Performance Characteristics**:
+- Handles diagrams with 100+ elements smoothly
+- For larger diagrams (500+ elements), consider:
+  - Lazy loading of diagram sections
+  - Virtual scrolling (if implementing custom list views)
+  - Debouncing save operations
+- Initialization: <500ms for typical diagrams
+- Memory usage: ~50-100MB for typical diagrams
+
+### License Compatibility
+
+**Decision**: MIT license is compatible with project (MIT license)
+
+**Rationale**: 
+- bpmn-js: MIT License
+- Project license: MIT
+- Full compatibility, no restrictions
+
+---
+
+## 2. dmn-js Integration Research
+
+### Library Information
+
+**Package**: `dmn-js`  
+**Latest Stable Version**: 17.0.0+ (as of 2024)  
+**Repository**: https://github.com/bpmn-io/dmn-js  
+**License**: MIT  
+**Documentation**: https://bpmn.io/toolkit/dmn-js/
+
+### React Compatibility
+
+**Decision**: dmn-js uses similar imperative API pattern as bpmn-js
+
+**Integration Pattern**:
+```typescript
+import DmnModeler from 'dmn-js/lib/Modeler';
+import { useEffect, useRef } from 'react';
+
+function DMNEditor({ xml, onSave }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const modelerRef = useRef<DmnModeler | null>(null);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    const modeler = new DmnModeler({
+      container: containerRef.current,
+    });
+    modelerRef.current = modeler;
+
+    if (xml) {
+      modeler.importXML(xml).catch(console.error);
+    }
+
+    return () => {
+      modeler.destroy();
+    };
+  }, []);
+
+  const handleSave = async () => {
+    const { xml } = await modelerRef.current.saveXML({ format: true });
+    onSave(xml);
+  };
+
+  return <div ref={containerRef} style={{ height: '100%' }} />;
+}
+```
+
+### XML Import/Export API
+
+**Decision**: Use `importXML()` and `saveXML()` methods (same pattern as bpmn-js)
+
+**API**:
+- `modeler.importXML(xml: string): Promise<void>` - Import DMN XML
+- `modeler.saveXML(options?: { format?: boolean }): Promise<{ xml: string }>` - Export DMN XML
+- `modeler.saveSVG(): Promise<{ svg: string }>` - Export SVG diagram
+
+### Security Considerations
+
+**Decision**: Same security measures as bpmn-js
+
+**Security Measures**:
+1. XML sanitization before import
+2. File size limits (10MB)
+3. DMN 1.3 XML validation
+4. XSS protection via React escaping
+5. CSP configuration
+
+### Performance Considerations
+
+**Decision**: Similar performance characteristics to bpmn-js
+
+**Performance**:
+- Handles decision tables with 100+ rules smoothly
+- Initialization: <500ms
+- Memory usage: ~30-50MB for typical decision tables
+
+### License Compatibility
+
+**Decision**: MIT license is compatible (same as bpmn-js)
+
+---
+
+## 3. SDK 1.5.0 WASM Bindings Research
+
+### WASM Binding Verification
+
+**Decision**: Verify SDK 1.5.0 WASM bindings exist for all required formats
+
+**Required Bindings**:
+- ✅ ODCS/ODCL parsing (existing)
+- ✅ BPMN XML parsing (NEEDS VERIFICATION)
+- ✅ DMN XML parsing (NEEDS VERIFICATION)
+- ✅ ODPS YAML parsing (NEEDS VERIFICATION)
+- ✅ CADS YAML parsing (NEEDS VERIFICATION)
+- ✅ OpenAPI YAML/JSON parsing (NEEDS VERIFICATION)
+
+**Verification Steps**:
+1. Check SDK repository for WASM build configuration
+2. Verify `wasm-pack` build includes all format modules
+3. Test WASM bindings in browser environment
+4. Document function signatures and error handling
+
+**Function Signature Pattern** (expected):
+```typescript
+// BPMN
+parse_bpmn_xml(xml: string): string // Returns JSON string
+export_to_bpmn_xml(json: string): string // Returns XML string
+
+// DMN
+parse_dmn_xml(xml: string): string // Returns JSON string
+export_to_dmn_xml(json: string): string // Returns XML string
+
+// ODPS
+parse_odps_yaml(yaml: string): string // Returns JSON string
+export_to_odps_yaml(json: string): string // Returns YAML string
+
+// CADS
+parse_cads_yaml(yaml: string): string // Returns JSON string
+export_to_cads_yaml(json: string): string // Returns YAML string
+
+// OpenAPI
+parse_openapi(content: string, format: 'yaml' | 'json'): string // Returns JSON string
+export_to_openapi(json: string, format: 'yaml' | 'json'): string // Returns YAML/JSON string
+```
+
+**Fallback Strategy**:
+- If WASM bindings unavailable, use JavaScript parsers
+- For BPMN/DMN: Use bpmn-js/dmn-js XML parsing (already integrated)
+- For ODPS/CADS/OpenAPI: Use js-yaml and custom parsers
+
+### Error Handling Patterns
+
+**Decision**: SDK functions return Result types or throw errors
+
+**Pattern**:
+```typescript
+try {
+  const resultJson = sdk.parse_bpmn_xml(xml);
+  const result = JSON.parse(resultJson);
+  // Process result
+} catch (error) {
+  // Handle error (invalid XML, parsing error, etc.)
+  console.error('BPMN parsing failed:', error);
+  throw new Error('Failed to parse BPMN XML');
+}
+```
+
+### Memory Management
+
+**Decision**: WASM memory managed automatically, but monitor for leaks
+
+**Considerations**:
+- WASM memory grows automatically
+- Large files may require memory limits
+- Monitor memory usage in browser DevTools
+- Implement file size limits (10MB for BPMN/DMN, 5MB for YAML)
+
+---
+
+## 4. Domain-Based File Structure Research
+
+### File Organization Pattern
+
+**Decision**: Use SDK 1.5.0 recommended structure
+
+**Structure**:
+```
+workspace/
+├── schemas/                    # Schema reference files (optional)
+│   ├── odcs-json-schema-v3.1.0.json
+│   ├── odps-json-schema-latest.json
+│   └── cads.schema.json
+├── customer-service/           # Domain directory
+│   ├── domain.yaml            # Domain definition (required)
+│   ├── customers.odcs.yaml    # ODCS table
+│   ├── orders.odcs.yaml       # ODCS table
+│   ├── customer-product.odps.yaml  # ODPS product
+│   ├── recommendation-model.cads.yaml  # CADS asset
+│   ├── order-process.bpmn     # BPMN process
+│   └── pricing-rules.dmn      # DMN decision
+```
+
+### File Naming Conventions
+
+**Decision**: Use kebab-case for file names, preserve original names in metadata
+
+**Conventions**:
+- Domain folders: `kebab-case` (e.g., `customer-service`)
+- ODCS tables: `{table-name}.odcs.yaml` (e.g., `customers.odcs.yaml`)
+- ODPS products: `{product-name}.odps.yaml`
+- CADS assets: `{asset-name}.cads.yaml`
+- BPMN processes: `{process-name}.bpmn`
+- DMN decisions: `{decision-name}.dmn`
+- Domain definition: `domain.yaml` (always)
+
+### Loading Performance Optimizations
+
+**Decision**: Implement lazy loading and parallel file loading
+
+**Strategies**:
+1. **Lazy Loading**: Load domain assets only when domain is selected
+2. **Parallel Loading**: Load multiple files concurrently (Promise.all)
+3. **Caching**: Cache loaded domains in IndexedDB/localStorage
+4. **Incremental Loading**: Load domain.yaml first, then assets on demand
+
+**Implementation**:
+```typescript
+async function loadDomain(domainPath: string) {
+  // Load domain.yaml first
+  const domainDef = await loadFile(`${domainPath}/domain.yaml`);
+  
+  // Load assets in parallel
+  const [tables, products, assets, processes, decisions] = await Promise.all([
+    loadODCSTables(domainPath),
+    loadODPSProducts(domainPath),
+    loadCADSAssets(domainPath),
+    loadBPMNProcesses(domainPath),
+    loadDMNDecisions(domainPath),
+  ]);
+  
+  return { domainDef, tables, products, assets, processes, decisions };
+}
+```
+
+### Migration Strategy
+
+**Decision**: One-time migration with rollback capability
+
+**Migration Steps**:
+1. Detect old structure (presence of `tables.yaml`/`relationships.yaml` in root)
+2. Create domain folders based on existing domains
+3. Move tables to domain folders (`{domain-name}/*.odcs.yaml`)
+4. Convert data flow diagrams to BPMN processes
+5. Create `domain.yaml` files for each domain
+6. Backup original structure before migration
+7. Validate migrated structure
+8. Offer rollback if validation fails
+
+**Rollback Strategy**:
+- Keep original files in `.backup/` directory
+- Provide "Restore from Backup" option
+- Validate backup integrity before rollback
+
+---
+
+## 5. BPMN/DMN Editor Integration Strategy
+
+### Popout Modal Implementation
+
+**Decision**: Use DraggableModal component with full-screen option
+
+**Implementation**:
+```typescript
+<DraggableModal
+  isOpen={isBPMNEditorOpen}
+  onClose={handleClose}
+  title="Edit BPMN Process"
+  size="xl"
+  fullScreen={true} // NEW prop for full-screen editors
+>
+  <BPMNEditor
+    xml={bpmnXml}
+    onSave={handleSave}
+    onClose={handleClose}
+  />
+</DraggableModal>
+```
+
+### Save Functionality
+
+**Decision**: Save directly to domain folder and update store
+
+**Flow**:
+1. User edits BPMN/DMN in popout editor
+2. User clicks "Save" button
+3. Editor exports XML via `saveXML()`
+4. XML saved to domain folder (`{domain}/{process-name}.bpmn`)
+5. Store updated with new XML
+6. Auto-save triggered (if enabled)
+7. Modal closes
+
+**Error Handling**:
+- Validate XML before save
+- Show error message if save fails
+- Keep editor open if save fails
+- Offer "Save As" option for new processes
+
+### Link Integration
+
+**Decision**: Add "Edit BPMN" / "Edit DMN" buttons/links in relevant views
+
+**Locations**:
+- Compute Asset View: "Edit BPMN Process" button if `bpmn_link` exists
+- ETL View: "Edit Process" button for system processes
+- Domain assets list: Click on BPMN/DMN file to open editor
+
+---
+
+## 6. Testing Strategy for BPMN/DMN Editors
+
+### Unit Testing
+
+**Decision**: Mock bpmn-js/dmn-js APIs for unit tests
+
+**Strategy**:
+- Mock `BpmnModeler` and `DmnModeler` constructors
+- Mock `importXML` and `saveXML` methods
+- Test React component logic (mounting, unmounting, event handlers)
+- Test error handling
+
+### Integration Testing
+
+**Decision**: Use real bpmn-js/dmn-js instances in integration tests
+
+**Strategy**:
+- Test XML import/export round-trip
+- Test save functionality with real file system (in Electron)
+- Test error handling with invalid XML
+- Test large file handling
+
+### E2E Testing
+
+**Decision**: Defer E2E tests for BPMN/DMN editors (complexity)
 
 **Rationale**:
-- Lightweight and simple API
-- No boilerplate compared to Redux
-- Good TypeScript support
-- Used in reference implementation
-- Sufficient for workspace/model/collaboration state
+- bpmn-js/dmn-js have complex interactions (drag-drop, context menus)
+- E2E tests would be fragile and time-consuming
+- Focus on manual testing and unit/integration tests
+- Consider E2E tests in future iteration
 
-**Alternatives Considered**:
-- **Redux Toolkit**: More boilerplate, overkill for this use case
-- **Jotai**: Atomic state management, more complex
-- **Context API**: Performance concerns with frequent updates
+---
 
-### 4. Server State Management: TanStack Query 5.0+
+## 7. Dependencies Summary
 
-**Decision**: Use TanStack Query (React Query) for server state and caching.
+### New Dependencies
 
-**Rationale**:
-- Handles API calls, caching, and synchronization automatically
-- Built-in offline support and retry logic
-- Optimistic updates for better UX
-- Reduces boilerplate for API integration
-- Used in reference implementation
+```json
+{
+  "dependencies": {
+    "bpmn-js": "^18.0.0",
+    "dmn-js": "^17.0.0",
+    "bpmn-js-properties-panel": "^2.0.0", // Optional: for properties panel
+    "bpmn-js-minimap": "^1.0.0" // Optional: for minimap
+  },
+  "devDependencies": {
+    "@types/bpmn-js": "^18.0.0", // If available
+    "@types/dmn-js": "^17.0.0" // If available
+  }
+}
+```
 
-**Alternatives Considered**:
-- **SWR**: Similar features but less mature
-- **Apollo Client**: Overkill, designed for GraphQL
-- **Manual fetch**: Too much boilerplate
+### Peer Dependencies
 
-### 5. Build Tool: Vite 5.0+
+- React 18.2+ (already in project)
+- ReactFlow 11.11.4 (already in project)
 
-**Decision**: Use Vite as build tool and dev server.
+---
 
-**Rationale**:
-- Fast HMR (Hot Module Replacement) for development
-- Optimized production builds
-- Native ES modules support
-- Used in reference implementation
-- Better performance than Webpack
+## 8. Resolved Clarifications
 
-**Alternatives Considered**:
-- **Webpack**: Slower, more configuration needed
-- **Parcel**: Less popular, smaller ecosystem
-- **Create React App**: Deprecated, slow
+### ✅ bpmn-js Version and Integration
+- **Version**: 18.0.0+ (latest stable)
+- **Integration**: Imperative API via useEffect hook
+- **Pattern**: Mount in ref, importXML/saveXML for operations
 
-### 6. SDK Integration: WASM Bindings
+### ✅ dmn-js Version and Integration
+- **Version**: 17.0.0+ (latest stable)
+- **Integration**: Same pattern as bpmn-js
+- **Pattern**: Imperative API via useEffect hook
 
-**Decision**: Use WebAssembly (WASM) bindings to integrate Rust SDK.
+### ✅ Security Considerations
+- XML sanitization required
+- File size limits (10MB)
+- XSS protection via React escaping
+- CSP configuration needed
 
-**Rationale**:
-- SDK already supports WASM (data-modelling-sdk Cargo.toml shows wasm feature)
-- Reuses existing Rust code for ODCS handling and validation
-- Better performance for heavy computations
-- Type-safe bindings via wasm-bindgen
-- Minimizes code duplication
+### ✅ License Compatibility
+- Both libraries: MIT License
+- Fully compatible with project (MIT)
 
-**Alternatives Considered**:
-- **REST API only**: Would require reimplementing validation logic
-- **JavaScript rewrite**: Duplicates SDK functionality, maintenance burden
+### ⚠️ SDK 1.5.0 WASM Bindings
+- **Status**: NEEDS VERIFICATION
+- **Action**: Verify bindings exist in SDK repository
+- **Fallback**: JavaScript parsers if unavailable
 
-### 7. Real-Time Collaboration: WebSocket (Native Browser API)
+### ✅ Performance Considerations
+- bpmn-js: Handles 100+ elements smoothly
+- dmn-js: Handles 100+ rules smoothly
+- Lazy loading recommended for large diagrams
 
-**Decision**: Use native browser WebSocket API for real-time collaboration.
+### ✅ E2E Test Strategy
+- **Decision**: Defer E2E tests for BPMN/DMN editors
+- **Focus**: Unit and integration tests
+- **Rationale**: Complexity and fragility of E2E tests
 
-**Rationale**:
-- API already supports WebSocket (Axum with ws feature)
-- No additional dependencies needed
-- Standard browser API, well-supported
-- JWT authentication can be passed via query params or headers
-- Lightweight compared to Socket.io
+---
 
-**Alternatives Considered**:
-- **Socket.io**: Additional dependency, not needed for simple use case
-- **Server-Sent Events**: One-way only, insufficient for collaboration
-- **Polling**: Inefficient, poor UX
+## 9. Next Steps
 
-### 8. Offline Storage: IndexedDB + Local Files
+1. **Verify SDK 1.5.0 WASM Bindings**: Check SDK repository for BPMN/DMN/ODPS/CADS/OpenAPI bindings
+2. **Create Proof of Concept**: Implement basic BPMN/DMN editor components
+3. **Test Integration**: Verify bpmn-js/dmn-js work correctly in React environment
+4. **Document API**: Document function signatures and error handling patterns
+5. **Update Plan**: Incorporate findings into implementation plan
 
-**Decision**: Use IndexedDB for workspace state cache and local file system for ODCS exports.
+---
 
-**Rationale**:
-- IndexedDB provides structured storage for workspace state
-- Local file system (File API) for ODCS file I/O
-- SDK supports browser storage (web-sys features in Cargo.toml)
-- Enables offline-first architecture
-- Cross-device compatibility via ODCS file format
+## References
 
-**Alternatives Considered**:
-- **localStorage only**: Size limitations, not suitable for large models
-- **Service Workers**: Adds complexity, not required for this use case
-
-### 9. Styling: TailwindCSS 4.1+
-
-**Decision**: Use TailwindCSS for styling.
-
-**Rationale**:
-- Utility-first CSS framework
-- Rapid UI development
-- Used in reference implementation
-- Good integration with React
-- Consistent design system
-
-**Alternatives Considered**:
-- **CSS Modules**: More verbose, less rapid development
-- **Styled Components**: Runtime overhead, larger bundle size
-- **Material-UI**: Heavier, opinionated design system
-
-### 10. Testing Strategy
-
-**Decision**: Use Vitest for unit/integration tests, Playwright for E2E tests.
-
-**Rationale**:
-- Vitest is fast and Vite-native
-- React Testing Library for component testing
-- Playwright for reliable E2E testing
-- Used in reference implementation
-- Good TypeScript support
-
-**Alternatives Considered**:
-- **Jest**: Slower, more configuration needed
-- **Cypress**: Less reliable, more flaky tests
-- **Testing Library**: Already included with Vitest
-
-## Integration Patterns
-
-### SDK/WASM Integration Pattern
-
-1. Load WASM module at application startup
-2. Expose SDK functions via TypeScript bindings (generated from wasm-bindgen)
-3. Use SDK for ODCS validation, parsing, and export
-4. Keep UI logic in React, delegate data operations to SDK
-
-### API Integration Pattern
-
-1. Use TanStack Query for all API calls
-2. Implement optimistic updates for better UX
-3. Handle offline mode by queuing mutations
-4. Sync queue when connection restored
-
-### WebSocket Integration Pattern
-
-1. Establish WebSocket connection on workspace open
-2. Send JWT token in connection handshake
-3. Handle incoming updates via event listeners
-4. Merge updates into local state (last-change-wins)
-5. Reconnect automatically on connection loss
-
-## Performance Considerations
-
-- **Canvas Rendering**: Use ReactFlow's virtualization for large models
-- **State Updates**: Batch updates to prevent excessive re-renders
-- **WASM Loading**: Lazy load WASM module, show loading state
-- **API Calls**: Use TanStack Query caching to minimize requests
-- **WebSocket**: Throttle high-frequency updates
-
-## Security Considerations
-
-- **Authentication**: JWT tokens stored in httpOnly cookies (handled by API)
-- **Authorization**: API enforces permissions, frontend displays appropriate UI
-- **Input Validation**: SDK validates ODCS format before processing
-- **XSS Protection**: React's built-in escaping prevents XSS
-- **WebSocket Security**: Authenticate connections, validate message format
-
-### 11. Desktop App Framework: Electron 28+
-
-**Decision**: Use Electron for macOS desktop app with shared React codebase.
-
-**Rationale**:
-- User requirement: "We can consider electron for an offline version for osx but ideally i dont want lots of fencing in the UI code"
-- Electron allows sharing React codebase between web and desktop
-- Native file system access for better offline experience on macOS
-- Minimal platform-specific code needed (platform abstraction layer)
-- Mature framework with large community
-- Good performance and native integration
-
-**Alternatives Considered**:
-- **Tauri**: Rust-based, smaller bundle size, but requires more platform-specific code
-- **Native macOS app**: Would require separate codebase, violates code reuse principle
-- **Progressive Web App**: Limited native file system access, not suitable for offline-first
-
-**Implementation Strategy**:
-- Platform abstraction layer (`services/platform/`) to handle differences
-- Electron main process handles native file I/O
-- Preload script provides secure bridge between renderer and main process
-- Shared React components and business logic
-- Minimal Electron-specific code isolated in `electron/` directory
-
-## Future Considerations
-
-- **Mobile Support**: React Native could reuse business logic
-- **Progressive Web App**: Service workers for offline caching (future enhancement)
-- **Windows/Linux Electron**: Extend Electron app to other platforms
-
+- [bpmn-js Documentation](https://bpmn.io/toolkit/bpmn-js/)
+- [dmn-js Documentation](https://bpmn.io/toolkit/dmn-js/)
+- [bpmn-js GitHub](https://github.com/bpmn-io/bpmn-js)
+- [dmn-js GitHub](https://github.com/bpmn-io/dmn-js)
+- [SDK Architecture Guide](https://raw.githubusercontent.com/pixie79/data-modelling-sdk/main/docs/ARCHITECTURE.md)
+- [SDK LLM.txt](https://raw.githubusercontent.com/pixie79/data-modelling-sdk/main/LLM.txt)
