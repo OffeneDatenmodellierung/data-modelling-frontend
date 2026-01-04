@@ -2,29 +2,23 @@
 
 ## Quick Start
 
-### 1. Start the Web Application
+**⚠️ IMPORTANT: This application currently only supports OFFLINE MODE.**
+
+### Electron Desktop Application
 
 ```bash
 cd frontend
 npm install          # First time only
-npm run dev          # Start dev server
+npm run build:wasm   # Build WASM SDK (required)
+npm run electron:dev # Start Electron app in development mode
 ```
 
-**Application URL**: http://localhost:5173
+This will:
+1. Build Electron main/preload scripts
+2. Start Vite dev server (http://localhost:5173)
+3. Launch Electron app connected to dev server
 
-### 2. Start the API Server (Optional)
-
-The app works in **offline mode** without the API, but for full online features:
-
-```bash
-# Navigate to data-modelling-api directory
-cd ../data-modelling-api
-
-# Follow API's README to start the server
-# API should run on http://localhost:8081
-```
-
-**Note**: If the API is not running, the app automatically switches to offline mode.
+**Note**: The app operates entirely offline. No API server is required.
 
 ## Running Tests
 
@@ -117,25 +111,27 @@ VITE_WS_BASE_URL=ws://localhost:8081
 
 ## Electron Desktop App
 
+See [frontend/ELECTRON_BUILD_GUIDE.md](./frontend/ELECTRON_BUILD_GUIDE.md) for complete build instructions.
+
 ### Development Mode
 
 ```bash
 cd frontend
-npm run electron:dev
+npm run build:wasm   # Build WASM SDK first
+npm run electron:dev # Start Electron app
 ```
-
-This runs:
-1. Vite dev server (http://localhost:5173)
-2. Electron app (connects to dev server)
 
 ### Production Build
 
 ```bash
 cd frontend
-npm run build
-npm run build:electron
-npm run electron:build
+npm run build:wasm   # Build WASM SDK
+npm run build        # Build frontend
+npm run build:electron # Build Electron scripts
+npm run electron:build  # Create production package
 ```
+
+This creates platform-specific installers in `release/` directory.
 
 ## Troubleshooting
 
@@ -177,11 +173,11 @@ npm install
 npm run build
 ```
 
-### API Connection Issues
+### File System Issues
 
-- Check API is running: `curl http://localhost:8081/api/v1/health`
-- Check `.env.local` configuration
-- App will automatically use offline mode if API unavailable
+- Ensure you have write permissions in the workspace directory
+- Check Electron console for file operation errors: `View > Toggle Developer Tools`
+- Verify WASM SDK is built: `ls -la public/wasm/`
 
 ## Development Workflow
 
@@ -197,6 +193,8 @@ npm run build
 
 - **Testing Guide**: [frontend/TESTING.md](./frontend/TESTING.md)
 - **Manual Testing**: [frontend/MANUAL_TESTING.md](./frontend/MANUAL_TESTING.md)
-- **API Integration**: [frontend/docs/API_INTEGRATION.md](./frontend/docs/API_INTEGRATION.md)
 - **Offline Mode**: [frontend/docs/OFFLINE_MODE.md](./frontend/docs/OFFLINE_MODE.md)
+- **Electron Build Guide**: [frontend/ELECTRON_BUILD_GUIDE.md](./frontend/ELECTRON_BUILD_GUIDE.md)
+
+
 

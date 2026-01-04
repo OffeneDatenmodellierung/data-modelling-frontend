@@ -1,49 +1,83 @@
-# Building and Running Electron App with WASM
+# Electron Build Guide
 
-This guide explains how to build and run the Electron desktop application with WASM SDK support.
+Complete guide for building the Electron desktop application.
 
 ## Prerequisites
 
-1. **Node.js** (v18+ recommended)
+1. **Node.js 20+** (LTS version recommended)
 2. **Rust** and **wasm-pack** (for building WASM SDK)
    ```bash
    # Install Rust
    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
    
    # Install wasm-pack
-   curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+   cargo install wasm-pack
    ```
-3. **data-modelling-sdk** repository cloned and accessible
-   - The SDK should be at: `../data-modelling-sdk` (relative to frontend directory)
+3. **data-modelling-sdk** repository (for WASM build)
+   - Clone the SDK repository: `git clone <sdk-repo-url> data-modelling-sdk`
+   - Place it at: `../data-modelling-sdk` (relative to `frontend/` directory)
    - Or update the path in `scripts/build-wasm.sh`
 
-## Step-by-Step Build Process
+## Quick Start
 
-### 1. Build WASM SDK
-
-The WASM SDK must be built first. This happens automatically during the build process, but you can also build it manually:
+### Development Mode
 
 ```bash
 cd frontend
+npm install
+npm run build:wasm
+npm run electron:dev
+```
+
+This will:
+1. Build Electron main/preload scripts
+2. Start Vite dev server (http://localhost:5173)
+3. Launch Electron app connected to dev server
+4. Enable hot-reload for frontend changes
+
+### Production Build
+
+```bash
+cd frontend
+npm install
+npm run build:wasm
+npm run build
+npm run build:electron
+npm run electron:build
+```
+
+This creates platform-specific installers in `release/`:
+- **macOS**: `.dmg` or `.pkg` files
+- **Windows**: `.exe` or `.msi` files
+- **Linux**: `.AppImage` or `.deb` files
+
+## Detailed Build Steps
+
+### Step 1: Install Dependencies
+
+```bash
+cd frontend
+npm install
+```
+
+### Step 2: Build WASM SDK
+
+The WASM SDK is required for offline functionality. Build it manually:
+
+```bash
 npm run build:wasm
 ```
 
 This script will:
 - Locate the `data-modelling-sdk` repository
 - Build the WASM module using `wasm-pack`
-- Copy the built WASM files to `frontend/public/wasm/`
+- Copy built files to `public/wasm/`
 
-**Note**: If the SDK is not found, the build will skip with a warning. Make sure the SDK is accessible at one of these locations:
-- `../data-modelling-sdk` (relative to frontend)
-- `../../data-modelling-sdk` (relative to project root)
-- Or update `scripts/build-wasm.sh` with your SDK path
+**Note**: The WASM build also runs automatically before `npm run build` via the `prebuild` script.
 
-### 2. Build Frontend
-
-Build the React frontend:
+### Step 3: Build Frontend
 
 ```bash
-cd frontend
 npm run build
 ```
 
@@ -51,13 +85,11 @@ This will:
 - Run TypeScript compilation (`tsc`)
 - Build the frontend with Vite
 - Include WASM files from `public/wasm/` in the build output
+- Output to `dist/` directory
 
-### 3. Build Electron Main Process
-
-Build the Electron main and preload scripts:
+### Step 4: Build Electron Main Process
 
 ```bash
-cd frontend
 npm run build:electron
 ```
 
@@ -65,42 +97,36 @@ This uses `vite.electron.config.ts` to build:
 - `electron/main.ts` → `dist-electron/main.cjs`
 - `electron/preload.ts` → `dist-electron/preload.cjs`
 
-### 4. Run Electron App (Development)
-
-For development with hot-reload:
+### Step 5: Create Production Package
 
 ```bash
-cd frontend
-npm run electron:dev
-```
-
-This will:
-1. Build Electron main/preload scripts
-2. Start the Vite dev server (http://localhost:5173)
-3. Launch Electron pointing to the dev server
-4. Enable hot-reload for frontend changes
-
-### 5. Run Electron App (Production)
-
-For production mode (uses built files, **offline mode**):
-
-```bash
-cd frontend
-npm run build          # Build frontend (required!)
-npm run build:electron # Build Electron scripts
-npm run electron       # Run Electron app in production/offline mode
-```
-
-**Important**: You **must** run `npm run build` first to create the `dist/` folder. The Electron app will load from `dist/index.html` in production mode, which enables offline mode (no API calls).
-
-Or use the combined command:
-
-```bash
-cd frontend
 npm run electron:build
 ```
 
-This builds everything and creates a distributable package using `electron-builder`.
+This uses `electron-builder` to create distributable packages:
+- Reads configuration from `electron/electron-builder.yml`
+- Creates platform-specific installers
+- Outputs to `release/` directory
+
+## Running the Electron App
+
+### Development Mode
+
+```bash
+npm run electron:dev
+```
+
+Runs Electron connected to Vite dev server with hot-reload.
+
+### Production Mode
+
+```bash
+npm run electron
+```
+
+Runs Electron using built files from `dist/` (offline mode).
+
+**Note**: You must run `npm run build` first to create the `dist/` folder.
 
 ## Complete Build Script
 
@@ -109,7 +135,7 @@ For a complete build from scratch:
 ```bash
 cd frontend
 
-# 1. Install dependencies (if needed)
+# 1. Install dependencies
 npm install
 
 # 2. Build WASM SDK
@@ -118,146 +144,93 @@ npm run build:wasm
 # 3. Build frontend
 npm run build
 
-# 4. Build Electron
+# 4. Build Electron scripts
 npm run build:electron
 
-# 5. Run Electron app
-npm run electron
+# 5. Create production package
+npm run electron:build
 ```
 
 ## Troubleshooting
 
-### Electron App Trying to Connect to localhost:5173 in Production Mode
-
-**Symptom**: Error `ERR_CONNECTION_REFUSED` when running `npm run electron` in production mode.
-
-**Solution**: 
-1. Make sure you've built the frontend first:
-   ```bash
-   npm run build
-   ```
-2. Verify `dist/index.html` exists:
-   ```bash
-   ls -la dist/index.html
-   ```
-3. The Electron app prioritizes `NODE_ENV=production` and will use the built files instead of the dev server.
-
-**Note**: The `electron` script sets `NODE_ENV=production`, which forces offline mode. The app will load from `dist/index.html` instead of connecting to the dev server.
-
 ### WASM SDK Not Found
 
-If you see: `WASM SDK build skipped (SDK not found or wasm-pack not installed)`
+**Error**: `WASM SDK build skipped (SDK not found or wasm-pack not installed)`
 
-**Solutions:**
+**Solutions**:
 1. Clone the SDK repository:
    ```bash
    cd ..
    git clone <sdk-repo-url> data-modelling-sdk
    ```
 
-2. Or update the SDK path in `scripts/build-wasm.sh`:
-   ```bash
-   SDK_DIR="/path/to/your/data-modelling-sdk"
-   ```
-
-3. Verify wasm-pack is installed:
+2. Verify wasm-pack is installed:
    ```bash
    wasm-pack --version
    ```
 
-### Electron Window Shows Blank Screen
+3. Update SDK path in `scripts/build-wasm.sh` if needed
 
-1. Check that the frontend build completed successfully
-2. Check Electron console for errors: `View > Toggle Developer Tools`
-3. Verify `dist-electron/main.cjs` exists and is valid
-4. Check that Vite dev server is running (for dev mode)
+### Electron App Shows Blank Screen
 
-### WASM Module Not Loading
-
-1. Verify WASM files exist in `public/wasm/`:
-   ```bash
-   ls -la frontend/public/wasm/
-   ```
-
-2. Check browser console for WASM loading errors
-3. Ensure WASM files are copied to `dist/` during build
-4. Verify CORS headers if loading from file:// protocol
+1. Check that frontend build completed: `ls -la dist/index.html`
+2. Check Electron console: `View > Toggle Developer Tools`
+3. Verify Electron scripts built: `ls -la dist-electron/main.cjs`
+4. For dev mode, ensure Vite server is running
 
 ### Build Errors
 
-1. **TypeScript errors**: Run `npm run type-check` to see all errors
+1. **TypeScript errors**: Run `npm run type-check`
 2. **Vite build errors**: Check `vite.config.ts` and `vite.electron.config.ts`
-3. **Electron build errors**: Ensure Electron dependencies are installed:
-   ```bash
-   npm install --save-dev electron electron-builder
-   ```
+3. **Electron build errors**: Ensure Electron dependencies are installed
+
+### Port Already in Use
+
+If port 5173 is in use:
+```bash
+# Find process using port
+lsof -i :5173
+
+# Kill process
+kill -9 <PID>
+```
 
 ## File Structure
 
 ```
 frontend/
 ├── electron/
-│   ├── main.ts          # Electron main process
-│   ├── preload.ts       # Preload script (IPC bridge)
-│   └── electron-builder.yml  # Electron Builder config
+│   ├── main.ts              # Electron main process
+│   ├── preload.ts           # Preload script (IPC bridge)
+│   ├── electron-builder.yml # Electron Builder config
+│   └── icons/               # App icons
 ├── scripts/
-│   └── build-wasm.sh    # WASM SDK build script
+│   └── build-wasm.sh        # WASM SDK build script
 ├── public/
-│   └── wasm/            # WASM SDK output (generated)
-├── dist/                # Frontend build output
-├── dist-electron/       # Electron build output
+│   └── wasm/                # WASM SDK output (generated)
+├── dist/                    # Frontend build output
+├── dist-electron/           # Electron build output
 │   ├── main.cjs
-│   └── preload.cjs
-├── vite.config.ts       # Frontend Vite config
-└── vite.electron.config.ts  # Electron Vite config
+│   ├── preload.cjs
+│   └── wasm/                # Copied WASM files
+└── release/                 # Production packages (generated)
 ```
-
-## Development Workflow
-
-1. **Terminal 1** - Start Vite dev server:
-   ```bash
-   cd frontend
-   npm run dev
-   ```
-
-2. **Terminal 2** - Run Electron (after building):
-   ```bash
-   cd frontend
-   npm run build:electron
-   npm run electron
-   ```
-
-   Or use the combined command:
-   ```bash
-   npm run electron:dev
-   ```
-
-## Production Distribution
-
-To create a distributable package:
-
-```bash
-cd frontend
-npm run electron:build
-```
-
-This creates platform-specific installers in `dist/`:
-- **macOS**: `.dmg` or `.pkg`
-- **Windows**: `.exe` or `.msi`
-- **Linux**: `.AppImage` or `.deb`
-
-Configuration is in `electron/electron-builder.yml`.
 
 ## Environment Variables
 
 - `NODE_ENV=development` - Development mode (uses Vite dev server)
-- `NODE_ENV=production` - Production mode (uses built files)
+- `NODE_ENV=production` - Production mode (uses built files, offline mode)
 
 ## Additional Notes
 
-- The Electron app uses **offline mode by default** (no API connection)
+- The Electron app operates in **offline mode** by default (no API connection)
 - WASM SDK is required for offline functionality
 - File system access is available through Electron IPC handlers
 - Native file dialogs are used for workspace folder selection
+- All data is stored locally in YAML files
 
+## Related Documentation
 
+- [README.md](../../README.md) - Project overview
+- [HOW_TO_RUN.md](../../HOW_TO_RUN.md) - Running instructions
+- [QUICK_START.md](../../QUICK_START.md) - Quick start guide

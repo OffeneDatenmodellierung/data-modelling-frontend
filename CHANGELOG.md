@@ -7,8 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-01-04
+
 ### Changed
-- **API Availability**: The `data-modelling-api` is now published on [crates.io](https://crates.io/crates/data-modelling-api) as version **1.0.1**. Documentation updated to reflect installation via `cargo install data-modelling-api`.
+- **Offline Mode Only**: Application now explicitly supports offline mode only. All API-related documentation and bug reports have been removed.
+- **Documentation**: Comprehensive documentation updates:
+  - Updated README.md to reflect offline-only mode and Electron desktop app focus
+  - Rewrote Electron build guide with clear step-by-step instructions
+  - Updated offline mode documentation to remove API references
+  - Updated HOW_TO_RUN.md and QUICK_START.md for offline mode
+- **CI/CD**: New GitHub Actions workflow (`.github/workflows/build-release.yml`):
+  - Lint and format checks
+  - Test suite with coverage requirements
+  - Multi-platform builds (Ubuntu, macOS, Windows)
+  - Automated release creation with installers when tags are pushed
+  - Security audits
+
+### Removed
+- Removed outdated API bug reports and integration documentation
+- Removed API-related setup guides (GitHub OAuth, API integration)
+- Removed references to Docker Compose and API server requirements
+
+### Fixed
+- Documentation now accurately reflects current application state (offline mode only)
+- Build instructions clarified for Electron app development
 
 ## [0.5.0] - 2025-01-XX
 
@@ -199,6 +221,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - TypeScript strict mode
 - GitHub Actions CI/CD workflow
 
-[Unreleased]: https://github.com/your-org/data-modelling-app/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/your-org/data-modelling-app/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/your-org/data-modelling-app/compare/v0.1.0...v1.1.0
 [0.1.0]: https://github.com/your-org/data-modelling-app/releases/tag/v0.1.0
 

@@ -2,31 +2,26 @@
 
 ## Overview
 
-The application supports **dual-mode operation**:
-- **Online Mode**: Uses API endpoints (which use the SDK server-side)
-- **Offline Mode**: Uses WASM SDK directly in the browser
+**⚠️ IMPORTANT: This application currently only supports OFFLINE MODE.**
+
+The application operates entirely offline using:
+- **WASM SDK**: Direct use of `data-modelling-sdk` compiled to WebAssembly
+- **Local File System**: Electron file system access for saving/loading workspaces
+- **No API Required**: All functionality works without any backend server
 
 ## Architecture
 
-### Mode Detection
+### Offline Mode Only
 
-The `sdkModeDetector` service automatically detects whether to use online or offline mode by checking API availability.
-
-### SDK Integration
-
-1. **Online Mode** (default when API is available):
-   - All import/export operations go through API endpoints
-   - API uses the SDK server-side
-   - Benefits: Centralized processing, consistent results
-
-2. **Offline Mode** (when API unavailable):
-   - Uses WASM SDK directly in the browser
-   - All operations run client-side
-   - Benefits: Works without internet, faster for local operations
+The application uses WASM SDK directly in the browser/Electron:
+- All import/export operations run client-side
+- File operations use Electron IPC handlers
+- All data is stored locally in YAML files
+- No network requests required
 
 ### WASM SDK Build
 
-The SDK (version **1.1.0**) is automatically built as part of the application build process:
+The SDK (version **1.6.2+**) is automatically built as part of the application build process:
 
 ```bash
 # Build WASM SDK manually
@@ -37,45 +32,49 @@ npm run build
 ```
 
 The build script (`scripts/build-wasm.sh`):
-1. Locates the `data-modelling-sdk` directory (must be version 1.1.0)
+1. Locates the `data-modelling-sdk` directory
 2. Builds the WASM module using `wasm-pack` with `--features wasm`
 3. Copies the built files to `frontend/public/wasm/`
 
-**SDK Version Requirement**: The application requires `data-modelling-sdk = "1.1.0"` crate. The API project (`data-modelling-api`) is available on [crates.io](https://crates.io/crates/data-modelling-api) as version **1.1.2** and uses `data-modelling-sdk = "1.1.0"` with features `["api-backend", "git"]`.
-
-**Note**: If the SDK is not available, the build will continue successfully and offline mode will use a JavaScript YAML parser fallback.
+**Note**: If the SDK is not available, the build will continue successfully and the app will use a JavaScript YAML parser fallback.
 
 ### Services
 
-All SDK services (`odcsService`, `importExportService`) automatically switch between modes:
+All SDK services (`odcsService`, `importExportService`) use offline mode:
+- `odcsService.parseYAML()` - Uses WASM SDK `parse_odcs_yaml` function
+- `odcsService.toYAML()` - Uses WASM SDK `export_to_odcs_yaml` function
+- `importExportService` - Uses WASM SDK for SQL, AVRO, JSON Schema, Protobuf imports
 
-- `parseYAML()` - Parses ODCS YAML (API or WASM)
-- `toYAML()` - Converts workspace to ODCS YAML (API or WASM)
-- `importFromSQL()` - Imports SQL (API or WASM)
-- `importFromAVRO()` - Imports AVRO (API or WASM)
-- `importFromJSONSchema()` - Imports JSON Schema (API or WASM)
-- `importFromProtobuf()` - Imports Protobuf (API or WASM)
-- `exportToSQL()` - Exports SQL (API or WASM)
-- `exportToAVRO()` - Exports AVRO (API or WASM)
-- `exportToJSONSchema()` - Exports JSON Schema (API or WASM)
-- `exportToProtobuf()` - Exports Protobuf (API or WASM)
+### File Storage
 
-### Current Status
+In Electron offline mode:
+- **Workspace Storage**: Domain folders with YAML files
+- **File Structure**: Each domain has its own folder containing:
+  - `domain.yaml` - Domain definition with systems and relationships
+  - `{table-name}.odcs.yaml` - Table definitions
+  - `{product-name}.odps.yaml` - Data product definitions
+  - `{asset-name}.cads.yaml` - Compute asset definitions
+  - `{process-name}.bpmn` - BPMN process definitions
+  - `{decision-name}.dmn` - DMN decision definitions
 
-- ✅ WASM SDK build: **Automated** (builds before app build)
-- ✅ Mode detection: **Implemented**
-- ✅ Dual-mode services: **Implemented**
-- ✅ YAML parser fallback: **Implemented** (js-yaml when SDK unavailable)
-- ✅ Build integration: **Implemented** (prebuild script)
-- ⏳ WASM bindings: **Pending** (SDK methods need to be exposed via wasm-bindgen)
-- ⏳ WASM module loading: **Placeholder** (needs actual module integration)
+### File Operations
 
-### Build Process
+File operations use Electron IPC handlers:
+- `readFile` - Read files from disk
+- `writeFile` - Write files to disk (creates directories automatically)
+- `readDirectory` - List files in a directory
+- `deleteFile` - Delete files
+- `ensureDirectory` - Create directories
 
-The WASM SDK is built automatically:
-1. **Development**: Run `npm run build:wasm` manually or let `npm run dev` handle it
-2. **Production**: `npm run build` automatically runs `prebuild` which builds WASM SDK
-3. **CI/CD**: GitHub Actions builds WASM SDK before building the application
+### Benefits of Offline Mode
 
-If the SDK is not available, the build continues and offline mode uses the JavaScript YAML parser fallback.
+1. **No Server Required**: Works completely standalone
+2. **Fast Local Operations**: No network latency
+3. **Privacy**: All data stays on your machine
+4. **Offline Capable**: Works without internet connection
+5. **Version Control Friendly**: All data stored as YAML files
 
+## Related Documentation
+
+- [ELECTRON_BUILD_GUIDE.md](../ELECTRON_BUILD_GUIDE.md) - Building the Electron app
+- [README.md](../../README.md) - Project overview

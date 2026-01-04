@@ -1,32 +1,24 @@
 # Quick Start Guide
 
-## Manual Testing - User Story 1
+**⚠️ IMPORTANT: This application currently only supports OFFLINE MODE.**
 
-### Option 1: Quick Start Script
+## Electron Desktop Application
 
-```bash
-cd frontend
-npm run dev:quick
-# OR
-./scripts/dev.sh
-```
-
-### Option 2: Manual Steps
+### Quick Start
 
 ```bash
-# 1. Install dependencies
 cd frontend
 npm install
-
-# 2. Create environment file (optional)
-cp .env.example .env.local
-# Edit .env.local if needed
-
-# 3. Start development server
-npm run dev
+npm run build:wasm   # Build WASM SDK (required)
+npm run electron:dev # Start Electron app
 ```
 
-**Application will be available at: http://localhost:5173**
+This will:
+1. Build Electron main/preload scripts
+2. Start Vite dev server (http://localhost:5173)
+3. Launch Electron app connected to dev server
+
+**Note**: No API server is required. The app operates entirely offline.
 
 ## Running Tests
 
@@ -49,15 +41,19 @@ npm run type-check
 npm run lint
 ```
 
-## Running the API Server (Optional)
-
-The app works in offline mode, but for full online features:
+## Building Production Release
 
 ```bash
-# Start the data-modelling-api server
-# Should run on http://localhost:8081
-# Check the API repository for instructions
+cd frontend
+npm run build:wasm   # Build WASM SDK
+npm run build        # Build frontend
+npm run build:electron # Build Electron scripts
+npm run electron:build  # Create production package
 ```
+
+This creates platform-specific installers in `release/` directory.
+
+See [frontend/ELECTRON_BUILD_GUIDE.md](./frontend/ELECTRON_BUILD_GUIDE.md) for detailed instructions.
 
 ## Manual Testing Checklist
 
@@ -74,18 +70,19 @@ Quick checklist:
 
 ## GitHub Actions
 
-CI/CD is configured in `.github/workflows/ci.yml`:
+CI/CD is configured in `.github/workflows/build-release.yml`:
 
-- **Automatically runs on push/PR**
-- **Tests on Node.js 20.x and 22.x**
-- **Checks coverage (95% threshold)**
-- **Builds web and Electron apps**
-- **Runs security audit**
+- **Lint and Format**: Runs ESLint and Prettier checks
+- **Test**: Runs test suite on Node.js 20.x and 22.x (95% coverage threshold)
+- **Build**: Builds WASM SDK, frontend, and Electron apps for all platforms
+- **Release**: Creates GitHub releases with installers when tags are pushed
+- **Security**: Performs npm security audits
 
-To trigger manually:
-1. Push to branch
-2. Create Pull Request
-3. Check Actions tab in GitHub
+The workflow runs on:
+- Push to `main` or `develop` branches
+- Pull requests to `main` or `develop`
+- Tags starting with `v*` (creates release)
+- Manual workflow dispatch
 
 ## Troubleshooting
 
@@ -121,5 +118,8 @@ npm test -- tests/unit/services/api/workspaceService.test.ts
 
 1. **Read Testing Guide**: [frontend/TESTING.md](./frontend/TESTING.md)
 2. **Manual Testing**: [frontend/MANUAL_TESTING.md](./frontend/MANUAL_TESTING.md)
-3. **API Integration**: [frontend/docs/API_INTEGRATION.md](./frontend/docs/API_INTEGRATION.md)
+3. **Electron Build Guide**: [frontend/ELECTRON_BUILD_GUIDE.md](./frontend/ELECTRON_BUILD_GUIDE.md)
+4. **Offline Mode**: [frontend/docs/OFFLINE_MODE.md](./frontend/docs/OFFLINE_MODE.md)
+
+
 

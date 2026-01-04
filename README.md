@@ -1,18 +1,20 @@
-# Data Modelling Web Application
+# Open Data Modelling Application
 
-A React-based web application with Electron desktop app support for creating data architectures, models, and flow diagrams.
+A domain-centric data modelling application built with React and Electron. Create data architectures, models, and flow diagrams entirely offline.
 
-[![Build and Test](https://github.com/your-org/data-modelling-app/actions/workflows/build-test.yml/badge.svg)](https://github.com/your-org/data-modelling-app/actions/workflows/build-test.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Build and Release](https://github.com/your-org/data-modelling-app/actions/workflows/build-release.yml/badge.svg)](https://github.com/your-org/data-modelling-app/actions/workflows/build-release.yml)
+[![License: ISC](https://img.shields.io/badge/License-ISC-blue.svg)](https://opensource.org/licenses/ISC)
+
+**⚠️ IMPORTANT: This application currently only supports OFFLINE MODE.**
 
 ## Features
 
 - **Data Modelling**: Conceptual, logical, and physical models with crow's feet notation
 - **Infinite Canvas**: ReactFlow-based canvas for visualizing data models
-- **Multi-User Collaboration**: Real-time collaboration via WebSockets
-- **Offline Mode**: Works without API using local files and WASM SDK
+- **Offline Mode**: **Currently only supports offline mode** - Works without API using local files and WASM SDK
 - **Import/Export**: Support for ODCS, SQL, AVRO, JSON Schema, and Protobuf formats
-- **Cross-Platform**: Web app and Electron desktop app (macOS)
+- **Cross-Platform**: Electron desktop app (macOS, Windows, Linux)
+- **Domain-Centric**: Organize data models by business domains with systems, tables, relationships, BPMN processes, and DMN decisions
 
 ## Prerequisites
 
@@ -29,25 +31,7 @@ A React-based web application with Electron desktop app support for creating dat
 
 ## Quick Start
 
-### Option 1: Docker Compose (Recommended)
-
-The easiest way to run the full stack (PostgreSQL + API + Frontend):
-
-```bash
-# Start all services
-docker-compose up -d
-
-# View logs
-docker-compose logs -f
-
-# Access the application
-# Frontend: http://localhost:5173
-# API: http://localhost:8081
-```
-
-See [docker/README.md](docker/README.md) for detailed Docker setup instructions.
-
-### Option 2: Local Development
+### Local Development (Electron App)
 
 #### Installation
 
@@ -58,28 +42,22 @@ npm install
 
 # Build WASM SDK (required for offline mode)
 npm run build:wasm
-
-# Create environment file (optional)
-cp .env.example .env.local
-# Edit .env.local with your API URL if needed
 ```
 
 #### Development
 
 ```bash
-# Start development server
-npm run dev
-# or use the convenience script
-./scripts/dev.sh
+# Start Electron app in development mode
+cd frontend
+npm run electron:dev
 
-# Application will be available at http://localhost:5173
+# This will:
+# 1. Build Electron main/preload scripts
+# 2. Start Vite dev server (http://localhost:5173)
+# 3. Launch Electron app connected to dev server
 ```
 
-**Note**: For local development, you'll need:
-- PostgreSQL running (or use Docker Compose for just PostgreSQL + API)
-- `data-modelling-api` installed from crates.io: `cargo install data-modelling-api`
-
-The development script (`scripts/dev.sh`) will automatically:
+**Note**: The development script (`scripts/dev.sh`) will automatically:
 - Check Node.js version
 - Install dependencies if needed
 - Build WASM SDK if not present
@@ -117,18 +95,32 @@ npm run type-check
 npm run lint
 ```
 
-### Building
+### Building Electron Application
+
+See [frontend/ELECTRON_BUILD_GUIDE.md](frontend/ELECTRON_BUILD_GUIDE.md) for detailed build instructions.
+
+**Quick build commands:**
 
 ```bash
-# Build web application (includes WASM SDK)
+cd frontend
+
+# Build WASM SDK (required)
+npm run build:wasm
+
+# Build frontend
 npm run build
 
-# Build Electron application
+# Build Electron main/preload scripts
 npm run build:electron
 
-# Preview production build
-npm run preview
+# Build production Electron app (creates installers)
+npm run electron:build
 ```
+
+This creates platform-specific installers:
+- **macOS**: `.dmg` or `.pkg` files
+- **Windows**: `.exe` or `.msi` files  
+- **Linux**: `.AppImage` or `.deb` files
 
 ## Project Structure
 
@@ -153,62 +145,88 @@ frontend/
 
 ## Environment Variables
 
-Create `frontend/.env.local`:
-
-```env
-VITE_API_BASE_URL=http://localhost:8081
-VITE_WS_BASE_URL=ws://localhost:8081
-```
+**Note**: Since the app operates in offline mode only, environment variables are not required. The app uses local file storage and WASM SDK for all operations.
 
 ## WASM SDK Integration
 
-The application uses a WASM build of the `data-modelling-sdk` (version **1.0.2**) for offline functionality:
+The application uses a WASM build of the `data-modelling-sdk` (version **1.1.0**) for offline functionality:
 
-1. **SDK Version**: Requires `data-modelling-sdk = "1.0.2"` crate
+1. **SDK Version**: Requires `data-modelling-sdk = "1.1.0"` crate
 2. **Build Process**: The SDK is built using `wasm-pack` and copied to `public/wasm/`
 3. **Automatic Build**: Runs automatically before `npm run build` via `prebuild` script
 4. **Development**: Can be built manually with `npm run build:wasm`
 5. **Fallback**: If WASM SDK is not available, the app uses a JavaScript YAML parser fallback
 
-**Note**: The SDK must be version 1.0.2 or compatible. The API project (`data-modelling-api`) is available on [crates.io](https://crates.io/crates/data-modelling-api) as version **1.0.1** and uses `data-modelling-sdk = "1.0.2"` with features `["api-backend", "git"]`.
+**Note**: The SDK must be version 1.1.0 or compatible. The API project (`data-modelling-api`) is available on [crates.io](https://crates.io/crates/data-modelling-api) as version **1.1.2** and uses `data-modelling-sdk = "1.1.0"` with features `["api-backend", "git"]`.
 
 ## Offline Mode
 
-The app supports two modes:
+**⚠️ IMPORTANT: This application currently only supports OFFLINE MODE.**
 
-- **Online Mode**: Uses API endpoints (requires API server)
-- **Offline Mode**: Uses WASM SDK directly (works without API)
+The app operates entirely offline using:
+- **WASM SDK**: Direct use of `data-modelling-sdk` compiled to WebAssembly
+- **Local File System**: Electron file system access for saving/loading workspaces
+- **No API Required**: All functionality works without any backend server
 
-The app automatically detects which mode to use based on API availability.
+**Note**: Online mode (API integration) is not currently supported. The application is designed to work standalone with local file storage.
 
 ## CI/CD
 
-The GitHub Actions workflow (`.github/workflows/build-test.yml`):
-- Builds WASM SDK before building the application
-- Runs tests with 95% coverage requirement
-- Builds both web and Electron applications
-- Performs security audits
-- Checks code formatting
-- Validates TypeScript types
+The GitHub Actions workflow (`.github/workflows/build-release.yml`):
+- **Lint and Format**: Runs ESLint and Prettier checks
+- **Test**: Runs test suite with 95% coverage requirement
+- **Build**: Builds WASM SDK, frontend, and Electron applications for all platforms
+- **Release**: Creates GitHub releases with installers when tags are pushed
+- **Security**: Performs npm security audits
 
-## API Specification
+The workflow runs on:
+- Push to `main` or `develop` branches
+- Pull requests to `main` or `develop`
+- Tags starting with `v*` (creates release)
+- Manual workflow dispatch
 
-The `data-modelling-api` is available on [crates.io](https://crates.io/crates/data-modelling-api) as version **1.0.1**. The OpenAPI specification (`openapi.json`) has been reverse-engineered from the frontend codebase and includes:
-- Authentication endpoints (GitHub OAuth, token management)
-- Workspace and domain management
-- Table and relationship CRUD operations
-- Import/Export endpoints for multiple formats
-- Complete schema definitions
+## Building from Source
 
-To install the API from crates.io:
-```bash
-cargo install data-modelling-api
-```
+### Prerequisites
 
-To regenerate the OpenAPI spec from the API server:
-```bash
-bash scripts/fetch-openapi.sh
-```
+- **Node.js 20+** (LTS version recommended)
+- **Rust** and **wasm-pack** (for building WASM SDK)
+  ```bash
+  # Install Rust
+  curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+  
+  # Install wasm-pack
+  cargo install wasm-pack
+  ```
+
+### Build Steps
+
+1. **Clone the repository**
+   ```bash
+   git clone <repository-url>
+   cd dm
+   ```
+
+2. **Install dependencies**
+   ```bash
+   cd frontend
+   npm install
+   ```
+
+3. **Build WASM SDK**
+   ```bash
+   npm run build:wasm
+   ```
+   Note: This requires the `data-modelling-sdk` repository to be accessible. See [frontend/ELECTRON_BUILD_GUIDE.md](frontend/ELECTRON_BUILD_GUIDE.md) for details.
+
+4. **Build Electron application**
+   ```bash
+   npm run build
+   npm run build:electron
+   npm run electron:build
+   ```
+
+See [frontend/ELECTRON_BUILD_GUIDE.md](frontend/ELECTRON_BUILD_GUIDE.md) for complete build instructions.
 
 ## Contributing
 
