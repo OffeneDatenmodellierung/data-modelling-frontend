@@ -10,7 +10,10 @@ export type SDKMode = 'online' | 'offline';
 
 interface SDKModeState {
   mode: SDKMode;
+  isManualOverride: boolean; // Always false in offline-only mode
   getMode: () => SDKMode;
+  setMode: (mode: SDKMode, manual?: boolean) => void;
+  checkOnlineMode: () => Promise<boolean>;
   initialize: () => void;
 }
 
@@ -55,6 +58,7 @@ function getSDKMode(): SDKMode {
 // Zustand store for SDK mode state (no persistence - always reads from env)
 export const useSDKModeStore = create<SDKModeState>()((set, get) => ({
   mode: getSDKMode(), // Initialize from environment variable
+  isManualOverride: false, // Always false in offline-only mode
   
   getMode: () => {
     // Always read from environment variable
@@ -63,10 +67,21 @@ export const useSDKModeStore = create<SDKModeState>()((set, get) => ({
     return mode;
   },
   
+  setMode: (mode: SDKMode, manual: boolean = false) => {
+    // In offline-only mode, always set to offline
+    const actualMode = getOfflineModeFromEnv() ? 'offline' : mode;
+    set({ mode: actualMode, isManualOverride: manual });
+  },
+  
+  checkOnlineMode: async (): Promise<boolean> => {
+    // In offline-only mode, always return false
+    return !getOfflineModeFromEnv();
+  },
+  
   initialize: () => {
     // Initialize mode from environment variable
     const mode = getSDKMode();
-    set({ mode });
+    set({ mode, isManualOverride: false });
     console.log(`[SDKMode] Initialized mode: ${mode} (from VITE_OFFLINE_MODE=${import.meta.env.VITE_OFFLINE_MODE ?? 'not set (defaults to offline)'})`);
   },
 }));

@@ -428,7 +428,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                   if (domainPath) {
                     try {
                       // Get all domain assets
-                      const domainTables = tables.filter((t) => t.domain_id === domain.id || t.primary_domain_id === domain.id);
+                      const domainTables = tables.filter((t) => t.primary_domain_id === domain.id);
                       const domainProducts = products.filter((p) => p.domain_id === domain.id);
                       const domainAssets = computeAssets.filter((a) => a.domain_id === domain.id);
                       const domainBpmnProcesses = bpmnProcesses.filter((p) => p.domain_id === domain.id);
@@ -443,8 +443,6 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                         name: domain.name,
                         description: domain.description,
                         owner: domain.owner,
-                        model_type: domain.model_type || 'conceptual',
-                        is_primary: domain.is_primary || false,
                         created_at: domain.created_at,
                         last_modified_at: new Date().toISOString(),
                       } as any;
@@ -533,9 +531,9 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                         for (const domain of domains) {
                           const domainTables = tables.filter(t => t.primary_domain_id === domain.id);
                           const domainProducts = products.filter(p => p.domain_id === domain.id);
-                          const domainAssets = assets.filter(a => a.primary_domain_id === domain.id);
-                          const domainBpmn = bpmnProcesses.filter(p => p.primary_domain_id === domain.id);
-                          const domainDmn = dmnDecisions.filter(d => d.primary_domain_id === domain.id);
+                          const domainAssets = assets.filter(a => a.domain_id === domain.id);
+                          const domainBpmn = bpmnProcesses.filter(p => p.domain_id === domain.id);
+                          const domainDmn = dmnDecisions.filter(d => d.domain_id === domain.id);
                           const domainSystems = systems.filter(s => s.domain_id === domain.id);
                           const domainRelationships = relationships.filter(r => r.domain_id === domain.id);
                           
@@ -677,9 +675,9 @@ export const useWorkspaceStore = create<WorkspaceState>()(
               for (const domain of domains) {
                 const domainTables = tables.filter(t => t.primary_domain_id === domain.id);
                 const domainProducts = products.filter(p => p.domain_id === domain.id);
-                const domainAssets = computeAssets.filter(a => a.primary_domain_id === domain.id);
-                const domainBpmn = bpmnProcesses.filter(p => p.primary_domain_id === domain.id);
-                const domainDmn = dmnDecisions.filter(d => d.primary_domain_id === domain.id);
+                const domainAssets = computeAssets.filter(a => a.domain_id === domain.id);
+                const domainBpmn = bpmnProcesses.filter(p => p.domain_id === domain.id);
+                const domainDmn = dmnDecisions.filter(d => d.domain_id === domain.id);
                 const domainSystems = systems.filter(s => s.domain_id === domain.id);
                 const domainRelationships = relationships.filter(r => r.domain_id === domain.id);
 

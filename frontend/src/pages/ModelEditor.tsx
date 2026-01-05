@@ -138,8 +138,6 @@ const ModelEditor: React.FC = () => {
           workspace_id: workspaceId || '',
           name: domainData.domain.name || domainName || 'Loaded Domain',
           description: domainData.domain.description,
-          model_type: domainData.domain.model_type || 'conceptual',
-          is_primary: domainData.domain.is_primary || false,
           created_at: domainData.domain.created_at || new Date().toISOString(),
           last_modified_at: domainData.domain.last_modified_at || new Date().toISOString(),
           folder_path: domainPath,
@@ -156,9 +154,9 @@ const ModelEditor: React.FC = () => {
         domainData.tables.forEach(table => {
           const index = mergedTables.findIndex(t => t.id === table.id);
           if (index >= 0) {
-            mergedTables[index] = { ...mergedTables[index], ...table, domain_id: domain.id, primary_domain_id: domain.id };
+            mergedTables[index] = { ...mergedTables[index], ...table, primary_domain_id: domain.id };
           } else {
-            mergedTables.push({ ...table, domain_id: domain.id, primary_domain_id: domain.id });
+            mergedTables.push({ ...table, primary_domain_id: domain.id });
           }
         });
         modelStore.setTables(mergedTables);
@@ -305,7 +303,7 @@ const ModelEditor: React.FC = () => {
       const domainPath = result.filePaths[0];
       
       // Get all domain assets
-      const domainTables = modelStore.tables.filter((t) => t.domain_id === selectedDomainId || t.primary_domain_id === selectedDomainId);
+      const domainTables = modelStore.tables.filter((t) => t.primary_domain_id === selectedDomainId);
       const domainProducts = modelStore.products.filter((p) => p.domain_id === selectedDomainId);
       const domainAssets = modelStore.computeAssets.filter((a) => a.domain_id === selectedDomainId);
       const domainBpmnProcesses = modelStore.bpmnProcesses.filter((p) => p.domain_id === selectedDomainId);
@@ -320,8 +318,6 @@ const ModelEditor: React.FC = () => {
         name: domain.name,
         description: domain.description,
         owner: domain.owner,
-        model_type: domain.model_type,
-        is_primary: domain.is_primary,
         created_at: domain.created_at,
         last_modified_at: domain.last_modified_at,
       } as any;

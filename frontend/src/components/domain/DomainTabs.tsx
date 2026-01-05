@@ -141,8 +141,6 @@ export const DomainTabs: React.FC<DomainTabsProps> = ({ workspaceId }) => {
           workspace_id: workspaceId || '',
           name: domainData.domain.name || domainName || 'Loaded Domain',
           description: domainData.domain.description,
-          model_type: domainData.domain.model_type || 'conceptual',
-          is_primary: domainData.domain.is_primary || false,
           created_at: domainData.domain.created_at || new Date().toISOString(),
           last_modified_at: domainData.domain.last_modified_at || new Date().toISOString(),
           folder_path: domainPath,
@@ -161,9 +159,9 @@ export const DomainTabs: React.FC<DomainTabsProps> = ({ workspaceId }) => {
         domainData.tables.forEach(table => {
           const index = mergedTables.findIndex(t => t.id === table.id);
           if (index >= 0) {
-            mergedTables[index] = { ...mergedTables[index], ...table, domain_id: domain.id, primary_domain_id: domain.id, workspace_id: workspaceId };
+            mergedTables[index] = { ...mergedTables[index], ...table, primary_domain_id: domain.id };
           } else {
-            mergedTables.push({ ...table, domain_id: domain.id, primary_domain_id: domain.id, workspace_id: workspaceId });
+            mergedTables.push({ ...table, primary_domain_id: domain.id });
           }
         });
         modelStore.setTables(mergedTables);
@@ -176,9 +174,9 @@ export const DomainTabs: React.FC<DomainTabsProps> = ({ workspaceId }) => {
         domainData.products.forEach(product => {
           const index = mergedProducts.findIndex(p => p.id === product.id);
           if (index >= 0) {
-            mergedProducts[index] = { ...mergedProducts[index], ...product, domain_id: domain.id, workspace_id: workspaceId };
+            mergedProducts[index] = { ...mergedProducts[index], ...product, domain_id: domain.id };
           } else {
-            mergedProducts.push({ ...product, domain_id: domain.id, workspace_id: workspaceId });
+            mergedProducts.push({ ...product, domain_id: domain.id });
           }
         });
         modelStore.setProducts(mergedProducts);
@@ -191,9 +189,9 @@ export const DomainTabs: React.FC<DomainTabsProps> = ({ workspaceId }) => {
         domainData.assets.forEach(asset => {
           const index = mergedAssets.findIndex(a => a.id === asset.id);
           if (index >= 0) {
-            mergedAssets[index] = { ...mergedAssets[index], ...asset, domain_id: domain.id, workspace_id: workspaceId };
+            mergedAssets[index] = { ...mergedAssets[index], ...asset, domain_id: domain.id };
           } else {
-            mergedAssets.push({ ...asset, domain_id: domain.id, workspace_id: workspaceId });
+            mergedAssets.push({ ...asset, domain_id: domain.id });
           }
         });
         modelStore.setComputeAssets(mergedAssets);
@@ -206,9 +204,9 @@ export const DomainTabs: React.FC<DomainTabsProps> = ({ workspaceId }) => {
         domainData.bpmnProcesses.forEach(process => {
           const index = mergedProcesses.findIndex(p => p.id === process.id);
           if (index >= 0) {
-            mergedProcesses[index] = { ...mergedProcesses[index], ...process, domain_id: domain.id, workspace_id: workspaceId };
+            mergedProcesses[index] = { ...mergedProcesses[index], ...process, domain_id: domain.id };
           } else {
-            mergedProcesses.push({ ...process, domain_id: domain.id, workspace_id: workspaceId });
+            mergedProcesses.push({ ...process, domain_id: domain.id });
           }
         });
         modelStore.setBPMNProcesses(mergedProcesses);
@@ -221,9 +219,9 @@ export const DomainTabs: React.FC<DomainTabsProps> = ({ workspaceId }) => {
         domainData.dmnDecisions.forEach(decision => {
           const index = mergedDecisions.findIndex(d => d.id === decision.id);
           if (index >= 0) {
-            mergedDecisions[index] = { ...mergedDecisions[index], ...decision, domain_id: domain.id, workspace_id: workspaceId };
+            mergedDecisions[index] = { ...mergedDecisions[index], ...decision, domain_id: domain.id };
           } else {
-            mergedDecisions.push({ ...decision, domain_id: domain.id, workspace_id: workspaceId });
+            mergedDecisions.push({ ...decision, domain_id: domain.id });
           }
         });
         modelStore.setDMNDecisions(mergedDecisions);
@@ -237,9 +235,9 @@ export const DomainTabs: React.FC<DomainTabsProps> = ({ workspaceId }) => {
         domainData.systems.forEach(system => {
           const index = mergedSystems.findIndex(s => s.id === system.id);
           if (index >= 0) {
-            mergedSystems[index] = { ...mergedSystems[index], ...system, domain_id: domain.id, workspace_id: workspaceId };
+            mergedSystems[index] = { ...mergedSystems[index], ...system, domain_id: domain.id };
           } else {
-            mergedSystems.push({ ...system, domain_id: domain.id, workspace_id: workspaceId });
+            mergedSystems.push({ ...system, domain_id: domain.id });
           }
         });
         modelStore.setSystems(mergedSystems);
@@ -343,9 +341,9 @@ export const DomainTabs: React.FC<DomainTabsProps> = ({ workspaceId }) => {
         // Get domain assets
         const domainTables = tables.filter(t => t.primary_domain_id === domain.id);
         const domainProducts = products.filter(p => p.domain_id === domain.id);
-        const domainAssets = computeAssets.filter(a => a.primary_domain_id === domain.id);
-        const domainBpmn = bpmnProcesses.filter(p => p.primary_domain_id === domain.id);
-        const domainDmn = dmnDecisions.filter(d => d.primary_domain_id === domain.id);
+        const domainAssets = computeAssets.filter(a => a.domain_id === domain.id);
+        const domainBpmn = bpmnProcesses.filter(p => p.domain_id === domain.id);
+        const domainDmn = dmnDecisions.filter(d => d.domain_id === domain.id);
         const domainSystems = systems.filter(s => s.domain_id === domain.id);
         const domainRelationships = relationships.filter(r => r.domain_id === domain.id);
 
@@ -437,7 +435,7 @@ export const DomainTabs: React.FC<DomainTabsProps> = ({ workspaceId }) => {
       const selectedPath = result.filePaths[0];
       
       // Get all domain assets
-      const domainTables = tables.filter((t) => t.domain_id === targetDomainId || t.primary_domain_id === targetDomainId);
+      const domainTables = tables.filter((t) => t.primary_domain_id === targetDomainId);
       const domainProducts = products.filter((p) => p.domain_id === targetDomainId);
       const domainAssets = computeAssets.filter((a) => a.domain_id === targetDomainId);
       const domainBpmnProcesses = bpmnProcesses.filter((p) => p.domain_id === targetDomainId);
@@ -452,8 +450,6 @@ export const DomainTabs: React.FC<DomainTabsProps> = ({ workspaceId }) => {
         name: domain.name,
         description: domain.description,
         owner: domain.owner,
-        model_type: domain.model_type,
-        is_primary: domain.is_primary,
         created_at: domain.created_at,
         last_modified_at: domain.last_modified_at,
       } as any;
@@ -605,9 +601,9 @@ export const DomainTabs: React.FC<DomainTabsProps> = ({ workspaceId }) => {
         for (const domain of domains) {
           const domainTables = tables.filter(t => t.primary_domain_id === domain.id);
           const domainProducts = products.filter(p => p.domain_id === domain.id);
-          const domainAssets = computeAssets.filter(a => a.primary_domain_id === domain.id);
-          const domainBpmn = bpmnProcesses.filter(p => p.primary_domain_id === domain.id);
-          const domainDmn = dmnDecisions.filter(d => d.primary_domain_id === domain.id);
+          const domainAssets = computeAssets.filter(a => a.domain_id === domain.id);
+          const domainBpmn = bpmnProcesses.filter(p => p.domain_id === domain.id);
+          const domainDmn = dmnDecisions.filter(d => d.domain_id === domain.id);
           const domainSystems = systems.filter(s => s.domain_id === domain.id);
           const domainRelationships = relationships.filter(r => r.domain_id === domain.id);
 
@@ -692,7 +688,7 @@ export const DomainTabs: React.FC<DomainTabsProps> = ({ workspaceId }) => {
         const domainPath = `${workspacePath}/${domain.name}`;
         
         // Get all domain assets
-        const domainTables = tables.filter((t) => t.domain_id === domain.id || t.primary_domain_id === domain.id);
+        const domainTables = tables.filter((t) => t.primary_domain_id === domain.id);
         const domainProducts = products.filter((p) => p.domain_id === domain.id);
         const domainAssets = computeAssets.filter((a) => a.domain_id === domain.id);
         const domainBpmnProcesses = bpmnProcesses.filter((p) => p.domain_id === domain.id);
@@ -707,8 +703,6 @@ export const DomainTabs: React.FC<DomainTabsProps> = ({ workspaceId }) => {
           name: domain.name,
           description: domain.description,
           owner: domain.owner,
-          model_type: domain.model_type,
-          is_primary: domain.is_primary,
           created_at: domain.created_at,
           last_modified_at: domain.last_modified_at,
         } as any;
