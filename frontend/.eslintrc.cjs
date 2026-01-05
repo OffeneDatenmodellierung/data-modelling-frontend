@@ -44,13 +44,32 @@ module.exports = {
     'react/prop-types': 'off',
     '@typescript-eslint/explicit-module-boundary-types': 'off',
     '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+    // Disable no-undef for TypeScript files - TypeScript compiler handles this
+    // Browser/node env should provide globals, but disable rule to be safe
+    'no-undef': 'off',
     'jsx-a11y/alt-text': 'error',
     'jsx-a11y/aria-props': 'error',
     'jsx-a11y/aria-proptypes': 'error',
     'jsx-a11y/aria-unsupported-elements': 'error',
     'jsx-a11y/role-has-required-aria-props': 'error',
     'jsx-a11y/role-supports-aria-props': 'error',
+    'jsx-a11y/label-has-associated-control': ['error', {
+      labelComponents: [],
+      labelAttributes: ['htmlFor'],
+      controlComponents: [],
+      assert: 'both',
+      depth: 25,
+    }],
   },
+  overrides: [
+    {
+      files: ['**/*.{ts,tsx}'],
+      rules: {
+        // TypeScript handles undefined variable checking, so disable ESLint's no-undef
+        'no-undef': 'off',
+      },
+    },
+  ],
   settings: {
     react: {
       version: 'detect',
