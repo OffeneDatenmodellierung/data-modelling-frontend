@@ -193,7 +193,7 @@ export const ImportExportDialog: React.FC<ImportExportDialogProps> = ({
         let currentDomainId = initialSelectedDomainId;
         
         // If no domain is selected, try to use the first available domain
-        if (!currentDomainId && domains.length > 0) {
+        if (!currentDomainId && domains.length > 0 && domains[0]) {
           currentDomainId = domains[0].id;
           useModelStore.getState().setSelectedDomain(currentDomainId);
           console.log('[ImportExportDialog] No domain selected, using first available domain:', currentDomainId);
@@ -239,7 +239,7 @@ export const ImportExportDialog: React.FC<ImportExportDialogProps> = ({
         // currentDomainId is already normalized above, so we can use it directly
         
         // Ensure all required fields are preserved, especially name and columns
-        const tablesWithDomain = normalizedWorkspace.tables.map((table, index) => {
+        const tablesWithDomain = normalizedWorkspace.tables.map((table: Table, index: number) => {
           console.log(`[ImportExportDialog] Processing table ${index}:`, table);
           console.log(`[ImportExportDialog] Table name: "${table.name}", columns:`, table.columns);
           
@@ -293,7 +293,7 @@ export const ImportExportDialog: React.FC<ImportExportDialogProps> = ({
         const existingTableIds = new Set((existingTables || []).map(t => t.id));
         
         // Filter out duplicates and merge
-        const newTables = tablesWithDomain.filter(t => !existingTableIds.has(t.id));
+        const newTables = tablesWithDomain.filter((t: Table) => !existingTableIds.has(t.id));
         const mergedTables = [...(existingTables || []), ...newTables];
         
         setTables(mergedTables);
@@ -306,7 +306,7 @@ export const ImportExportDialog: React.FC<ImportExportDialogProps> = ({
         if (selectedSystemId && newTables.length > 0) {
           const selectedSystem = existingSystems.find(s => s.id === selectedSystemId);
           if (selectedSystem) {
-            const newTableIds = newTables.map(t => t.id);
+            const newTableIds = newTables.map((t: Table) => t.id);
             const updatedTableIds = [...(selectedSystem.table_ids || []), ...newTableIds];
             // Remove duplicates
             const uniqueTableIds = Array.from(new Set(updatedTableIds));
@@ -336,10 +336,11 @@ export const ImportExportDialog: React.FC<ImportExportDialogProps> = ({
       
       if (workspace && workspace.relationships && workspace.relationships.length > 0) {
         // Map imported relationships to current domain if available
+        const currentDomainIdForRelationships = useModelStore.getState().selectedDomainId || (domains.length > 0 && domains[0] ? domains[0].id : 'default-domain');
         const relationshipsWithDomain = workspace.relationships.map((rel) => ({
           ...rel,
           workspace_id: useWorkspaceStore.getState().currentWorkspaceId || 'offline-workspace',
-          domain_id: selectedDomainId || 'default-domain',
+          domain_id: currentDomainIdForRelationships,
         }));
         setRelationships(relationshipsWithDomain);
       }
@@ -447,7 +448,10 @@ export const ImportExportDialog: React.FC<ImportExportDialogProps> = ({
           if (!productToExport) {
             throw new Error('No data products to export');
           }
-          content = await odpsService.toYAML(productToExport);
+          // Get domain name for ODPS export
+          const productDomain = domains.find(d => d.id === productToExport.domain_id);
+          const productDomainName = productDomain?.name || 'unknown';
+          content = await odpsService.toYAML(productToExport, productDomainName);
           filename = `${productToExport.name || 'product'}.odps.yaml`;
           mimeType = 'application/yaml';
           break;

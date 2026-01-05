@@ -732,7 +732,6 @@ export const DomainCanvas: React.FC<DomainCanvasProps> = ({ workspaceId, domainI
         nodesDraggable={true}
         nodesConnectable={true}
         elementsSelectable={true}
-        connectionMode="loose"
         fitView
         attributionPosition="bottom-left"
         edgesUpdatable={false}
@@ -911,6 +910,31 @@ export const DomainCanvas: React.FC<DomainCanvasProps> = ({ workspaceId, domainI
         onClose={() => setShowUnlinkedTablesDialog(false)}
         domainId={domainId}
       />
+
+      {/* Copyright Notice */}
+      <div
+        style={{
+          position: 'absolute',
+          bottom: 10,
+          right: 10,
+          fontSize: '10px',
+          color: '#666',
+          zIndex: 1000,
+          pointerEvents: 'auto',
+        }}
+      >
+        <a
+          href="https://opendatamodelling.com"
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            color: '#666',
+            textDecoration: 'none',
+          }}
+        >
+          © Open Data Modelling | MIT License
+        </a>
+      </div>
     </div>
   );
 };

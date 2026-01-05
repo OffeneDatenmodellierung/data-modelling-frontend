@@ -394,7 +394,23 @@ export const useModelStore = create<ModelState>((set, get) => ({
         const { generateUUID } = await import('@/utils/validation');
         const tableId = generateUUID();
         // Get workspace_id from workspace store if available
-        const workspaceId = useWorkspaceStore.getState().currentWorkspace?.id || 'offline-workspace';
+        const workspaceId = useWorkspaceStore.getState().currentWorkspaceId || 'offline-workspace';
+        
+        // Map columns to ensure they have required fields
+        const columns: Column[] = (request.columns || []).map((col, index) => ({
+          id: generateUUID(),
+          table_id: tableId,
+          name: col.name,
+          data_type: col.data_type,
+          nullable: col.nullable ?? false,
+          is_primary_key: col.is_primary_key ?? false,
+          is_foreign_key: col.is_foreign_key ?? false,
+          foreign_key_reference: col.foreign_key_reference,
+          default_value: col.default_value,
+          constraints: col.constraints,
+          order: col.order ?? index,
+          created_at: new Date().toISOString(),
+        }));
         
         table = {
           id: tableId,
@@ -402,15 +418,16 @@ export const useModelStore = create<ModelState>((set, get) => ({
           primary_domain_id: domain,
           name: request.name,
           alias: request.alias,
-          description: request.description,
-          data_level: request.data_level || 'operational',
-          columns: request.columns || [],
+          model_type: request.model_type || 'logical',
+          columns,
           position_x: request.position_x,
           position_y: request.position_y,
           width: request.width || 200,
           height: request.height || 150,
           tags: [],
           metadata: {},
+          visible_domains: [domain],
+          is_owned_by_domain: true,
           created_at: new Date().toISOString(),
           last_modified_at: new Date().toISOString(),
         };

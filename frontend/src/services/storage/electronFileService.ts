@@ -309,7 +309,7 @@ class ElectronFileService {
    * @param table - Table object to save
    * @param systems - Optional array of systems to determine which system owns this table
    */
-  async saveODCSTable(domainPath: string, domainName: string, table: Table, systems: System[] = []): Promise<void> {
+  async saveODCSTable(domainPath: string, _domainName: string, table: Table, systems: System[] = []): Promise<void> {
     if (getPlatform() !== 'electron') {
       throw new Error('Electron file service can only be used in Electron environment');
     }
@@ -348,8 +348,11 @@ class ElectronFileService {
       throw new Error('Electron file service can only be used in Electron environment');
     }
 
+    // Extract domain name from path if not provided
+    const finalDomainName = domainName || domainPath.split('/').pop() || 'unknown';
+    
     const productYamlPath = joinPath(domainPath, `${product.name}.odps.yaml`);
-    const yamlContent = await odpsService.toYAML(product);
+    const yamlContent = await odpsService.toYAML(product, finalDomainName);
     await platformFileService.writeFile(productYamlPath, yamlContent);
   }
 
@@ -359,7 +362,7 @@ class ElectronFileService {
    * @param domainName - Domain name (for backward compatibility, not used if domainPath is provided)
    * @param asset - Asset object to save
    */
-  async saveCADSAsset(domainPath: string, domainName: string, asset: ComputeAsset): Promise<void> {
+  async saveCADSAsset(domainPath: string, _domainName: string, asset: ComputeAsset): Promise<void> {
     if (getPlatform() !== 'electron') {
       throw new Error('Electron file service can only be used in Electron environment');
     }
@@ -375,7 +378,7 @@ class ElectronFileService {
    * @param domainName - Domain name (for backward compatibility, not used if domainPath is provided)
    * @param process - BPMN process object to save
    */
-  async saveBPMNProcess(domainPath: string, domainName: string, process: BPMNProcess): Promise<void> {
+  async saveBPMNProcess(domainPath: string, _domainName: string, process: BPMNProcess): Promise<void> {
     if (getPlatform() !== 'electron') {
       throw new Error('Electron file service can only be used in Electron environment');
     }
@@ -393,7 +396,7 @@ class ElectronFileService {
    * @param domainName - Domain name (for backward compatibility, not used if domainPath is provided)
    * @param decision - DMN decision object to save
    */
-  async saveDMNDecision(domainPath: string, domainName: string, decision: DMNDecision): Promise<void> {
+  async saveDMNDecision(domainPath: string, _domainName: string, decision: DMNDecision): Promise<void> {
     if (getPlatform() !== 'electron') {
       throw new Error('Electron file service can only be used in Electron environment');
     }
@@ -600,13 +603,15 @@ class ElectronFileService {
                 // Fallback: If no match found and there are systems, link to the first system
                 if (!linked && systems.length > 0) {
                   const fallbackSystem = systems[0];
-                  if (!fallbackSystem.table_ids) {
-                    fallbackSystem.table_ids = [];
-                  }
-                  if (!fallbackSystem.table_ids.includes(table.id)) {
-                    fallbackSystem.table_ids.push(table.id);
-                    console.log(`[ElectronFileService] ⚠ Linked table "${table.name || table.id}" to first system "${fallbackSystem.name}" (${fallbackSystem.id}) as fallback (no name match found)`);
-                    linked = true;
+                  if (fallbackSystem) {
+                    if (!fallbackSystem.table_ids) {
+                      fallbackSystem.table_ids = [];
+                    }
+                    if (!fallbackSystem.table_ids.includes(table.id)) {
+                      fallbackSystem.table_ids.push(table.id);
+                      console.log(`[ElectronFileService] ⚠ Linked table "${table.name || table.id}" to first system "${fallbackSystem.name}" (${fallbackSystem.id}) as fallback (no name match found)`);
+                      linked = true;
+                    }
                   }
                 }
                 

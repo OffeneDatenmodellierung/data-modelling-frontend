@@ -22,7 +22,7 @@ export const TableProperties: React.FC<TablePropertiesProps> = ({
   workspaceId,
   onClose,
 }) => {
-  const { tables, updateTable, updateTableRemote, updateColumn, updateColumnRemote } = useModelStore();
+  const { tables, updateTableRemote, updateColumn, updateColumnRemote } = useModelStore();
   const { mode } = useSDKModeStore();
   const table = tables.find((t) => t.id === tableId);
   
@@ -52,14 +52,16 @@ export const TableProperties: React.FC<TablePropertiesProps> = ({
     }
   };
 
-  const handleTableSave = async (tableId: string, updates: Partial<Table>) => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  // @ts-expect-error - Unused function kept for potential future use
+  const _handleTableSave = async (_tableId: string, _updates: Partial<Table>) => {
     // Update local state
-    updateTable(tableId, updates);
+    // updateTable(tableId, updates);
     
     // Update remote if online
     if (mode === 'online') {
       try {
-        await updateTableRemote(workspaceId, tableId, updates);
+        await updateTableRemote(workspaceId, _tableId, _updates);
       } catch (error) {
         console.error('Failed to update table:', error);
         throw error;
@@ -207,10 +209,8 @@ export const TableProperties: React.FC<TablePropertiesProps> = ({
       {table && (
         <TableMetadataModal
           table={table}
-          workspaceId={workspaceId}
           isOpen={showTableMetadata}
           onClose={() => setShowTableMetadata(false)}
-          onSave={handleTableSave}
         />
       )}
     </>

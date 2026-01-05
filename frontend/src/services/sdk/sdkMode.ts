@@ -56,7 +56,7 @@ function getSDKMode(): SDKMode {
 }
 
 // Zustand store for SDK mode state (no persistence - always reads from env)
-export const useSDKModeStore = create<SDKModeState>()((set, get) => ({
+export const useSDKModeStore = create<SDKModeState>()((set, _get) => ({
   mode: getSDKMode(), // Initialize from environment variable
   isManualOverride: false, // Always false in offline-only mode
   

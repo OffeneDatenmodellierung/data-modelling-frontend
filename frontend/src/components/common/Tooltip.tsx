@@ -7,7 +7,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { generateAriaId } from '@/utils/accessibility';
 
 export interface TooltipProps {
-  content: string;
+  content: string | React.ReactNode;
   children: React.ReactNode;
   position?: 'top' | 'bottom' | 'left' | 'right';
   delay?: number;
@@ -148,7 +148,7 @@ export const Tooltip: React.FC<TooltipProps> = ({
             left: `${tooltipPosition.left}px`,
           }}
         >
-          {content}
+          {typeof content === 'string' ? content : content}
           <div
             className={`absolute w-2 h-2 bg-gray-900 transform rotate-45 ${
               position === 'top'

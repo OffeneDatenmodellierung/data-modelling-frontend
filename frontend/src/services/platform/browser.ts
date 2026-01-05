@@ -129,7 +129,7 @@ export const browserFileService = {
     directoryHandle: FileSystemDirectoryHandle,
     filename: string,
     content: string,
-    mimeType: string = 'text/yaml'
+    _mimeType: string = 'text/yaml'
   ): Promise<void> {
     try {
       // Create file handle (creates file if it doesn't exist)
@@ -166,6 +166,7 @@ export const browserFileService = {
       // Navigate/create subdirectories
       for (let i = 0; i < pathParts.length - 1; i++) {
         const dirName = pathParts[i];
+        if (!dirName) continue;
         try {
           currentHandle = await currentHandle.getDirectoryHandle(dirName, { create: true });
         } catch (error) {
@@ -176,6 +177,9 @@ export const browserFileService = {
 
       // Save file
       const filename = pathParts[pathParts.length - 1];
+      if (!filename) {
+        throw new Error('Invalid file path: missing filename');
+      }
       await this.saveFileToDirectory(
         currentHandle,
         filename,

@@ -3,7 +3,7 @@
  * Allows creating and editing domain-level BPMN processes
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useModelStore } from '@/stores/modelStore';
 import { useUIStore } from '@/stores/uiStore';
 import { EditorModal } from '@/components/editors/EditorModal';

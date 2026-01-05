@@ -7,7 +7,7 @@ import React, { useState, useEffect } from 'react';
 import { DraggableModal } from '@/components/common/DraggableModal';
 import { useModelStore } from '@/stores/modelStore';
 import { useUIStore } from '@/stores/uiStore';
-import { isValidTableName, isValidUUID, generateUUID } from '@/utils/validation';
+import { isValidTableName, generateUUID } from '@/utils/validation';
 import { odcsService } from '@/services/sdk/odcsService';
 import { importExportService } from '@/services/sdk/importExportService';
 import { openapiService } from '@/services/sdk/openapiService';
@@ -131,7 +131,7 @@ export const CreateTableDialog: React.FC<CreateTableDialogProps> = ({
       let currentDomainIdFromStore = selectedDomainId || domainId;
       
       // If no domain is selected, try to use the first available domain
-      if (!currentDomainIdFromStore && domains.length > 0) {
+      if (!currentDomainIdFromStore && domains.length > 0 && domains[0]) {
         currentDomainIdFromStore = domains[0].id;
         console.log('[CreateTableDialog] No domain selected, using first available domain:', currentDomainIdFromStore);
       }
@@ -191,7 +191,7 @@ export const CreateTableDialog: React.FC<CreateTableDialogProps> = ({
         isValid: isValidUUID(currentDomainId),
       });
       
-      const importedTables: Table[] = normalizedWorkspace.tables.map((table, index) => {
+      const importedTables: Table[] = normalizedWorkspace.tables.map((table: Table, index: number) => {
         const importedTable = {
           ...table,
           id: normalizeUUID(table.id),
@@ -239,7 +239,7 @@ export const CreateTableDialog: React.FC<CreateTableDialogProps> = ({
       });
 
       // Call onCreated callback with first table if provided
-      if (onCreated && importedTables.length > 0) {
+      if (onCreated && importedTables.length > 0 && importedTables[0]) {
         onCreated(importedTables[0].id);
       }
 
@@ -485,7 +485,7 @@ export const CreateTableDialog: React.FC<CreateTableDialogProps> = ({
                   if (file) {
                     file.text().then((text) => {
                       setImportYaml(text);
-                    }).catch((error) => {
+                    }).catch((_error) => {
                       addToast({
                         type: 'error',
                         message: 'Failed to read file',

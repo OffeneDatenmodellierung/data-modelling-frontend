@@ -8,8 +8,6 @@ import React, { useState, useMemo } from 'react';
 import { useModelStore } from '@/stores/modelStore';
 import { useUIStore } from '@/stores/uiStore';
 import { CreateSystemDialog } from './CreateSystemDialog';
-import type { Table } from '@/types/table';
-import type { System } from '@/types/system';
 
 export interface UnlinkedTablesDialogProps {
   isOpen: boolean;
@@ -22,9 +20,10 @@ export const UnlinkedTablesDialog: React.FC<UnlinkedTablesDialogProps> = ({
   onClose,
   domainId,
 }) => {
-  const { tables, systems, updateSystem, addSystem } = useModelStore();
+  const { tables, systems, updateSystem } = useModelStore();
   const { addToast } = useUIStore();
-  const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [_selectedTableId, _setSelectedTableId] = useState<string | null>(null);
   const [showCreateSystemDialog, setShowCreateSystemDialog] = useState(false);
   const [creatingSystemForTable, setCreatingSystemForTable] = useState<string | null>(null);
 
@@ -85,7 +84,9 @@ export const UnlinkedTablesDialog: React.FC<UnlinkedTablesDialogProps> = ({
     setShowCreateSystemDialog(false);
   };
 
-  const handleMoveTable = (tableId: string, fromSystemId: string, toSystemId: string) => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  // @ts-expect-error - Unused function kept for potential future use
+  const _handleMoveTable = (tableId: string, fromSystemId: string, toSystemId: string) => {
     const fromSystem = systems.find((s) => s.id === fromSystemId);
     const toSystem = systems.find((s) => s.id === toSystemId);
     

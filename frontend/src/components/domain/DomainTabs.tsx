@@ -101,6 +101,10 @@ export const DomainTabs: React.FC<DomainTabsProps> = ({ workspaceId }) => {
       }
 
       const domainPath = result.filePaths[0];
+      if (!domainPath) {
+        setIsLoading(false);
+        return;
+      }
       
       // Import validation utilities
       const { generateUUID, isValidUUID } = await import('@/utils/validation');
@@ -457,6 +461,11 @@ export const DomainTabs: React.FC<DomainTabsProps> = ({ workspaceId }) => {
       // Determine workspace path and domain path
       // If user selects a folder that ends with domain name, use parent as workspace
       // Otherwise, use selected path as workspace (will create subfolder)
+      if (!selectedPath) {
+        addToast({ type: 'error', message: 'No path selected' });
+        setIsLoading(false);
+        return;
+      }
       const pathParts = selectedPath.split(/[/\\]/).filter(Boolean);
       const lastPart = pathParts[pathParts.length - 1];
       const workspacePath = (lastPart === domain.name && pathParts.length > 1)
@@ -515,7 +524,9 @@ export const DomainTabs: React.FC<DomainTabsProps> = ({ workspaceId }) => {
     }
   };
 
-  const handleLoadWorkspace = async () => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  // @ts-expect-error - Unused function kept for potential future use
+  const _handleLoadWorkspace = async () => {
     if (getPlatform() !== 'electron') {
       addToast({
         type: 'error',
@@ -537,10 +548,13 @@ export const DomainTabs: React.FC<DomainTabsProps> = ({ workspaceId }) => {
         return;
       }
 
-      const workspacePath = result.filePaths[0];
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      // @ts-expect-error - Unused variable kept for potential future use
+      const _workspacePath = result.filePaths[0];
       
       // Import validation utilities
-      const { generateUUID, isValidUUID } = await import('@/utils/validation');
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { generateUUID: _generateUUID, isValidUUID: _isValidUUID } = await import('@/utils/validation');
       
       // For now, we'll require the user to manually select domain folders
       // In the future, we could add directory listing to automatically find all domain folders

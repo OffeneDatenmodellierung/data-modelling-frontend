@@ -19,7 +19,7 @@ import type { DataProduct } from '@/types/odps';
 import type { ComputeAsset } from '@/types/cads';
 import type { BPMNProcess } from '@/types/bpmn';
 import type { DMNDecision } from '@/types/dmn';
-import { indexedDBStorage } from './indexedDBStorage';
+// import { indexedDBStorage } from './indexedDBStorage';
 
 class LocalFileService {
   /**
@@ -526,13 +526,15 @@ class LocalFileService {
                 // Fallback: If no match found and there are systems in the domain, link to the first system
                 if (!linked && domainSystems.length > 0) {
                   const fallbackSystem = domainSystems[0];
-                  if (!fallbackSystem.table_ids) {
-                    fallbackSystem.table_ids = [];
-                  }
-                  if (!fallbackSystem.table_ids.includes(table.id)) {
-                    fallbackSystem.table_ids.push(table.id);
-                    console.log(`[LocalFileService] ⚠ Linked table "${table.name || table.id}" to first system "${fallbackSystem.name}" (${fallbackSystem.id}) as fallback (no name match found)`);
-                    linked = true;
+                  if (fallbackSystem) {
+                    if (!fallbackSystem.table_ids) {
+                      fallbackSystem.table_ids = [];
+                    }
+                    if (!fallbackSystem.table_ids.includes(table.id)) {
+                      fallbackSystem.table_ids.push(table.id);
+                      console.log(`[LocalFileService] ⚠ Linked table "${table.name || table.id}" to first system "${fallbackSystem.name}" (${fallbackSystem.id}) as fallback (no name match found)`);
+                      linked = true;
+                    }
                   }
                 }
                 
@@ -869,8 +871,14 @@ class LocalFileService {
   /**
    * Save ODPS product to {product-name}.odps.yaml
    */
-  async saveODPSProduct(_workspaceId: string, _domainId: string, product: DataProduct): Promise<void> {
-    const yamlContent = await odpsService.toYAML(product);
+  async saveODPSProduct(_workspaceId: string, domainId: string, product: DataProduct): Promise<void> {
+    // Get domain name from model store
+    const { useModelStore } = await import('@/stores/modelStore');
+    const domains = useModelStore.getState().domains;
+    const domain = domains.find(d => d.id === domainId);
+    const domainName = domain?.name || 'unknown';
+    
+    const yamlContent = await odpsService.toYAML(product, domainName);
     browserFileService.downloadFile(yamlContent, `${product.name}.odps.yaml`, 'text/yaml');
   }
 
@@ -974,7 +982,7 @@ class LocalFileService {
 
     // Add product files
     for (const product of products) {
-      const productYaml = await odpsService.toYAML(product);
+      const productYaml = await odpsService.toYAML(product, domainName);
       files.push({ path: `${domainName}/${product.name}.odps.yaml`, content: productYaml });
     }
 

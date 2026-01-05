@@ -29,7 +29,13 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   const handleExport = async () => {
     setIsExporting(true);
     try {
-      const yamlContent = await odpsService.toYAML(product);
+      // Get domain name for ODPS export
+      const { useModelStore } = await import('@/stores/modelStore');
+      const domains = useModelStore.getState().domains;
+      const productDomain = domains.find(d => d.id === product.domain_id);
+      const domainName = productDomain?.name || 'unknown';
+      
+      const yamlContent = await odpsService.toYAML(product, domainName);
       const filename = `${product.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.yaml`;
       browserFileService.downloadFile(yamlContent, filename, 'text/yaml');
       addToast({
@@ -74,7 +80,11 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             {product.team && (
               <div>
                 <span className="text-sm font-medium text-gray-600">Team:</span>
-                <span className="ml-2 text-sm text-gray-900">{product.team}</span>
+                <span className="ml-2 text-sm text-gray-900">
+                  {typeof product.team === 'string' 
+                    ? product.team 
+                    : (product.team as any)?.name || JSON.stringify(product.team)}
+                </span>
               </div>
             )}
           </div>

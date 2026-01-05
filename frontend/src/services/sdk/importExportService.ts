@@ -280,15 +280,15 @@ class ImportExportService {
     
     // Use JSON Schema-specific cleaning that preserves constraints
     const cleanedTables = Array.isArray(normalized.tables) 
-      ? normalized.tables.map(table => this.cleanTableForJSONSchemaExport(table))
+      ? normalized.tables.map((table: any) => this.cleanTableForJSONSchemaExport(table))
       : [];
     
     const cleanedRelationships = Array.isArray(normalized.relationships)
-      ? normalized.relationships.map(rel => this.cleanRelationshipForExport(rel))
+      ? normalized.relationships.map((rel: any) => this.cleanRelationshipForExport(rel))
       : [];
   
     const cleanedDomains = Array.isArray(normalized.domains)
-      ? normalized.domains.map(domain => ({
+      ? normalized.domains.map((domain: any) => ({
           id: domain.id,
           name: domain.name,
           workspace_id: domain.workspace_id,
@@ -358,12 +358,12 @@ class ImportExportService {
     
     // Clean tables to remove complex nested structures
     const cleanedTables = Array.isArray(normalized.tables) 
-      ? normalized.tables.map(table => this.cleanTableForExport(table))
+      ? normalized.tables.map((table: any) => this.cleanTableForExport(table))
       : [];
     
     // Clean relationships to ensure required fields are present
     const cleanedRelationships = Array.isArray(normalized.relationships)
-      ? normalized.relationships.map(rel => this.cleanRelationshipForExport(rel))
+      ? normalized.relationships.map((rel: any) => this.cleanRelationshipForExport(rel))
       : [];
     
     // Create clean workspace structure - SDK expects DataModel with all required fields
@@ -432,7 +432,7 @@ class ImportExportService {
     // 1. Replace IDENTIFIER(:variable || 'schema.table') with 'schema.table'
     // Pattern: IDENTIFIER(:variable || '.schema.table') or IDENTIFIER(:variable || 'schema.table')
     const identifierPattern = /IDENTIFIER\s*\(\s*:[\w_]+\s*\|\|\s*['"]([^'"]+)['"]\s*\)/gi;
-    processed = processed.replace(identifierPattern, (match, tableName) => {
+    processed = processed.replace(identifierPattern, (_match, tableName) => {
       // Extract the table name part (everything after the ||)
       // If it starts with '.', we need to handle it differently
       const cleanTableName = tableName.startsWith('.') ? tableName.substring(1) : tableName;
@@ -441,9 +441,9 @@ class ImportExportService {
 
     // 2. Handle IDENTIFIER(:variable) without concatenation (just use a placeholder)
     const simpleIdentifierPattern = /IDENTIFIER\s*\(\s*:[\w_]+\s*\)/gi;
-    processed = processed.replace(simpleIdentifierPattern, (match) => {
+    processed = processed.replace(simpleIdentifierPattern, (_match) => {
       // Extract variable name and use it as a placeholder
-      const varMatch = match.match(/:(\w+)/);
+      const varMatch = _match.match(/:(\w+)/);
       if (varMatch) {
         return `\`${varMatch[1]}_table\``; // Use variable name as table name hint
       }
@@ -453,7 +453,7 @@ class ImportExportService {
     // 3. Handle IDENTIFIER with complex expressions - try to extract table name
     // Pattern: IDENTIFIER(:var || '.schema.table' || '.suffix')
     const complexPattern = /IDENTIFIER\s*\(\s*:[\w_]+\s*\|\|\s*['"]([^'"]+)['"]/gi;
-    processed = processed.replace(complexPattern, (match, tablePart) => {
+    processed = processed.replace(complexPattern, (_match, tablePart) => {
       // Extract the table name part
       const cleanTableName = tablePart.startsWith('.') ? tablePart.substring(1) : tablePart;
       return `\`${cleanTableName}\``;
@@ -509,7 +509,7 @@ class ImportExportService {
     // Pattern: column_name :variable TYPE - remove the variable reference
     // Be very careful here to avoid breaking valid SQL
     const columnVarPattern = /(\w+)\s+:\s*:[\w_]+\s+([A-Z][A-Z0-9_]*)/gi;
-    processed = processed.replace(columnVarPattern, (match, columnName, type) => {
+    processed = processed.replace(columnVarPattern, (_match, columnName, type) => {
       // Keep column name and type, remove variable reference
       return `${columnName} ${type}`;
     });
@@ -527,7 +527,7 @@ class ImportExportService {
     // We'll simplify them to single-line comments
     // Match COMMENT '...' with potential newlines inside the string
     const multilineCommentPattern = /COMMENT\s+['"]([^'"]*(?:\n[^'"]*)*?)['"]/gis;
-    processed = processed.replace(multilineCommentPattern, (match, commentText) => {
+    processed = processed.replace(multilineCommentPattern, (_match, commentText) => {
       // Replace newlines and multiple spaces with single space
       const simplified = commentText.replace(/\s+/g, ' ').trim();
       // Limit length to avoid very long comments
@@ -582,10 +582,9 @@ class ImportExportService {
     // Match :variable followed by whitespace and then >, ,, ), or newline
     const anyVarPattern = /:[\w_]+(\s*[>,,\n\)])/gs;
     let matchCount = 0;
-    let lastIndex = 0;
     
     // Use a while loop to properly track positions
-    let match;
+    let match: RegExpExecArray | null;
     const replacements: Array<{start: number, end: number, replacement: string}> = [];
     
     while ((match = anyVarPattern.exec(processed)) !== null) {
@@ -802,8 +801,8 @@ class ImportExportService {
                   const lineMatch = msg.match(/Line:\s*(\d+)/i);
                   const columnMatch = msg.match(/Column:\s*(\d+)/i);
                   return {
-                    line: lineMatch ? parseInt(lineMatch[1], 10) : null,
-                    column: columnMatch ? parseInt(columnMatch[1], 10) : null,
+                    line: lineMatch && lineMatch[1] ? parseInt(lineMatch[1], 10) : null,
+                    column: columnMatch && columnMatch[1] ? parseInt(columnMatch[1], 10) : null,
                   };
                 };
                 
@@ -1049,8 +1048,8 @@ class ImportExportService {
             const lineMatch = msg.match(/Line:\s*(\d+)/i);
             const columnMatch = msg.match(/Column:\s*(\d+)/i);
             return {
-              line: lineMatch ? parseInt(lineMatch[1], 10) : null,
-              column: columnMatch ? parseInt(columnMatch[1], 10) : null,
+              line: lineMatch && lineMatch[1] ? parseInt(lineMatch[1], 10) : null,
+              column: columnMatch && columnMatch[1] ? parseInt(columnMatch[1], 10) : null,
             };
           };
           
@@ -1086,8 +1085,8 @@ class ImportExportService {
           const lineMatch = msg.match(/Line:\s*(\d+)/i);
           const columnMatch = msg.match(/Column:\s*(\d+)/i);
           return {
-            line: lineMatch ? parseInt(lineMatch[1], 10) : null,
-            column: columnMatch ? parseInt(columnMatch[1], 10) : null,
+            line: lineMatch && lineMatch[1] ? parseInt(lineMatch[1], 10) : null,
+            column: columnMatch && columnMatch[1] ? parseInt(columnMatch[1], 10) : null,
           };
         };
         

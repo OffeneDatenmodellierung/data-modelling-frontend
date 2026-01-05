@@ -3,12 +3,9 @@
  * Provides navigation and action buttons with conditional visibility rules
  */
 
-import React, { useState } from 'react';
-import { useModelStore } from '@/stores/modelStore';
+import React from 'react';
 import { useSDKModeStore } from '@/services/sdk/sdkMode';
-import { useUIStore } from '@/stores/uiStore';
-import { useWorkspaceStore } from '@/stores/workspaceStore';
-import { getPlatform, getAssetPath } from '@/services/platform/platform';
+import { getAssetPath } from '@/services/platform/platform';
 
 export interface ModelNavbarProps {
   onShowSettings: () => void;
@@ -21,10 +18,9 @@ export const ModelNavbar: React.FC<ModelNavbarProps> = ({
   onShowSettings,
   onShowVersionHistory,
   workspaceId,
-  domainId,
+  domainId: _domainId,
 }) => {
   const { mode } = useSDKModeStore();
-  const isOffline = mode === 'offline';
   const isOnline = mode === 'online';
 
   return (

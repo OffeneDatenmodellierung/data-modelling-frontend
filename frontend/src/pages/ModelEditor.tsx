@@ -9,8 +9,8 @@ import { DomainCanvas } from '@/components/canvas/DomainCanvas';
 import { DomainTabs } from '@/components/domain/DomainTabs';
 import { DomainSelector } from '@/components/domain/DomainSelector';
 import { ViewSelector } from '@/components/domain/ViewSelector';
-import { EditorModal } from '@/components/editors/EditorModal';
-import { bpmnService } from '@/services/sdk/bpmnService';
+// import { EditorModal } from '@/components/editors/EditorModal';
+// import { bpmnService } from '@/services/sdk/bpmnService';
 import { TableEditor } from '@/components/table/TableEditor';
 import { TableProperties } from '@/components/table/TableProperties';
 import { CreateTableDialog } from '@/components/table/CreateTableDialog';
@@ -71,7 +71,9 @@ const ModelEditor: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   
   // Load Domain handler for offline mode
-  const handleLoadDomain = async () => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  // @ts-expect-error - Unused function kept for potential future use
+  const _handleLoadDomain = async () => {
     if (getPlatform() !== 'electron') {
       addToast({
         type: 'error',
@@ -96,6 +98,10 @@ const ModelEditor: React.FC = () => {
       // Import validation utilities
       const { generateUUID, isValidUUID } = await import('@/utils/validation');
       
+      if (!domainPath) {
+        setIsLoading(false);
+        return;
+      }
       // Load domain folder
       const domainData = await electronFileService.loadDomainFolder(domainPath);
       
@@ -261,7 +267,9 @@ const ModelEditor: React.FC = () => {
   };
 
   // Save Domain handler for offline mode
-  const handleSaveDomain = async () => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  // @ts-expect-error - Unused function kept for potential future use
+  const _handleSaveDomain = async () => {
     if (getPlatform() !== 'electron') {
       addToast({
         type: 'error',
@@ -322,6 +330,10 @@ const ModelEditor: React.FC = () => {
         last_modified_at: domain.last_modified_at,
       } as any;
       
+      if (!domainPath) {
+        setIsLoading(false);
+        return;
+      }
       // Extract workspace path from domain path (parent directory)
       const pathParts = domainPath.split(/[/\\]/).filter(Boolean);
       const workspacePath = pathParts.slice(0, -1).join('/');

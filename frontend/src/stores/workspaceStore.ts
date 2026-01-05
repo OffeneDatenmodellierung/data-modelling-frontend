@@ -7,7 +7,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { workspaceService } from '@/services/api/workspaceService';
 import { useSDKModeStore } from '@/services/sdk/sdkMode';
-import { localFileService } from '@/services/storage/localFileService';
+// import { localFileService } from '@/services/storage/localFileService';
 import { getPlatform } from '@/services/platform/platform';
 import axios from 'axios';
 import type { Workspace } from '@/types/workspace';
@@ -380,7 +380,6 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                 
                 // Save each domain to its folder
                 let allDomainsSaved = true;
-                let needsWorkspacePath = false;
                 let workspacePath: string | null = null;
                 
                 for (const domain of domains) {
@@ -396,11 +395,10 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                   } else {
                     // Need to prompt for workspace path (only once)
                     if (!workspacePath) {
-                      needsWorkspacePath = true;
+                      // Workspace path needed but not set
                       const result = await electronPlatformModule.electronFileService.showOpenDialog({
                         properties: ['openDirectory'],
                         title: 'Select Workspace Folder for Auto-Save',
-                        message: 'Select the workspace folder where domains should be saved. This will be remembered for future auto-saves.',
                       });
                       
                       if (result.canceled || !result.filePaths || result.filePaths.length === 0) {
@@ -409,20 +407,24 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                         break;
                       }
                       
-                      workspacePath = result.filePaths[0];
+                      workspacePath = result.filePaths[0] || null;
                       
                       // Update all domains with workspace path
-                      for (const d of domains) {
-                        if (!d.workspace_path) {
-                          modelStoreModule.useModelStore.getState().updateDomain(d.id, {
-                            workspace_path: workspacePath,
-                            folder_path: `${workspacePath}/${d.name}`,
-                          });
+                      if (workspacePath) {
+                        for (const d of domains) {
+                          if (!d.workspace_path) {
+                            modelStoreModule.useModelStore.getState().updateDomain(d.id, {
+                              workspace_path: workspacePath,
+                              folder_path: `${workspacePath}/${d.name}`,
+                            });
+                          }
                         }
                       }
                     }
                     
-                    domainPath = `${workspacePath}/${domain.name}`;
+                    if (workspacePath) {
+                      domainPath = `${workspacePath}/${domain.name}`;
+                    }
                   }
                   
                   if (domainPath) {
@@ -498,6 +500,10 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                 try {
                   const { indexedDBStorage } = await import('@/services/storage/indexedDBStorage');
                   const { localFileService } = await import('@/services/storage/localFileService');
+                  const { useModelStore } = await import('@/stores/modelStore');
+                  
+                  // Get compute assets from model store
+                  const { computeAssets } = useModelStore.getState();
                   
                   // Save workspace state to IndexedDB
                   await indexedDBStorage.saveWorkspace(
@@ -510,7 +516,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                       relationships,
                       systems,
                       products,
-                      assets,
+                      assets: computeAssets,
                       bpmnProcesses,
                       dmnDecisions,
                     }
@@ -524,14 +530,26 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                   if (directoryHandle) {
                     try {
                       // Verify directory handle is still valid by checking permissions
-                      const permissionStatus = await directoryHandle.queryPermission({ mode: 'readwrite' });
+                      // Note: queryPermission may not be available in all browsers
+                      let permissionStatus: PermissionState = 'prompt';
+                      if ('queryPermission' in directoryHandle && typeof directoryHandle.queryPermission === 'function') {
+                        permissionStatus = await (directoryHandle as any).queryPermission({ mode: 'readwrite' });
+                      } else {
+                        // Try to access the directory to check permissions
+                        try {
+                          await directoryHandle.getDirectoryHandle('.', { create: false });
+                          permissionStatus = 'granted';
+                        } catch {
+                          permissionStatus = 'prompt';
+                        }
+                      }
                       
                       if (permissionStatus === 'granted') {
                         // Save each domain folder using File System Access API
                         for (const domain of domains) {
                           const domainTables = tables.filter(t => t.primary_domain_id === domain.id);
                           const domainProducts = products.filter(p => p.domain_id === domain.id);
-                          const domainAssets = assets.filter(a => a.domain_id === domain.id);
+                          const domainAssets = computeAssets.filter((a: any) => a.domain_id === domain.id);
                           const domainBpmn = bpmnProcesses.filter(p => p.domain_id === domain.id);
                           const domainDmn = dmnDecisions.filter(d => d.domain_id === domain.id);
                           const domainSystems = systems.filter(s => s.domain_id === domain.id);
@@ -591,7 +609,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                 } catch (error) {
                   console.error('[WorkspaceStore] Failed to auto-save to IndexedDB:', error);
                   // Still mark as saved to avoid repeated attempts
-                  set({ pendingChanges: false, lastSavedAt: new Date().toISOString() });
+                set({ pendingChanges: false, lastSavedAt: new Date().toISOString() });
                 }
               }
             } else {
@@ -723,22 +741,22 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             }
           } else {
             // Electron mode or online mode: Use existing autoSave logic
-            // Force pendingChanges to true to ensure save happens
-            set({ pendingChanges: true });
-            
-            // Call autoSave which will handle the actual save
-            await get().autoSave();
-            
+          // Force pendingChanges to true to ensure save happens
+          set({ pendingChanges: true });
+          
+          // Call autoSave which will handle the actual save
+          await get().autoSave();
+          
             if (mode === 'offline' && platform === 'electron') {
-              uiStoreModule.useUIStore.getState().addToast({
-                type: 'success',
-                message: 'Domains saved successfully',
-              });
-            } else if (mode === 'online') {
-              uiStoreModule.useUIStore.getState().addToast({
-                type: 'success',
-                message: 'Workspace synced to server',
-              });
+            uiStoreModule.useUIStore.getState().addToast({
+              type: 'success',
+              message: 'Domains saved successfully',
+            });
+          } else if (mode === 'online') {
+            uiStoreModule.useUIStore.getState().addToast({
+              type: 'success',
+              message: 'Workspace synced to server',
+            });
             }
           }
         },

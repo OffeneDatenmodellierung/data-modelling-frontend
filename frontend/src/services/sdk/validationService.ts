@@ -108,6 +108,9 @@ class ValidationService {
     
     // Build adjacency list
     for (const rel of relationships) {
+      if (!rel.source_table_id || !rel.target_table_id) {
+        continue; // Skip relationships with missing IDs
+      }
       if (!graph.has(rel.source_table_id)) {
         graph.set(rel.source_table_id, []);
       }
@@ -165,13 +168,15 @@ class ValidationService {
     // Check for orphaned relationships
     const tableIds = new Set(tables.map((t) => t.id));
     for (const rel of relationships) {
-      if (!tableIds.has(rel.source_table_id)) {
-        const errorMsg = `orphaned relationship: ${rel.id} (source table ${rel.source_table_id} not found)`;
-        orphanedRelationships.push(`Relationship ${rel.id} references non-existent source table ${rel.source_table_id}`);
+      if (!rel.source_table_id || !tableIds.has(rel.source_table_id)) {
+        const sourceId = rel.source_table_id || 'unknown';
+        const errorMsg = `orphaned relationship: ${rel.id} (source table ${sourceId} not found)`;
+        orphanedRelationships.push(`Relationship ${rel.id} references non-existent source table ${sourceId}`);
         errors.push(errorMsg);
       }
-      if (!tableIds.has(rel.target_table_id)) {
-        const errorMsg = `orphaned relationship: ${rel.id} (target table ${rel.target_table_id} not found)`;
+      if (!rel.target_table_id || !tableIds.has(rel.target_table_id)) {
+        const targetId = rel.target_table_id || 'unknown';
+        const errorMsg = `orphaned relationship: ${rel.id} (target table ${targetId} not found)`;
         orphanedRelationships.push(`Relationship ${rel.id} references non-existent target table ${rel.target_table_id}`);
         errors.push(errorMsg);
       }

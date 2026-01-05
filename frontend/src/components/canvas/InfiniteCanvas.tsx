@@ -79,11 +79,12 @@ export const InfiniteCanvas: React.FC<InfiniteCanvasProps> = ({ workspaceId, dom
         const targetVisible = visibleTables.some((t) => t.id === rel.target_table_id);
         return sourceVisible && targetVisible;
       })
+      .filter((rel) => rel.source_table_id && rel.target_table_id)
       .map((relationship) => ({
         id: relationship.id,
         type: 'cardinality',
-        source: relationship.source_table_id,
-        target: relationship.target_table_id,
+        source: relationship.source_table_id!,
+        target: relationship.target_table_id!,
         data: { relationship },
         selected: selectedRelationshipId === relationship.id,
         animated: relationship.is_circular,

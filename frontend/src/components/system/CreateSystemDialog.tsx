@@ -7,7 +7,7 @@ import React, { useState, useEffect } from 'react';
 import { DraggableModal } from '@/components/common/DraggableModal';
 import { useModelStore } from '@/stores/modelStore';
 import { useUIStore } from '@/stores/uiStore';
-import type { CreateSystemRequest, System } from '@/types/system';
+import type { System } from '@/types/system';
 
 export interface CreateSystemDialogProps {
   isOpen: boolean;

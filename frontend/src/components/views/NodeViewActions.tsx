@@ -49,7 +49,9 @@ export const NodeViewActions: React.FC<NodeViewActionsProps> = ({ domainId }) =>
             <Tooltip
               content="Add AI, ML, or App nodes to this system. These are CADS (Compute Asset Definition Standard) nodes that represent compute assets."
               position="bottom"
-            />
+            >
+              <span />
+            </Tooltip>
           )}
         </div>
       </div>

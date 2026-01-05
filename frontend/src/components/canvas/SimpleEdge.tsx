@@ -27,9 +27,11 @@ export const SimpleEdge: React.FC<EdgeProps<SimpleEdgeData>> = ({
   const allEdges = useEdges();
   const allNodes = useNodes();
   
-  // Helper function to get node bounding box
-  const getNodeBounds = (nodeId: string): { x: number, y: number, width: number, height: number } | null => {
-    const node = allNodes.find(n => n.id === nodeId);
+  // Helper function to get node bounding box (unused but kept for potential future use)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  // @ts-expect-error - Unused function kept for potential future use
+  const _getNodeBounds = (_nodeId: string): { x: number, y: number, width: number, height: number } | null => {
+    const node = allNodes.find(n => n.id === _nodeId);
     if (!node) return null;
     
     const width = (node.width as number) || 200;
@@ -237,8 +239,8 @@ export const SimpleEdge: React.FC<EdgeProps<SimpleEdgeData>> = ({
     for (const otherEdge of allEdges) {
       if (otherEdge.id === id) continue;
       
-      // Get other edge's path
-      const otherPath = otherEdge.path || '';
+      // Get other edge's path (if available as custom property)
+      const otherPath = (otherEdge as { path?: string }).path || '';
       const otherSegments = extractPathSegments(otherPath);
       
       for (const otherSeg of otherSegments) {

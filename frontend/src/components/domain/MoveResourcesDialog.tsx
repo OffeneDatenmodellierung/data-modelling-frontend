@@ -280,7 +280,7 @@ export const MoveResourcesDialog: React.FC<MoveResourcesDialogProps> = ({
 
   if (!isOpen) return null;
 
-  const isMovingBetweenDomains = targetDomainId && targetDomainId !== domainId;
+  const isMovingBetweenDomains = Boolean(targetDomainId && targetDomainId !== domainId);
   const availableSystems = isMovingBetweenDomains ? targetDomainSystems : domainSystems;
 
   return (

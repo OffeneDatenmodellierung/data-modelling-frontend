@@ -201,6 +201,9 @@ export const RelationshipEditor: React.FC<RelationshipEditorProps> = ({
           if (mode === 'online') {
             try {
               const { relationshipService } = await import('@/services/api/relationshipService');
+              if (!reverseRel.source_table_id || !reverseRel.target_table_id) {
+                throw new Error('Reverse relationship missing source or target table ID');
+              }
               await relationshipService.createRelationship(selectedDomainId, {
                 source_table_id: reverseRel.source_table_id,
                 target_table_id: reverseRel.target_table_id,
@@ -208,7 +211,6 @@ export const RelationshipEditor: React.FC<RelationshipEditorProps> = ({
                 source_cardinality: reverseRel.source_cardinality,
                 target_cardinality: reverseRel.target_cardinality,
                 label: reverseRel.label,
-                description: reverseRel.description,
               });
             } catch (error) {
               console.warn('Failed to create reverse relationship on server:', error);

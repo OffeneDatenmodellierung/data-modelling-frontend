@@ -79,7 +79,8 @@ export const DraggableModal: React.FC<DraggableModalProps> = ({
     e.preventDefault(); // Prevent text selection while dragging
   };
 
-  const [hasFocused, setHasFocused] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [_hasFocused, _setHasFocused] = useState(false);
 
   useEffect(() => {
     if (!isOpen) {

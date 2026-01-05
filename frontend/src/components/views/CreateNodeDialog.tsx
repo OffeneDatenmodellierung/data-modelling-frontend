@@ -8,7 +8,6 @@ import { DraggableModal } from '@/components/common/DraggableModal';
 import { useModelStore } from '@/stores/modelStore';
 import { useUIStore } from '@/stores/uiStore';
 import { cadsService } from '@/services/sdk/cadsService';
-import { browserFileService } from '@/services/platform/browser';
 import type { ComputeAsset } from '@/types/cads';
 
 export interface CreateNodeDialogProps {
@@ -279,7 +278,7 @@ export const CreateNodeDialog: React.FC<CreateNodeDialogProps> = ({
                   if (file) {
                     file.text().then((text) => {
                       setImportYaml(text);
-                    }).catch((error) => {
+                    }).catch((_error) => {
                       addToast({
                         type: 'error',
                         message: 'Failed to read file',

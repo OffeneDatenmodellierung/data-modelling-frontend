@@ -10,6 +10,7 @@ import { useUIStore } from '@/stores/uiStore';
 import { useSDKModeStore } from '@/services/sdk/sdkMode';
 import { relationshipService } from '@/services/api/relationshipService';
 import { checkCircularRelationshipWarning } from '@/utils/validation';
+import type { Relationship } from '@/types/relationship';
 
 export interface UseCanvasReturn {
   onNodeClick: (event: React.MouseEvent, node: Node) => void;
@@ -169,7 +170,9 @@ export function useCanvas(_workspaceId: string, domainId: string): UseCanvasRetu
       // For table-to-table relationships, check for circular dependency warning
       if (sourceType === 'table' && targetType === 'table') {
         const warning = checkCircularRelationshipWarning(
-          relationships,
+          relationships.filter((r): r is Relationship & { source_table_id: string; target_table_id: string } => 
+            Boolean(r.source_table_id && r.target_table_id)
+          ),
           connection.source,
           connection.target
         );

@@ -64,6 +64,10 @@ export const CreateDomainDialog: React.FC<CreateDomainDialogProps> = ({
       }
 
       const domainPath = result.filePaths[0];
+      if (!domainPath) {
+        setIsLoading(false);
+        return;
+      }
       
       // Load domain folder
       const domainData = await electronFileService.loadDomainFolder(domainPath);

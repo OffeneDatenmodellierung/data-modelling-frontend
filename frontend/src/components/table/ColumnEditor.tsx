@@ -32,9 +32,12 @@ const DATA_TYPES = [
 export const ColumnEditor: React.FC<ColumnEditorProps> = ({ column, compoundKeys = [], allColumns = [], onChange, onDelete }) => {
   const [name, setName] = useState(column.name);
   const [dataType, setDataType] = useState(column.data_type);
-  const [nullable, setNullable] = useState(column.nullable);
-  const [isPrimaryKey, setIsPrimaryKey] = useState(column.is_primary_key);
-  const [isForeignKey, setIsForeignKey] = useState(column.is_foreign_key);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [_nullable, setNullable] = useState(column.nullable);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [_isPrimaryKey, setIsPrimaryKey] = useState(column.is_primary_key);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [_isForeignKey, setIsForeignKey] = useState(column.is_foreign_key);
   const [nameError, setNameError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -165,24 +168,7 @@ export const ColumnEditor: React.FC<ColumnEditorProps> = ({ column, compoundKeys
               
               return (
                 <Tooltip
-                  text={
-                    <div>
-                      <div className="font-semibold mb-1">Compound Key: {column.compound_key_tag}</div>
-                      <div className="text-xs">
-                        {compoundKey.is_primary && <div className="mb-1 text-yellow-300 font-semibold">Primary Key</div>}
-                        <div className="mb-1">Columns in this compound key ({compoundKeyColumns.length}):</div>
-                        <ul className="list-disc list-inside space-y-0.5">
-                          {compoundKeyColumns.map((col, idx) => (
-                            <li key={col.id}>
-                              {col.name}
-                              {col.id === column.id && <span className="ml-1 text-blue-300">(this column)</span>}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    </div>
-                  }
-                  title="Compound Key"
+                  content={`Compound Key: ${column.compound_key_tag}. ${compoundKey.is_primary ? 'Primary Key. ' : ''}Columns in this compound key (${compoundKeyColumns.length}): ${compoundKeyColumns.map((col) => col.name).join(', ')}`}
                 >
                   <span className="inline-flex items-center gap-1 text-xs bg-purple-100 text-purple-800 px-2 py-0.5 rounded cursor-help">
                     CK - {column.compound_key_tag}

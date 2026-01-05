@@ -241,7 +241,7 @@ export const DataProductEditor: React.FC<DataProductEditorProps> = ({
                     // Read file and populate textarea
                     file.text().then((text) => {
                       setImportYaml(text);
-                    }).catch((error) => {
+                    }).catch((_error) => {
                       addToast({
                         type: 'error',
                         message: 'Failed to read file',
