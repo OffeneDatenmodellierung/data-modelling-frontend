@@ -88,15 +88,24 @@ interface ModelState {
   fetchRelationships: (domain: string) => Promise<void>;
   createTable: (domain: string, request: CreateTableRequest) => Promise<Table>;
   updateTableRemote: (domain: string, tableId: string, updates: Partial<Table>) => Promise<Table>;
-  updateColumnRemote: (workspaceId: string, tableId: string, columnId: string, updates: Partial<Column>) => Promise<Table>;
+  updateColumnRemote: (
+    workspaceId: string,
+    tableId: string,
+    columnId: string,
+    updates: Partial<Column>
+  ) => Promise<Table>;
   deleteTableRemote: (domain: string, tableId: string) => Promise<void>;
   createRelationship: (domain: string, request: CreateRelationshipRequest) => Promise<Relationship>;
-  updateRelationshipRemote: (domain: string, relationshipId: string, updates: Partial<Relationship>) => Promise<Relationship>;
+  updateRelationshipRemote: (
+    domain: string,
+    relationshipId: string,
+    updates: Partial<Relationship>
+  ) => Promise<Relationship>;
   deleteRelationshipRemote: (domain: string, relationshipId: string) => Promise<void>;
-  
+
   // Domain asset loading
   loadDomainAssets: (workspaceId: string, domainId: string) => Promise<void>;
-  
+
   // Filtering helpers
   getFilteredTables: () => Table[]; // Filter by currentView and selectedDataLevel
 }
@@ -113,7 +122,8 @@ const filterTablesByView = (
   // Filter by selected domain visibility
   if (selectedDomainId) {
     filtered = filtered.filter(
-      (t) => t.primary_domain_id === selectedDomainId || t.visible_domains.includes(selectedDomainId)
+      (t) =>
+        t.primary_domain_id === selectedDomainId || t.visible_domains.includes(selectedDomainId)
     );
   }
 
@@ -126,8 +136,8 @@ const filterTablesByView = (
       filtered = filtered.filter((t) => t.data_level === 'operational' || !t.data_level);
     } else {
       // Analytical view: show bronze/silver/gold if no level selected
-      filtered = filtered.filter((t) => 
-        t.data_level === 'bronze' || t.data_level === 'silver' || t.data_level === 'gold'
+      filtered = filtered.filter(
+        (t) => t.data_level === 'bronze' || t.data_level === 'silver' || t.data_level === 'gold'
       );
     }
   }
@@ -139,9 +149,7 @@ const filterTablesByView = (
   // Products view: show tables linked to products
   if (currentView === 'products') {
     const state = useModelStore.getState();
-    const productTableIds = new Set(
-      state.products.flatMap((p) => p.linked_tables)
-    );
+    const productTableIds = new Set(state.products.flatMap((p) => p.linked_tables));
     filtered = filtered.filter((t) => productTableIds.has(t.id));
   }
 
@@ -210,13 +218,13 @@ export const useModelStore = create<ModelState>((set, get) => ({
     }));
     useWorkspaceStore.getState().setPendingChanges(true);
   },
-          addTable: (table) => {
-            set((state) => ({
-              tables: [...state.tables, table],
-            }));
-            // Mark workspace as having pending changes
-            useWorkspaceStore.getState().setPendingChanges(true);
-          },
+  addTable: (table) => {
+    set((state) => ({
+      tables: [...state.tables, table],
+    }));
+    // Mark workspace as having pending changes
+    useWorkspaceStore.getState().setPendingChanges(true);
+  },
   updateTable: (tableId: string, updates: Partial<Table>) =>
     set((state) => {
       const updatedTables = state.tables.map((t) => {
@@ -248,39 +256,55 @@ export const useModelStore = create<ModelState>((set, get) => ({
           : t
       ),
     })),
-          removeTable: (tableId: string) => {
-            set((state) => ({
-              tables: state.tables.filter((t) => t.id !== tableId),
-              selectedTableId: state.selectedTableId === tableId ? null : state.selectedTableId,
-            }));
-            // Mark workspace as having pending changes
-            useWorkspaceStore.getState().setPendingChanges(true);
-          },
-          addRelationship: (relationship) => {
-            set((state) => ({
-              relationships: [...state.relationships, relationship],
-            }));
-            // Mark workspace as having pending changes
-            useWorkspaceStore.getState().setPendingChanges(true);
-          },
-          updateRelationship: (relationshipId, updates) => {
-            set((state) => ({
-              relationships: state.relationships.map((r) =>
-                r.id === relationshipId ? { ...r, ...updates } : r
-              ),
-            }));
-            // Mark workspace as having pending changes
-            useWorkspaceStore.getState().setPendingChanges(true);
-          },
-          removeRelationship: (relationshipId) => {
-            set((state) => ({
-              relationships: state.relationships.filter((r) => r.id !== relationshipId),
-              selectedRelationshipId:
-                state.selectedRelationshipId === relationshipId ? null : state.selectedRelationshipId,
-            }));
-            // Mark workspace as having pending changes
-            useWorkspaceStore.getState().setPendingChanges(true);
-          },
+  removeTable: (tableId: string) => {
+    set((state) => ({
+      tables: state.tables.filter((t) => t.id !== tableId),
+      selectedTableId: state.selectedTableId === tableId ? null : state.selectedTableId,
+    }));
+    // Mark workspace as having pending changes
+    useWorkspaceStore.getState().setPendingChanges(true);
+  },
+  addRelationship: (relationship) => {
+    set((state) => ({
+      relationships: [...state.relationships, relationship],
+    }));
+    // Mark workspace as having pending changes
+    useWorkspaceStore.getState().setPendingChanges(true);
+  },
+  updateRelationship: (relationshipId, updates) => {
+    console.log('[ModelStore] updateRelationship (local):', {
+      relationshipId,
+      updates,
+      beforeCount: get().relationships.length,
+    });
+
+    set((state) => {
+      const updatedRelationships = state.relationships.map((r) =>
+        r.id === relationshipId ? { ...r, ...updates } : r
+      );
+
+      console.log('[ModelStore] After local update:', {
+        afterCount: updatedRelationships.length,
+        duplicates: updatedRelationships
+          .filter((r, i, arr) => arr.findIndex((r2) => r2.id === r.id) !== i)
+          .map((r) => r.id),
+      });
+
+      return { relationships: updatedRelationships };
+    });
+
+    // Mark workspace as having pending changes
+    useWorkspaceStore.getState().setPendingChanges(true);
+  },
+  removeRelationship: (relationshipId) => {
+    set((state) => ({
+      relationships: state.relationships.filter((r) => r.id !== relationshipId),
+      selectedRelationshipId:
+        state.selectedRelationshipId === relationshipId ? null : state.selectedRelationshipId,
+    }));
+    // Mark workspace as having pending changes
+    useWorkspaceStore.getState().setPendingChanges(true);
+  },
   addProduct: (product) => {
     set((state) => ({
       products: [...state.products, product],
@@ -321,7 +345,9 @@ export const useModelStore = create<ModelState>((set, get) => ({
   },
   updateBPMNProcess: (processId, updates) =>
     set((state) => ({
-      bpmnProcesses: state.bpmnProcesses.map((p) => (p.id === processId ? { ...p, ...updates } : p)),
+      bpmnProcesses: state.bpmnProcesses.map((p) =>
+        p.id === processId ? { ...p, ...updates } : p
+      ),
     })),
   removeBPMNProcess: (processId) => {
     set((state) => ({
@@ -386,7 +412,7 @@ export const useModelStore = create<ModelState>((set, get) => ({
     try {
       // Check if we're in offline mode
       const mode = await sdkModeDetector.getMode();
-      
+
       let table: Table;
       if (mode === 'offline') {
         // Create table locally in offline mode
@@ -395,7 +421,7 @@ export const useModelStore = create<ModelState>((set, get) => ({
         const tableId = generateUUID();
         // Get workspace_id from workspace store if available
         const workspaceId = useWorkspaceStore.getState().currentWorkspaceId || 'offline-workspace';
-        
+
         // Map columns to ensure they have required fields
         const columns: Column[] = (request.columns || []).map((col, index) => ({
           id: generateUUID(),
@@ -411,7 +437,7 @@ export const useModelStore = create<ModelState>((set, get) => ({
           order: col.order ?? index,
           created_at: new Date().toISOString(),
         }));
-        
+
         table = {
           id: tableId,
           workspace_id: workspaceId,
@@ -431,7 +457,7 @@ export const useModelStore = create<ModelState>((set, get) => ({
           created_at: new Date().toISOString(),
           last_modified_at: new Date().toISOString(),
         };
-        
+
         // Add to store immediately
         set((state) => ({
           tables: [...state.tables, table],
@@ -445,7 +471,7 @@ export const useModelStore = create<ModelState>((set, get) => ({
           isLoading: false,
         }));
       }
-      
+
       return table;
     } catch (error) {
       set({
@@ -474,7 +500,12 @@ export const useModelStore = create<ModelState>((set, get) => ({
     }
   },
 
-  updateColumnRemote: async (_workspaceId: string, tableId: string, columnId: string, updates: Partial<Column>) => {
+  updateColumnRemote: async (
+    _workspaceId: string,
+    tableId: string,
+    columnId: string,
+    updates: Partial<Column>
+  ) => {
     set({ isLoading: true, error: null });
     try {
       // Update column by updating the table with modified columns
@@ -484,7 +515,9 @@ export const useModelStore = create<ModelState>((set, get) => ({
         throw new Error('Table not found');
       }
 
-      const updatedColumns = table.columns.map((c) => (c.id === columnId ? { ...c, ...updates } : c));
+      const updatedColumns = table.columns.map((c) =>
+        c.id === columnId ? { ...c, ...updates } : c
+      );
 
       // Get domain from table
       const domain = table.primary_domain_id;
@@ -524,10 +557,7 @@ export const useModelStore = create<ModelState>((set, get) => ({
     }
   },
 
-  createRelationship: async (
-    domain: string,
-    request: CreateRelationshipRequest
-  ) => {
+  createRelationship: async (domain: string, request: CreateRelationshipRequest) => {
     set({ isLoading: true, error: null });
     try {
       const relationship = await relationshipService.createRelationship(domain, request);
@@ -557,12 +587,30 @@ export const useModelStore = create<ModelState>((set, get) => ({
         relationshipId,
         updates
       );
-      set((state) => ({
-        relationships: state.relationships.map((r) =>
+
+      console.log('[ModelStore] updateRelationshipRemote:', {
+        relationshipId,
+        updatedRelationship: relationship,
+        beforeCount: get().relationships.length,
+      });
+
+      set((state) => {
+        const updatedRelationships = state.relationships.map((r) =>
           r.id === relationshipId ? relationship : r
-        ),
-        isLoading: false,
-      }));
+        );
+
+        console.log('[ModelStore] After update:', {
+          afterCount: updatedRelationships.length,
+          duplicates: updatedRelationships
+            .filter((r, i, arr) => arr.findIndex((r2) => r2.id === r.id) !== i)
+            .map((r) => r.id),
+        });
+
+        return {
+          relationships: updatedRelationships,
+          isLoading: false,
+        };
+      });
       return relationship;
     } catch (error) {
       set({
@@ -573,10 +621,7 @@ export const useModelStore = create<ModelState>((set, get) => ({
     }
   },
 
-  deleteRelationshipRemote: async (
-    domain: string,
-    relationshipId: string
-  ) => {
+  deleteRelationshipRemote: async (domain: string, relationshipId: string) => {
     set({ isLoading: true, error: null });
     try {
       await relationshipService.deleteRelationship(domain, relationshipId);
@@ -628,4 +673,3 @@ export const useModelStore = create<ModelState>((set, get) => ({
     );
   },
 }));
-
