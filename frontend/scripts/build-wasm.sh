@@ -8,7 +8,7 @@ FRONTEND_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 WASM_OUT_DIR="$FRONTEND_DIR/public/wasm"
 SDK_VERSION="1.8.3"
 GITHUB_REPO="pixie79/data-modelling-sdk"
-RELEASE_URL="https://github.com/$GITHUB_REPO/releases/download/v$SDK_VERSION/wasm-pkg.tar.gz"
+RELEASE_URL="https://github.com/$GITHUB_REPO/releases/download/v$SDK_VERSION/data-modelling-sdk-wasm-v$SDK_VERSION.tar.gz"
 
 echo "Downloading pre-built WASM SDK v$SDK_VERSION from GitHub releases..."
 
