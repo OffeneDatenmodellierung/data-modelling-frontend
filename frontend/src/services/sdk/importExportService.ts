@@ -912,7 +912,7 @@ class ImportExportService {
               const errorType = e.error_type || e.type || e.errorType || e.name || 'Error';
               
               // Try multiple possible field names for error message
-              let message = e.message || e.msg || e.error || e.details || e.description || 
+              const message = e.message || e.msg || e.error || e.details || e.description || 
                              (typeof e === 'string' ? e : JSON.stringify(e)) || 'Unknown error';
               
               // Extract line and column from error message if not in object

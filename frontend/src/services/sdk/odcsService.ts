@@ -887,8 +887,8 @@ class ODCSService {
 
       // Extract workspace_id and domain_id from SDK result or use defaults
       // SDK may not return these for ODCL format, so we'll extract from original if needed
-      let workspaceId = sdkResult.workspace_id;
-      let domainId = sdkResult.domain_id;
+      const workspaceId = sdkResult.workspace_id;
+      const domainId = sdkResult.domain_id;
 
       // For ODCL format, workspace_id and domain_id might not be in SDK result
       // They should be extracted from the ODCL id field
