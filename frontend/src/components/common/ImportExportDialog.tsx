@@ -515,7 +515,7 @@ export const ImportExportDialog: React.FC<ImportExportDialogProps> = ({ isOpen, 
           filename = 'workspace.proto';
           mimeType = 'text/plain';
           break;
-        case 'odps':
+        case 'odps': {
           if (products.length === 0) {
             throw new Error('No data products to export');
           }
@@ -531,7 +531,8 @@ export const ImportExportDialog: React.FC<ImportExportDialogProps> = ({ isOpen, 
           filename = `${productToExport.name || 'product'}.odps.yaml`;
           mimeType = 'application/yaml';
           break;
-        case 'cads':
+        }
+        case 'cads': {
           if (computeAssets.length === 0) {
             throw new Error('No compute assets to export');
           }
@@ -544,7 +545,8 @@ export const ImportExportDialog: React.FC<ImportExportDialogProps> = ({ isOpen, 
           filename = `${assetToExport.name || 'asset'}.cads.yaml`;
           mimeType = 'application/yaml';
           break;
-        case 'bpmn':
+        }
+        case 'bpmn': {
           if (bpmnProcesses.length === 0) {
             throw new Error('No BPMN processes to export');
           }
@@ -557,7 +559,8 @@ export const ImportExportDialog: React.FC<ImportExportDialogProps> = ({ isOpen, 
           filename = `${processToExport.name || 'process'}.bpmn`;
           mimeType = 'application/xml';
           break;
-        case 'dmn':
+        }
+        case 'dmn': {
           if (dmnDecisions.length === 0) {
             throw new Error('No DMN decisions to export');
           }
@@ -570,12 +573,14 @@ export const ImportExportDialog: React.FC<ImportExportDialogProps> = ({ isOpen, 
           filename = `${decisionToExport.name || 'decision'}.dmn`;
           mimeType = 'application/xml';
           break;
-        case 'openapi':
+        }
+        case 'openapi': {
           const { openapiService } = await import('@/services/sdk/openapiService');
           content = await openapiService.toFormat(workspace as any, 'yaml');
           filename = 'workspace.openapi.yaml';
           mimeType = 'application/yaml';
           break;
+        }
         default:
           throw new Error(`Unsupported export format: ${exportFormat}`);
       }

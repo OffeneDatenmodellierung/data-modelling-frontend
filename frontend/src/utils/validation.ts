@@ -29,14 +29,14 @@ export function generateUUID(): string {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
     return crypto.randomUUID();
   }
-  
+
   // Fallback: Generate UUID v4 manually
   // Format: xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
   // where x is any hexadecimal digit and y is one of 8, 9, A, or B
   const hex = '0123456789abcdef';
   const r = () => Math.floor(Math.random() * 16);
   const v = () => (Math.floor(Math.random() * 4) + 8).toString(16); // 8, 9, a, or b
-  
+
   return [
     Array.from({ length: 8 }, () => hex[r()]).join(''),
     Array.from({ length: 4 }, () => hex[r()]).join(''),
@@ -110,7 +110,7 @@ export function isValidColumnName(name: string): boolean {
  * Sanitize string input (remove dangerous characters)
  */
 export function sanitizeString(input: string): string {
-  return input.replace(/[<>\"']/g, '');
+  return input.replace(/[<>"']/g, '');
 }
 
 /**
@@ -124,7 +124,7 @@ export function detectCircularRelationship(
 ): { isCircular: boolean; path?: string[] } {
   // Build adjacency map
   const graph = new Map<string, string[]>();
-  
+
   // Add existing relationships
   relationships.forEach((rel) => {
     if (!graph.has(rel.source_table_id)) {
@@ -232,7 +232,7 @@ export function normalizeWorkspaceUUIDs(workspace: any): any {
   if (Array.isArray(normalized.tables)) {
     normalized.tables = normalized.tables.map((table: any) => {
       const normalizedTable = { ...table };
-      
+
       // Normalize table-level UUIDs
       if (normalizedTable.id) {
         const oldId = normalizedTable.id;
@@ -242,10 +242,13 @@ export function normalizeWorkspaceUUIDs(workspace: any): any {
         }
       }
       if (normalizedTable.workspace_id) {
-        normalizedTable.workspace_id = uuidMap.get(normalizedTable.workspace_id) || normalizeUUID(normalizedTable.workspace_id);
+        normalizedTable.workspace_id =
+          uuidMap.get(normalizedTable.workspace_id) || normalizeUUID(normalizedTable.workspace_id);
       }
       if (normalizedTable.primary_domain_id) {
-        normalizedTable.primary_domain_id = uuidMap.get(normalizedTable.primary_domain_id) || normalizeUUID(normalizedTable.primary_domain_id);
+        normalizedTable.primary_domain_id =
+          uuidMap.get(normalizedTable.primary_domain_id) ||
+          normalizeUUID(normalizedTable.primary_domain_id);
       }
       if (normalizedTable.table_id) {
         normalizedTable.table_id = normalizeUUID(normalizedTable.table_id);
@@ -262,7 +265,9 @@ export function normalizeWorkspaceUUIDs(workspace: any): any {
             normalizedCol.table_id = normalizedTable.id; // Use normalized table ID
           }
           if (normalizedCol.foreign_key_reference) {
-            normalizedCol.foreign_key_reference = normalizeUUID(normalizedCol.foreign_key_reference);
+            normalizedCol.foreign_key_reference = normalizeUUID(
+              normalizedCol.foreign_key_reference
+            );
           }
           if (normalizedCol.compound_key_id) {
             normalizedCol.compound_key_id = normalizeUUID(normalizedCol.compound_key_id);
@@ -284,7 +289,9 @@ export function normalizeWorkspaceUUIDs(workspace: any): any {
           if (Array.isArray(normalizedCK.column_ids)) {
             // Map column IDs to normalized column IDs
             normalizedCK.column_ids = normalizedCK.column_ids.map((colId: string) => {
-              const col = normalizedTable.columns?.find((c: any) => c.id === colId || c.id === uuidMap.get(colId));
+              const col = normalizedTable.columns?.find(
+                (c: any) => c.id === colId || c.id === uuidMap.get(colId)
+              );
               return col?.id || normalizeUUID(colId);
             });
           }
@@ -301,7 +308,9 @@ export function normalizeWorkspaceUUIDs(workspace: any): any {
           }
           if (Array.isArray(normalizedIdx.column_ids)) {
             normalizedIdx.column_ids = normalizedIdx.column_ids.map((colId: string) => {
-              const col = normalizedTable.columns?.find((c: any) => c.id === colId || c.id === uuidMap.get(colId));
+              const col = normalizedTable.columns?.find(
+                (c: any) => c.id === colId || c.id === uuidMap.get(colId)
+              );
               return col?.id || normalizeUUID(colId);
             });
           }
@@ -321,22 +330,30 @@ export function normalizeWorkspaceUUIDs(workspace: any): any {
         normalizedRel.id = normalizeUUID(normalizedRel.id);
       }
       if (normalizedRel.workspace_id) {
-        normalizedRel.workspace_id = uuidMap.get(normalizedRel.workspace_id) || normalizeUUID(normalizedRel.workspace_id);
+        normalizedRel.workspace_id =
+          uuidMap.get(normalizedRel.workspace_id) || normalizeUUID(normalizedRel.workspace_id);
       }
       if (normalizedRel.domain_id) {
-        normalizedRel.domain_id = uuidMap.get(normalizedRel.domain_id) || normalizeUUID(normalizedRel.domain_id);
+        normalizedRel.domain_id =
+          uuidMap.get(normalizedRel.domain_id) || normalizeUUID(normalizedRel.domain_id);
       }
       if (normalizedRel.source_id) {
-        normalizedRel.source_id = uuidMap.get(normalizedRel.source_id) || normalizeUUID(normalizedRel.source_id);
+        normalizedRel.source_id =
+          uuidMap.get(normalizedRel.source_id) || normalizeUUID(normalizedRel.source_id);
       }
       if (normalizedRel.target_id) {
-        normalizedRel.target_id = uuidMap.get(normalizedRel.target_id) || normalizeUUID(normalizedRel.target_id);
+        normalizedRel.target_id =
+          uuidMap.get(normalizedRel.target_id) || normalizeUUID(normalizedRel.target_id);
       }
       if (normalizedRel.source_table_id) {
-        normalizedRel.source_table_id = uuidMap.get(normalizedRel.source_table_id) || normalizeUUID(normalizedRel.source_table_id);
+        normalizedRel.source_table_id =
+          uuidMap.get(normalizedRel.source_table_id) ||
+          normalizeUUID(normalizedRel.source_table_id);
       }
       if (normalizedRel.target_table_id) {
-        normalizedRel.target_table_id = uuidMap.get(normalizedRel.target_table_id) || normalizeUUID(normalizedRel.target_table_id);
+        normalizedRel.target_table_id =
+          uuidMap.get(normalizedRel.target_table_id) ||
+          normalizeUUID(normalizedRel.target_table_id);
       }
       if (normalizedRel.source_key) {
         normalizedRel.source_key = normalizeUUID(normalizedRel.source_key);
@@ -350,4 +367,3 @@ export function normalizeWorkspaceUUIDs(workspace: any): any {
 
   return normalized;
 }
-

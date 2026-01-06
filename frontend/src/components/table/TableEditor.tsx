@@ -26,7 +26,15 @@ export interface TableEditorProps {
 }
 
 export const TableEditor: React.FC<TableEditorProps> = ({ tableId, workspaceId, onClose }) => {
-  const { tables, updateTable, updateTableRemote, updateColumnRemote, deleteTableRemote, selectedDomainId, removeTable } = useModelStore();
+  const {
+    tables,
+    updateTable,
+    updateTableRemote,
+    updateColumnRemote,
+    deleteTableRemote,
+    selectedDomainId,
+    removeTable,
+  } = useModelStore();
   const { addToast } = useUIStore();
   const { mode } = useSDKModeStore();
   const table = tables.find((t) => t.id === tableId);
@@ -39,7 +47,11 @@ export const TableEditor: React.FC<TableEditorProps> = ({ tableId, workspaceId, 
   const [compoundKeys, setCompoundKeys] = useState<CompoundKey[]>(table?.compoundKeys || []);
   const [indexes, setIndexes] = useState<TableIndex[]>(() => {
     // Load indexes from metadata
-    if (table?.metadata && typeof table.metadata.indexes === 'object' && Array.isArray(table.metadata.indexes)) {
+    if (
+      table?.metadata &&
+      typeof table.metadata.indexes === 'object' &&
+      Array.isArray(table.metadata.indexes)
+    ) {
       return table.metadata.indexes as TableIndex[];
     }
     return [];
@@ -51,22 +63,33 @@ export const TableEditor: React.FC<TableEditorProps> = ({ tableId, workspaceId, 
   const [isSaving, setIsSaving] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
-  const [exportFormat, setExportFormat] = useState<'odcs' | 'avro' | 'protobuf' | 'json-schema' | 'sql'>('odcs');
-  const [sqlDialect, setSqlDialect] = useState<'postgresql' | 'mysql' | 'sqlite' | 'mssql' | 'databricks'>('postgresql');
+  const [exportFormat, setExportFormat] = useState<
+    'odcs' | 'avro' | 'protobuf' | 'json-schema' | 'sql'
+  >('odcs');
+  const [sqlDialect, setSqlDialect] = useState<
+    'postgresql' | 'mysql' | 'sqlite' | 'mssql' | 'databricks'
+  >('postgresql');
   const [showSqlDialectSelector, setShowSqlDialectSelector] = useState(false);
   const [showIndexes, setShowIndexes] = useState(false);
-  
+
   // Check if table is editable (must be primary domain)
   // Normalize both IDs for comparison in case one is invalid
   // This handles cases where domains were created with invalid UUIDs (e.g., "domain-123456")
-  const normalizedTableDomainId = table?.primary_domain_id 
-    ? (isValidUUID(table.primary_domain_id) ? table.primary_domain_id : normalizeUUID(table.primary_domain_id))
+  const normalizedTableDomainId = table?.primary_domain_id
+    ? isValidUUID(table.primary_domain_id)
+      ? table.primary_domain_id
+      : normalizeUUID(table.primary_domain_id)
     : null;
   const normalizedSelectedDomainId = selectedDomainId
-    ? (isValidUUID(selectedDomainId) ? selectedDomainId : normalizeUUID(selectedDomainId))
+    ? isValidUUID(selectedDomainId)
+      ? selectedDomainId
+      : normalizeUUID(selectedDomainId)
     : null;
-  const isEditable = normalizedTableDomainId !== null && normalizedSelectedDomainId !== null && normalizedTableDomainId === normalizedSelectedDomainId;
-  
+  const isEditable =
+    normalizedTableDomainId !== null &&
+    normalizedSelectedDomainId !== null &&
+    normalizedTableDomainId === normalizedSelectedDomainId;
+
   // Debug logging
   if (table && !isEditable) {
     console.log('[TableEditor] Table is read-only:', {
@@ -91,24 +114,32 @@ export const TableEditor: React.FC<TableEditorProps> = ({ tableId, workspaceId, 
       setAlias(table.alias || '');
       setDescription(table.description || '');
       setDataLevel(table.data_level || 'operational');
-      
+
       // Ensure all columns have unique IDs - fix any duplicates
       const columnsWithUniqueIds = table.columns.map((col, index) => {
         // Check if this ID is duplicated
-        const duplicateCount = table.columns.filter(c => c.id === col.id).length;
+        const duplicateCount = table.columns.filter((c) => c.id === col.id).length;
         if (duplicateCount > 1 || !col.id) {
           // Generate a new unique ID
           const newId = `col-${tableId}-${col.name || 'col'}-${index}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-          console.warn('[TableEditor] Found duplicate or missing column ID, generating new one:', { oldId: col.id, newId, columnName: col.name });
+          console.warn('[TableEditor] Found duplicate or missing column ID, generating new one:', {
+            oldId: col.id,
+            newId,
+            columnName: col.name,
+          });
           return { ...col, id: newId };
         }
         return col;
       });
-      
+
       setColumns(columnsWithUniqueIds);
       setCompoundKeys(table.compoundKeys || []);
       // Load indexes from metadata
-      if (table.metadata && typeof table.metadata.indexes === 'object' && Array.isArray(table.metadata.indexes)) {
+      if (
+        table.metadata &&
+        typeof table.metadata.indexes === 'object' &&
+        Array.isArray(table.metadata.indexes)
+      ) {
         setIndexes(table.metadata.indexes as TableIndex[]);
       } else {
         setIndexes([]);
@@ -133,10 +164,10 @@ export const TableEditor: React.FC<TableEditorProps> = ({ tableId, workspaceId, 
       }));
       return false;
     }
-    setErrors((prev => {
+    setErrors((prev) => {
       const { name, ...rest } = prev;
       return rest;
-    }));
+    });
     return true;
   };
 
@@ -151,7 +182,7 @@ export const TableEditor: React.FC<TableEditorProps> = ({ tableId, workspaceId, 
 
     // Update local state immediately (for canvas preview)
     updateTable(tableId, { name });
-    
+
     // Only update remote if in online mode (but don't wait for it - save button will handle final save)
     // In offline mode, changes are saved locally via Save button
   };
@@ -181,16 +212,20 @@ export const TableEditor: React.FC<TableEditorProps> = ({ tableId, workspaceId, 
   };
 
   const handleColumnChange = (columnId: string, updates: Partial<Column>) => {
-    console.log('[TableEditor] handleColumnChange called:', { columnId, updates, allColumnIds: columns.map(c => c.id) });
-    
+    console.log('[TableEditor] handleColumnChange called:', {
+      columnId,
+      updates,
+      allColumnIds: columns.map((c) => c.id),
+    });
+
     setColumns((cols) => {
       // Verify columnId exists in the array
-      const targetColumn = cols.find(c => c.id === columnId);
+      const targetColumn = cols.find((c) => c.id === columnId);
       if (!targetColumn) {
         console.warn('[TableEditor] Column ID not found:', columnId);
         return cols; // Return unchanged if column not found
       }
-      
+
       // If setting primary key to true, clear primary key from all other columns
       if (updates.is_primary_key === true) {
         console.log('[TableEditor] Setting PK to true for column:', columnId);
@@ -216,7 +251,7 @@ export const TableEditor: React.FC<TableEditorProps> = ({ tableId, workspaceId, 
           return col; // Don't modify other columns
         });
       }
-      
+
       // For other updates (nullable, foreign key, etc.), just update the specific column
       // Ensure we only update the exact column and don't accidentally modify others
       if ('is_foreign_key' in updates) {
@@ -225,13 +260,14 @@ export const TableEditor: React.FC<TableEditorProps> = ({ tableId, workspaceId, 
       if ('nullable' in updates) {
         console.log('[TableEditor] Setting nullable for column:', columnId, 'to', updates.nullable);
       }
-      
+
       return cols.map((col) => {
         if (col.id === columnId) {
           // Only apply the specific updates, don't spread everything
           const updatedCol = { ...col };
           if ('nullable' in updates) updatedCol.nullable = updates.nullable ?? false;
-          if ('is_foreign_key' in updates) updatedCol.is_foreign_key = updates.is_foreign_key ?? false;
+          if ('is_foreign_key' in updates)
+            updatedCol.is_foreign_key = updates.is_foreign_key ?? false;
           if ('name' in updates) updatedCol.name = updates.name ?? '';
           if ('data_type' in updates) updatedCol.data_type = updates.data_type ?? 'VARCHAR';
           if ('description' in updates) updatedCol.description = updates.description;
@@ -263,31 +299,23 @@ export const TableEditor: React.FC<TableEditorProps> = ({ tableId, workspaceId, 
   // @ts-expect-error - Unused function kept for potential future use
   const _handleTableMetadataSave = async (_tableId: string, _updates: Partial<Table>) => {
     // updateTable(tableId, updates);
-    
+
     if (mode === 'online' && selectedDomainId) {
-      try {
-        await updateTableRemote(selectedDomainId, _tableId, _updates);
-      } catch (error) {
-        throw error;
-      }
+      await updateTableRemote(selectedDomainId, _tableId, _updates);
     }
   };
 
   const handleColumnDetailsSave = async (columnId: string, updates: Partial<Column>) => {
     handleColumnChange(columnId, updates);
-    
+
     if (mode === 'online') {
-      try {
-        await updateColumnRemote(workspaceId, tableId, columnId, updates);
-      } catch (error) {
-        throw error;
-      }
+      await updateColumnRemote(workspaceId, tableId, columnId, updates);
     }
   };
 
   const handleSaveTable = async () => {
     if (!table || !selectedDomainId) return;
-    
+
     setIsSaving(true);
     try {
       // Validate name
@@ -298,7 +326,7 @@ export const TableEditor: React.FC<TableEditorProps> = ({ tableId, workspaceId, 
 
       // Update compound key tags on columns
       const updatedColumns = columns.map((col, index) => {
-        const compoundKey = compoundKeys.find(ck => ck.column_ids.includes(col.id));
+        const compoundKey = compoundKeys.find((ck) => ck.column_ids.includes(col.id));
         if (compoundKey) {
           return {
             ...col,
@@ -349,7 +377,7 @@ export const TableEditor: React.FC<TableEditorProps> = ({ tableId, workspaceId, 
 
       // Update local state - this will trigger canvas re-render
       updateTable(tableId, updates);
-      
+
       // Also mark workspace as having pending changes
       useWorkspaceStore.getState().setPendingChanges(true);
 
@@ -378,11 +406,11 @@ export const TableEditor: React.FC<TableEditorProps> = ({ tableId, workspaceId, 
       }
 
       setHasUnsavedChanges(false);
-      
+
       // Force a small delay to ensure store update propagates before closing
       // The canvas will automatically update via useEffect dependencies
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
       // Force canvas to refresh by triggering a store update notification
       // This ensures views redraw after dialogs close
       updateTable(tableId, { last_modified_at: new Date().toISOString() });
@@ -398,8 +426,12 @@ export const TableEditor: React.FC<TableEditorProps> = ({ tableId, workspaceId, 
 
   const handleDeleteTable = async () => {
     if (!table || !selectedDomainId) return;
-    
-    if (!window.confirm(`Are you sure you want to delete table "${table.name}"? This action cannot be undone.`)) {
+
+    if (
+      !window.confirm(
+        `Are you sure you want to delete table "${table.name}"? This action cannot be undone.`
+      )
+    ) {
       return;
     }
 
@@ -426,20 +458,22 @@ export const TableEditor: React.FC<TableEditorProps> = ({ tableId, workspaceId, 
   const handleAddCompoundKey = (compoundKey: CompoundKey) => {
     // If this is a primary compound key, check if there's already a single-column PK
     if (compoundKey.is_primary) {
-      const hasSingleColumnPK = columns.some(col => col.is_primary_key);
+      const hasSingleColumnPK = columns.some((col) => col.is_primary_key);
       if (hasSingleColumnPK) {
         addToast({
           type: 'warning',
-          message: 'Cannot create compound primary key when a single-column primary key exists. Remove the single-column primary key first.',
+          message:
+            'Cannot create compound primary key when a single-column primary key exists. Remove the single-column primary key first.',
         });
         return;
       }
       // Also check if there's already a compound primary key
-      const hasCompoundPK = compoundKeys.some(ck => ck.is_primary);
+      const hasCompoundPK = compoundKeys.some((ck) => ck.is_primary);
       if (hasCompoundPK) {
         addToast({
           type: 'warning',
-          message: 'Only one primary key is allowed. Remove the existing compound primary key first.',
+          message:
+            'Only one primary key is allowed. Remove the existing compound primary key first.',
         });
         return;
       }
@@ -451,30 +485,34 @@ export const TableEditor: React.FC<TableEditorProps> = ({ tableId, workspaceId, 
   const handleUpdateCompoundKey = (compoundKeyId: string, updates: Partial<CompoundKey>) => {
     // If updating to primary, check for conflicts
     if (updates.is_primary === true) {
-      const hasSingleColumnPK = columns.some(col => col.is_primary_key);
+      const hasSingleColumnPK = columns.some((col) => col.is_primary_key);
       if (hasSingleColumnPK) {
         addToast({
           type: 'warning',
-          message: 'Cannot set compound key as primary when a single-column primary key exists. Remove the single-column primary key first.',
+          message:
+            'Cannot set compound key as primary when a single-column primary key exists. Remove the single-column primary key first.',
         });
         return;
       }
       // Check if another compound key is already primary
-      const otherCompoundPK = compoundKeys.find(ck => ck.id !== compoundKeyId && ck.is_primary);
+      const otherCompoundPK = compoundKeys.find((ck) => ck.id !== compoundKeyId && ck.is_primary);
       if (otherCompoundPK) {
         addToast({
           type: 'warning',
-          message: 'Only one primary key is allowed. Remove the existing compound primary key first.',
+          message:
+            'Only one primary key is allowed. Remove the existing compound primary key first.',
         });
         return;
       }
     }
-    setCompoundKeys(compoundKeys.map(ck => ck.id === compoundKeyId ? { ...ck, ...updates } : ck));
+    setCompoundKeys(
+      compoundKeys.map((ck) => (ck.id === compoundKeyId ? { ...ck, ...updates } : ck))
+    );
     setHasUnsavedChanges(true);
   };
 
   const handleDeleteCompoundKey = (compoundKeyId: string) => {
-    setCompoundKeys(compoundKeys.filter(ck => ck.id !== compoundKeyId));
+    setCompoundKeys(compoundKeys.filter((ck) => ck.id !== compoundKeyId));
     setHasUnsavedChanges(true);
   };
 
@@ -490,12 +528,12 @@ export const TableEditor: React.FC<TableEditorProps> = ({ tableId, workspaceId, 
   };
 
   const handleUpdateIndex = (indexId: string, updates: Partial<TableIndex>) => {
-    setIndexes(indexes.map(idx => idx.id === indexId ? { ...idx, ...updates } : idx));
+    setIndexes(indexes.map((idx) => (idx.id === indexId ? { ...idx, ...updates } : idx)));
     setHasUnsavedChanges(true);
   };
 
   const handleDeleteIndex = (indexId: string) => {
-    setIndexes(indexes.filter(idx => idx.id !== indexId));
+    setIndexes(indexes.filter((idx) => idx.id !== indexId));
     setHasUnsavedChanges(true);
   };
 
@@ -517,7 +555,7 @@ export const TableEditor: React.FC<TableEditorProps> = ({ tableId, workspaceId, 
     try {
       // Create a workspace object with just this table
       const workspace = { tables: [table] } as any;
-      
+
       let content: string;
       let filename: string;
       let mimeType: string;
@@ -553,7 +591,7 @@ export const TableEditor: React.FC<TableEditorProps> = ({ tableId, workspaceId, 
       }
 
       browserFileService.downloadFile(content, filename, mimeType);
-      
+
       addToast({
         type: 'success',
         message: `Table "${table.name}" exported as ${format.toUpperCase()} successfully`,
@@ -582,18 +620,15 @@ export const TableEditor: React.FC<TableEditorProps> = ({ tableId, workspaceId, 
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
           <h3 className="text-sm font-semibold text-yellow-800 mb-2">Read-Only Table</h3>
           <p className="text-sm text-yellow-700">
-            This table belongs to another domain and cannot be edited here. Switch to the primary domain to edit.
+            This table belongs to another domain and cannot be edited here. Switch to the primary
+            domain to edit.
           </p>
         </div>
         <div>
           <h2 className="text-lg font-semibold text-gray-900 mb-2">{table.name}</h2>
-          {table.description && (
-            <p className="text-sm text-gray-600 mb-2">{table.description}</p>
-          )}
+          {table.description && <p className="text-sm text-gray-600 mb-2">{table.description}</p>}
           {table.owner && (
-            <p className="text-xs text-gray-500">
-              Owner: {table.owner.name || table.owner.email}
-            </p>
+            <p className="text-xs text-gray-500">Owner: {table.owner.name || table.owner.email}</p>
           )}
         </div>
       </div>
@@ -605,363 +640,378 @@ export const TableEditor: React.FC<TableEditorProps> = ({ tableId, workspaceId, 
   return (
     <>
       <div className="p-4 space-y-4 max-h-[90vh] overflow-y-auto">
-      <div className="flex items-center justify-between mb-2">
-        <h2 className="text-lg font-semibold text-gray-900">Edit Table</h2>
-        <div className="flex gap-2">
-          <div className="relative">
-            <button
-              onClick={() => setShowExportMenu(!showExportMenu)}
-              disabled={isExporting}
-              className="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
-              aria-label="Export table"
-              title="Export table"
-            >
-              {isExporting ? 'Exporting...' : 'Export'}
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
-            </button>
-            
-            {/* Export Format Menu */}
-            {showExportMenu && (
-              <>
-                <div 
-                  className="fixed inset-0 z-10" 
-                  onClick={() => setShowExportMenu(false)}
-                />
-                <div className="absolute right-0 mt-1 w-56 bg-white rounded-md shadow-lg border border-gray-200 z-20">
-                  <div className="py-1">
-                    <button
-                      onClick={() => handleExportTable('odcs')}
-                      disabled={isExporting}
-                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-between"
-                    >
-                      <span>ODCS (Default)</span>
-                      {exportFormat === 'odcs' && <span className="text-green-600">✓</span>}
-                    </button>
-                    <button
-                      onClick={() => handleExportTable('avro')}
-                      disabled={isExporting}
-                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-between"
-                    >
-                      <span>AVRO Schema</span>
-                      {exportFormat === 'avro' && <span className="text-green-600">✓</span>}
-                    </button>
-                    <button
-                      onClick={() => handleExportTable('protobuf')}
-                      disabled={isExporting}
-                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-between"
-                    >
-                      <span>Protobuf Schema</span>
-                      {exportFormat === 'protobuf' && <span className="text-green-600">✓</span>}
-                    </button>
-                    <button
-                      onClick={() => handleExportTable('json-schema')}
-                      disabled={isExporting}
-                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-between"
-                    >
-                      <span>JSON Schema</span>
-                      {exportFormat === 'json-schema' && <span className="text-green-600">✓</span>}
-                    </button>
-                    <div className="border-t border-gray-200">
+        <div className="flex items-center justify-between mb-2">
+          <h2 className="text-lg font-semibold text-gray-900">Edit Table</h2>
+          <div className="flex gap-2">
+            <div className="relative">
+              <button
+                onClick={() => setShowExportMenu(!showExportMenu)}
+                disabled={isExporting}
+                className="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                aria-label="Export table"
+                title="Export table"
+              >
+                {isExporting ? 'Exporting...' : 'Export'}
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M19 9l-7 7-7-7"
+                  />
+                </svg>
+              </button>
+
+              {/* Export Format Menu */}
+              {showExportMenu && (
+                <>
+                  <div className="fixed inset-0 z-10" onClick={() => setShowExportMenu(false)} />
+                  <div className="absolute right-0 mt-1 w-56 bg-white rounded-md shadow-lg border border-gray-200 z-20">
+                    <div className="py-1">
                       <button
-                        onClick={() => handleExportTable('sql')}
+                        onClick={() => handleExportTable('odcs')}
                         disabled={isExporting}
                         className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-between"
                       >
-                        <span>CreateTable SQL</span>
-                        {exportFormat === 'sql' && <span className="text-green-600">✓</span>}
+                        <span>ODCS (Default)</span>
+                        {exportFormat === 'odcs' && <span className="text-green-600">✓</span>}
                       </button>
-                      {showSqlDialectSelector && exportFormat === 'sql' && (
-                        <div className="px-4 pb-2 pt-1 border-t border-gray-100">
-                          <label className="block text-xs font-medium text-gray-600 mb-1">SQL Dialect:</label>
-                          <select
-                            value={sqlDialect}
-                            onChange={(e) => setSqlDialect(e.target.value as typeof sqlDialect)}
-                            className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-green-500"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <option value="postgresql">PostgreSQL</option>
-                            <option value="mysql">MySQL</option>
-                            <option value="sqlite">SQLite</option>
-                            <option value="mssql">SQL Server</option>
-                            <option value="databricks">Databricks</option>
-                          </select>
-                          <button
-                            onClick={() => handleExportTable('sql', true)}
-                            disabled={isExporting}
-                            className="mt-2 w-full px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                          >
-                            Export SQL
-                          </button>
-                        </div>
-                      )}
+                      <button
+                        onClick={() => handleExportTable('avro')}
+                        disabled={isExporting}
+                        className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-between"
+                      >
+                        <span>AVRO Schema</span>
+                        {exportFormat === 'avro' && <span className="text-green-600">✓</span>}
+                      </button>
+                      <button
+                        onClick={() => handleExportTable('protobuf')}
+                        disabled={isExporting}
+                        className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-between"
+                      >
+                        <span>Protobuf Schema</span>
+                        {exportFormat === 'protobuf' && <span className="text-green-600">✓</span>}
+                      </button>
+                      <button
+                        onClick={() => handleExportTable('json-schema')}
+                        disabled={isExporting}
+                        className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-between"
+                      >
+                        <span>JSON Schema</span>
+                        {exportFormat === 'json-schema' && (
+                          <span className="text-green-600">✓</span>
+                        )}
+                      </button>
+                      <div className="border-t border-gray-200">
+                        <button
+                          onClick={() => handleExportTable('sql')}
+                          disabled={isExporting}
+                          className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-between"
+                        >
+                          <span>CreateTable SQL</span>
+                          {exportFormat === 'sql' && <span className="text-green-600">✓</span>}
+                        </button>
+                        {showSqlDialectSelector && exportFormat === 'sql' && (
+                          <div className="px-4 pb-2 pt-1 border-t border-gray-100">
+                            <label className="block text-xs font-medium text-gray-600 mb-1">
+                              SQL Dialect:
+                            </label>
+                            <select
+                              value={sqlDialect}
+                              onChange={(e) => setSqlDialect(e.target.value as typeof sqlDialect)}
+                              className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-green-500"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <option value="postgresql">PostgreSQL</option>
+                              <option value="mysql">MySQL</option>
+                              <option value="sqlite">SQLite</option>
+                              <option value="mssql">SQL Server</option>
+                              <option value="databricks">Databricks</option>
+                            </select>
+                            <button
+                              onClick={() => handleExportTable('sql', true)}
+                              disabled={isExporting}
+                              className="mt-2 w-full px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              Export SQL
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+            <button
+              onClick={handleSaveTable}
+              disabled={isSaving || !hasUnsavedChanges}
+              className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-400 disabled:cursor-not-allowed"
+              aria-label="Save table"
+            >
+              {isSaving ? 'Saving...' : 'Save Table'}
+            </button>
+            <button
+              onClick={handleDeleteTable}
+              className="px-3 py-1 text-sm bg-red-600 text-white rounded hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500"
+              aria-label="Delete table"
+            >
+              Delete Table
+            </button>
+            {onClose && (
+              <button
+                onClick={onClose}
+                className="px-3 py-1 text-sm bg-gray-200 text-gray-700 rounded hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500"
+                aria-label="Close"
+              >
+                Close
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div>
+          <label htmlFor="table-name" className="block text-sm font-medium text-gray-700 mb-1">
+            Table Name *
+          </label>
+          <input
+            id="table-name"
+            type="text"
+            value={name}
+            onChange={(e) => handleNameChange(e.target.value)}
+            onBlur={handleNameBlur}
+            className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+              errors.name ? 'border-red-500' : 'border-gray-300'
+            }`}
+            aria-invalid={!!errors.name}
+            aria-describedby={errors.name ? 'name-error' : undefined}
+          />
+          {errors.name && (
+            <p id="name-error" className="mt-1 text-sm text-red-600" role="alert">
+              {errors.name}
+            </p>
+          )}
+        </div>
+
+        <div>
+          <label htmlFor="table-alias" className="block text-sm font-medium text-gray-700 mb-1">
+            Alias (Optional)
+          </label>
+          <input
+            id="table-alias"
+            type="text"
+            value={alias}
+            onChange={(e) => handleAliasChange(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+
+        <div>
+          <label
+            htmlFor="table-description"
+            className="block text-sm font-medium text-gray-700 mb-1"
+          >
+            Description
+          </label>
+          <textarea
+            id="table-description"
+            value={description}
+            onChange={(e) => {
+              setDescription(e.target.value);
+              updateTable(tableId, { description: e.target.value });
+              setHasUnsavedChanges(true);
+            }}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            rows={3}
+          />
+        </div>
+
+        <div>
+          <label
+            htmlFor="table-data-level"
+            className="block text-sm font-medium text-gray-700 mb-1"
+          >
+            Data Level
+          </label>
+          <select
+            id="table-data-level"
+            value={dataLevel}
+            onChange={(e) => handleDataLevelChange(e.target.value as DataLevel)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="operational">Operational</option>
+            <option value="bronze">Bronze</option>
+            <option value="silver">Silver</option>
+            <option value="gold">Gold</option>
+          </select>
+        </div>
+
+        <div className="flex gap-2">
+          <button
+            onClick={() => setShowTableMetadata(true)}
+            className="px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
+          >
+            Edit Table Metadata
+          </button>
+        </div>
+
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <label className="block text-sm font-medium text-gray-700">Columns</label>
+            <button
+              onClick={handleAddColumn}
+              className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              Add Column
+            </button>
+          </div>
+          <div className="space-y-2 max-h-[400px] overflow-y-auto table-columns-scrollable">
+            {columns.length === 0 ? (
+              <p className="text-sm text-gray-500 py-4 text-center">
+                No columns. Add one to get started.
+              </p>
+            ) : (
+              columns
+                .sort((a, b) => a.order - b.order)
+                .map((column) => (
+                  <div key={column.id} className="flex items-center gap-2">
+                    <div className="flex-1">
+                      <ColumnEditor
+                        column={column}
+                        compoundKeys={compoundKeys}
+                        allColumns={columns}
+                        onChange={(updates) => handleColumnChange(column.id, updates)}
+                        onDelete={() => handleDeleteColumn(column.id)}
+                      />
+                    </div>
+                    <button
+                      onClick={() => setSelectedColumnId(column.id)}
+                      className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
+                      title="Edit column details"
+                    >
+                      Details
+                    </button>
+                  </div>
+                ))
+            )}
+          </div>
+        </div>
+
+        {/* Compound Keys Section */}
+        <div className="border-t border-gray-200 pt-4">
+          <CompoundKeyEditor
+            tableId={tableId}
+            columns={columns}
+            compoundKeys={compoundKeys}
+            onAdd={handleAddCompoundKey}
+            onUpdate={handleUpdateCompoundKey}
+            onDelete={handleDeleteCompoundKey}
+          />
+        </div>
+
+        {/* Indexes Section */}
+        <div className="border-t border-gray-200 pt-4">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-sm font-semibold text-gray-700">Indexes</h3>
+            <button
+              onClick={() => setShowIndexes(!showIndexes)}
+              className="px-2 py-1 text-xs bg-gray-600 text-white rounded hover:bg-gray-700"
+            >
+              {showIndexes ? 'Hide' : 'Show'} Indexes
+            </button>
+          </div>
+          {showIndexes && (
+            <div className="space-y-3">
+              {indexes.map((index) => (
+                <div key={index.id} className="p-3 border border-gray-200 rounded bg-white">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={index.name}
+                        onChange={(e) => handleUpdateIndex(index.id, { name: e.target.value })}
+                        className="px-2 py-1 text-sm border border-gray-300 rounded"
+                        placeholder="Index name"
+                      />
+                      <label className="flex items-center gap-1 text-xs">
+                        <input
+                          type="checkbox"
+                          checked={index.is_unique}
+                          onChange={(e) =>
+                            handleUpdateIndex(index.id, { is_unique: e.target.checked })
+                          }
+                          className="rounded"
+                        />
+                        <span>Unique</span>
+                      </label>
+                    </div>
+                    <button
+                      onClick={() => handleDeleteIndex(index.id)}
+                      className="text-xs text-red-600 hover:text-red-800"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Columns</label>
+                    <div className="space-y-1 max-h-32 overflow-y-auto border border-gray-200 rounded p-2 bg-gray-50">
+                      {columns.map((column) => (
+                        <label
+                          key={column.id}
+                          className="flex items-center gap-2 text-xs cursor-pointer hover:bg-gray-100 p-1 rounded"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={index.column_ids.includes(column.id)}
+                            onChange={(e) => {
+                              const newColumnIds = e.target.checked
+                                ? [...index.column_ids, column.id]
+                                : index.column_ids.filter((id) => id !== column.id);
+                              handleUpdateIndex(index.id, { column_ids: newColumnIds });
+                            }}
+                            className="rounded"
+                          />
+                          <span>{column.name}</span>
+                        </label>
+                      ))}
                     </div>
                   </div>
                 </div>
-              </>
-            )}
-          </div>
-          <button
-            onClick={handleSaveTable}
-            disabled={isSaving || !hasUnsavedChanges}
-            className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-400 disabled:cursor-not-allowed"
-            aria-label="Save table"
-          >
-            {isSaving ? 'Saving...' : 'Save Table'}
-          </button>
-          <button
-            onClick={handleDeleteTable}
-            className="px-3 py-1 text-sm bg-red-600 text-white rounded hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500"
-            aria-label="Delete table"
-          >
-            Delete Table
-          </button>
-          {onClose && (
-            <button
-              onClick={onClose}
-              className="px-3 py-1 text-sm bg-gray-200 text-gray-700 rounded hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500"
-              aria-label="Close"
-            >
-              Close
-            </button>
+              ))}
+              <button
+                onClick={handleAddIndex}
+                className="w-full px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
+              >
+                Add Index
+              </button>
+              {indexes.length === 0 && (
+                <p className="text-xs text-gray-500 italic">No indexes defined</p>
+              )}
+            </div>
           )}
         </div>
-      </div>
-      
-      <div>
-        <label htmlFor="table-name" className="block text-sm font-medium text-gray-700 mb-1">
-          Table Name *
-        </label>
-        <input
-          id="table-name"
-          type="text"
-          value={name}
-          onChange={(e) => handleNameChange(e.target.value)}
-          onBlur={handleNameBlur}
-          className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-            errors.name ? 'border-red-500' : 'border-gray-300'
-          }`}
-          aria-invalid={!!errors.name}
-          aria-describedby={errors.name ? 'name-error' : undefined}
-        />
-        {errors.name && (
-          <p id="name-error" className="mt-1 text-sm text-red-600" role="alert">
-            {errors.name}
-          </p>
+
+        {/* Table Metadata Modal */}
+        {table && (
+          <TableMetadataModal
+            table={table}
+            isOpen={showTableMetadata}
+            onClose={() => setShowTableMetadata(false)}
+          />
         )}
-      </div>
 
-      <div>
-        <label htmlFor="table-alias" className="block text-sm font-medium text-gray-700 mb-1">
-          Alias (Optional)
-        </label>
-        <input
-          id="table-alias"
-          type="text"
-          value={alias}
-          onChange={(e) => handleAliasChange(e.target.value)}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
-      </div>
-
-      <div>
-        <label htmlFor="table-description" className="block text-sm font-medium text-gray-700 mb-1">
-          Description
-        </label>
-        <textarea
-          id="table-description"
-          value={description}
-          onChange={(e) => {
-            setDescription(e.target.value);
-            updateTable(tableId, { description: e.target.value });
-            setHasUnsavedChanges(true);
-          }}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          rows={3}
-        />
-      </div>
-
-      <div>
-        <label htmlFor="table-data-level" className="block text-sm font-medium text-gray-700 mb-1">
-          Data Level
-        </label>
-        <select
-          id="table-data-level"
-          value={dataLevel}
-          onChange={(e) => handleDataLevelChange(e.target.value as DataLevel)}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          <option value="operational">Operational</option>
-          <option value="bronze">Bronze</option>
-          <option value="silver">Silver</option>
-          <option value="gold">Gold</option>
-        </select>
-      </div>
-
-      <div className="flex gap-2">
-        <button
-          onClick={() => setShowTableMetadata(true)}
-          className="px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
-        >
-          Edit Table Metadata
-        </button>
-      </div>
-
-      <div>
-        <div className="flex items-center justify-between mb-2">
-          <label className="block text-sm font-medium text-gray-700">Columns</label>
-          <button
-            onClick={handleAddColumn}
-            className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            Add Column
-          </button>
-        </div>
-        <div className="space-y-2 max-h-[400px] overflow-y-auto table-columns-scrollable">
-          {columns.length === 0 ? (
-            <p className="text-sm text-gray-500 py-4 text-center">No columns. Add one to get started.</p>
-          ) : (
-            columns
-              .sort((a, b) => a.order - b.order)
-              .map((column) => (
-                <div key={column.id} className="flex items-center gap-2">
-                  <div className="flex-1">
-                    <ColumnEditor
-                      column={column}
-                      compoundKeys={compoundKeys}
-                      allColumns={columns}
-                      onChange={(updates) => handleColumnChange(column.id, updates)}
-                      onDelete={() => handleDeleteColumn(column.id)}
-                    />
-                  </div>
-                  <button
-                    onClick={() => setSelectedColumnId(column.id)}
-                    className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
-                    title="Edit column details"
-                  >
-                    Details
-                  </button>
-                </div>
-              ))
-          )}
-        </div>
-      </div>
-
-      {/* Compound Keys Section */}
-      <div className="border-t border-gray-200 pt-4">
-        <CompoundKeyEditor
-          tableId={tableId}
-          columns={columns}
-          compoundKeys={compoundKeys}
-          onAdd={handleAddCompoundKey}
-          onUpdate={handleUpdateCompoundKey}
-          onDelete={handleDeleteCompoundKey}
-        />
-      </div>
-
-      {/* Indexes Section */}
-      <div className="border-t border-gray-200 pt-4">
-        <div className="flex items-center justify-between mb-2">
-          <h3 className="text-sm font-semibold text-gray-700">Indexes</h3>
-          <button
-            onClick={() => setShowIndexes(!showIndexes)}
-            className="px-2 py-1 text-xs bg-gray-600 text-white rounded hover:bg-gray-700"
-          >
-            {showIndexes ? 'Hide' : 'Show'} Indexes
-          </button>
-        </div>
-        {showIndexes && (
-          <div className="space-y-3">
-            {indexes.map((index) => (
-              <div key={index.id} className="p-3 border border-gray-200 rounded bg-white">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="text"
-                      value={index.name}
-                      onChange={(e) => handleUpdateIndex(index.id, { name: e.target.value })}
-                      className="px-2 py-1 text-sm border border-gray-300 rounded"
-                      placeholder="Index name"
-                    />
-                    <label className="flex items-center gap-1 text-xs">
-                      <input
-                        type="checkbox"
-                        checked={index.is_unique}
-                        onChange={(e) => handleUpdateIndex(index.id, { is_unique: e.target.checked })}
-                        className="rounded"
-                      />
-                      <span>Unique</span>
-                    </label>
-                  </div>
-                  <button
-                    onClick={() => handleDeleteIndex(index.id)}
-                    className="text-xs text-red-600 hover:text-red-800"
-                  >
-                    Delete
-                  </button>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Columns</label>
-                  <div className="space-y-1 max-h-32 overflow-y-auto border border-gray-200 rounded p-2 bg-gray-50">
-                    {columns.map((column) => (
-                      <label
-                        key={column.id}
-                        className="flex items-center gap-2 text-xs cursor-pointer hover:bg-gray-100 p-1 rounded"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={index.column_ids.includes(column.id)}
-                          onChange={(e) => {
-                            const newColumnIds = e.target.checked
-                              ? [...index.column_ids, column.id]
-                              : index.column_ids.filter(id => id !== column.id);
-                            handleUpdateIndex(index.id, { column_ids: newColumnIds });
-                          }}
-                          className="rounded"
-                        />
-                        <span>{column.name}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            ))}
-            <button
-              onClick={handleAddIndex}
-              className="w-full px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
-            >
-              Add Index
-            </button>
-            {indexes.length === 0 && (
-              <p className="text-xs text-gray-500 italic">No indexes defined</p>
-            )}
-          </div>
+        {/* Column Details Modal */}
+        {selectedColumn && (
+          <ColumnDetailsModal
+            column={selectedColumn}
+            tableId={tableId}
+            workspaceId={workspaceId}
+            isOpen={!!selectedColumnId}
+            onClose={() => setSelectedColumnId(null)}
+            onSave={handleColumnDetailsSave}
+          />
         )}
-      </div>
-
-      {/* Table Metadata Modal */}
-      {table && (
-        <TableMetadataModal
-          table={table}
-          isOpen={showTableMetadata}
-          onClose={() => setShowTableMetadata(false)}
-        />
-      )}
-
-      {/* Column Details Modal */}
-      {selectedColumn && (
-        <ColumnDetailsModal
-          column={selectedColumn}
-          tableId={tableId}
-          workspaceId={workspaceId}
-          isOpen={!!selectedColumnId}
-          onClose={() => setSelectedColumnId(null)}
-          onSave={handleColumnDetailsSave}
-        />
-      )}
       </div>
     </>
   );
 };
-
