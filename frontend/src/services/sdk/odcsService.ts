@@ -776,6 +776,7 @@ class ODCSService {
    * @deprecated SDK 1.8.3+ returns complete data - no merging needed
    * This method is only used by the fallback parser when SDK is not available
    */
+  // @ts-expect-error - Kept for fallback parser, marked as deprecated
   private mergeOriginalYAMLWithSDKResult(sdkResult: any, originalYAML: any): any {
     if (!originalYAML || !sdkResult) return sdkResult;
 
@@ -853,6 +854,7 @@ class ODCSService {
    * @deprecated SDK 1.8.3+ returns workspace structure directly - no conversion needed
    * This method is only used by the fallback parser when SDK is not available
    */
+  // @ts-expect-error - Kept for fallback parser, marked as deprecated
   private convertSDKResultToWorkspace(
     sdkResult: any,
     format: 'odcl' | 'odcs' = 'odcs',
@@ -1016,6 +1018,7 @@ class ODCSService {
    * @deprecated SDK 1.8.3+ applies ODCL metadata automatically via parse_odcl_yaml()
    * This method is only used by the fallback parser when SDK is not available
    */
+  // @ts-expect-error - Kept for fallback parser, marked as deprecated
   private applyODCLMetadataToTable(table: Table, odclMetadata: Record<string, unknown>): Table {
     const updates: Partial<Table> = {};
 

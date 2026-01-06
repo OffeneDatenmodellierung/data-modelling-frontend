@@ -29,15 +29,27 @@ export const CreateTableDialog: React.FC<CreateTableDialogProps> = ({
   onClose,
   onCreated,
 }) => {
-  const { createTable, selectedSystemId, systems, updateSystem, addTable, selectedDomainId, domains } = useModelStore();
+  const {
+    createTable,
+    selectedSystemId,
+    systems,
+    updateSystem,
+    addTable,
+    selectedDomainId,
+    domains,
+  } = useModelStore();
   const { addToast } = useUIStore();
   const [isCreating, setIsCreating] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [importMode, setImportMode] = useState(false);
   const [importYaml, setImportYaml] = useState('');
   const [importFile, setImportFile] = useState<File | null>(null);
-  const [importFormat, setImportFormat] = useState<'odcs' | 'sql' | 'avro' | 'json-schema' | 'protobuf' | 'openapi'>('odcs');
-  const [sqlDialect, setSqlDialect] = useState<'postgresql' | 'mysql' | 'sqlite' | 'mssql' | 'databricks'>('postgresql');
+  const [importFormat, setImportFormat] = useState<
+    'odcs' | 'sql' | 'avro' | 'json-schema' | 'protobuf' | 'openapi'
+  >('odcs');
+  const [sqlDialect, setSqlDialect] = useState<
+    'postgresql' | 'mysql' | 'sqlite' | 'mssql' | 'databricks'
+  >('postgresql');
   const [openapiFormat, setOpenapiFormat] = useState<'yaml' | 'json'>('yaml');
   const [name, setName] = useState('');
   const [alias, setAlias] = useState('');
@@ -71,7 +83,7 @@ export const CreateTableDialog: React.FC<CreateTableDialogProps> = ({
 
     try {
       const content = importYaml.trim() || (importFile ? await importFile.text() : '');
-      
+
       let workspace;
       if (importFormat === 'odcs') {
         workspace = await odcsService.parseYAML(content);
@@ -97,7 +109,7 @@ export const CreateTableDialog: React.FC<CreateTableDialogProps> = ({
             workspace_id: workspaceId || 'offline-workspace',
             primary_domain_id: domainId,
             columns: t.columns || [],
-            position_x: t.position_x ?? centerX + (index * 250),
+            position_x: t.position_x ?? centerX + index * 250,
             position_y: t.position_y ?? centerY,
             width: t.width ?? 200,
             height: t.height ?? 150,
@@ -112,10 +124,13 @@ export const CreateTableDialog: React.FC<CreateTableDialogProps> = ({
 
       if (!workspace.tables || workspace.tables.length === 0) {
         // Provide more helpful error message based on import format
-        const formatHint = importFormat === 'sql' 
-          ? ` Please ensure your SQL contains CREATE TABLE statements and that the dialect "${sqlDialect}" is correct.`
-          : '';
-        throw new Error(`No tables found in imported ${importFormat.toUpperCase()} content.${formatHint}`);
+        const formatHint =
+          importFormat === 'sql'
+            ? ` Please ensure your SQL contains CREATE TABLE statements and that the dialect "${sqlDialect}" is correct.`
+            : '';
+        throw new Error(
+          `No tables found in imported ${importFormat.toUpperCase()} content.${formatHint}`
+        );
       }
 
       // Get canvas center position for new tables
@@ -123,49 +138,45 @@ export const CreateTableDialog: React.FC<CreateTableDialogProps> = ({
       const centerY = window.innerHeight / 2 - 150;
 
       // Import all tables from the workspace - normalize UUIDs to ensure validity
-      const { normalizeUUID, normalizeWorkspaceUUIDs, isValidUUID } = await import('@/utils/validation');
-      
+      const { normalizeUUID, normalizeWorkspaceUUIDs, isValidUUID } =
+        await import('@/utils/validation');
+
       // Use current workspace/domain IDs if workspace doesn't have valid UUIDs
       // ODCL format might have string identifiers instead of UUIDs
       // Always prefer selectedDomainId from store over prop (more reliable)
       let currentDomainIdFromStore = selectedDomainId || domainId;
-      
+
       // If no domain is selected, try to use the first available domain
       if (!currentDomainIdFromStore && domains.length > 0 && domains[0]) {
         currentDomainIdFromStore = domains[0].id;
-        console.log('[CreateTableDialog] No domain selected, using first available domain:', currentDomainIdFromStore);
+        console.log(
+          '[CreateTableDialog] No domain selected, using first available domain:',
+          currentDomainIdFromStore
+        );
       }
-      
+
       // Validate that we have a domain ID (even if invalid UUID, we'll normalize it)
       if (!currentDomainIdFromStore) {
         throw new Error('No domain available. Please create a domain before importing tables.');
       }
-      
-      // Normalize the domain ID if it's not a valid UUID (instead of rejecting it)
-      // This handles cases where domains were created with invalid UUIDs like "domain-123456"
-      if (!isValidUUID(currentDomainIdFromStore)) {
-        console.warn('[CreateTableDialog] Domain ID is not a valid UUID, normalizing:', currentDomainIdFromStore);
-        // If the domain exists in the store, we should update it with a valid UUID
-        const domainToUpdate = domains.find(d => d.id === currentDomainIdFromStore);
-        if (domainToUpdate) {
-          const normalizedId = normalizeUUID(currentDomainIdFromStore);
-          // Update the domain in the store with the normalized ID
-          useModelStore.getState().updateDomain(currentDomainIdFromStore, { id: normalizedId });
-          // Update selectedDomainId if it matches
-          if (selectedDomainId === currentDomainIdFromStore) {
-            useModelStore.getState().setSelectedDomain(normalizedId);
-          }
-          currentDomainIdFromStore = normalizedId;
-        } else {
-          // Domain not found, just normalize the ID for this import
-          currentDomainIdFromStore = normalizeUUID(currentDomainIdFromStore);
-        }
+
+      // Use the domain ID as-is - don't normalize it
+      // The domain ID should remain consistent throughout the application lifecycle
+      // Only normalize IDs for imported data (tables, relationships, etc.), not for the domain we're importing into
+      const domainToCheck = domains.find((d) => d.id === currentDomainIdFromStore);
+      if (!domainToCheck) {
+        // Domain not found in store - this shouldn't happen, but if it does, log a warning
+        console.warn('[CreateTableDialog] Domain not found in store:', currentDomainIdFromStore);
       }
-      
-      const finalWorkspaceId = workspace.workspace_id && isValidUUID(workspace.workspace_id) 
-        ? workspace.workspace_id 
-        : workspaceId || 'offline-workspace';
-      
+
+      // Use domain ID as-is - preserve it exactly as it exists in the store
+      const currentDomainId = currentDomainIdFromStore;
+
+      const finalWorkspaceId =
+        workspace.workspace_id && isValidUUID(workspace.workspace_id)
+          ? workspace.workspace_id
+          : workspaceId || 'offline-workspace';
+
       // Normalize workspace with proper IDs
       // Clear primary_domain_id from tables before normalization so we can set it to current domain
       const workspaceWithValidIds = {
@@ -178,44 +189,42 @@ export const CreateTableDialog: React.FC<CreateTableDialogProps> = ({
         })),
       };
       const normalizedWorkspace = normalizeWorkspaceUUIDs(workspaceWithValidIds);
-      
-      // Always use the current selected domain ID from the store (the domain where we're importing)
-      // This ensures imported tables belong to the current domain and are editable
-      const currentDomainId = normalizeUUID(currentDomainIdFromStore);
-      
+
       console.log('[CreateTableDialog] Importing tables with domain ID:', {
         selectedDomainIdFromStore: selectedDomainId,
         domainIdProp: domainId,
         currentDomainIdFromStore,
-        normalizedCurrentDomainId: currentDomainId,
+        currentDomainId,
         isValid: isValidUUID(currentDomainId),
       });
-      
-      const importedTables: Table[] = normalizedWorkspace.tables.map((table: Table, index: number) => {
-        const importedTable = {
-          ...table,
-          id: normalizeUUID(table.id),
-          workspace_id: normalizedWorkspace.workspace_id || normalizeUUID(finalWorkspaceId),
-          // Always override with current domain ID - never use what's in the imported table
-          primary_domain_id: currentDomainId,
-          visible_domains: [currentDomainId], // Also set visible_domains to current domain
-          position_x: table.position_x ?? centerX + (index * 250),
-          position_y: table.position_y ?? centerY,
-          width: table.width ?? 200,
-          height: table.height ?? 150,
-          created_at: table.created_at || new Date().toISOString(),
-          last_modified_at: table.last_modified_at || new Date().toISOString(),
-        };
-        
-        console.log(`[CreateTableDialog] Imported table ${index} (${importedTable.name}):`, {
-          id: importedTable.id,
-          primary_domain_id: importedTable.primary_domain_id,
-          selectedDomainId,
-          matches: importedTable.primary_domain_id === selectedDomainId,
-        });
-        
-        return importedTable;
-      });
+
+      const importedTables: Table[] = normalizedWorkspace.tables.map(
+        (table: Table, index: number) => {
+          const importedTable = {
+            ...table,
+            id: normalizeUUID(table.id),
+            workspace_id: normalizedWorkspace.workspace_id || normalizeUUID(finalWorkspaceId),
+            // Always override with current domain ID - never use what's in the imported table
+            primary_domain_id: currentDomainId,
+            visible_domains: [currentDomainId], // Also set visible_domains to current domain
+            position_x: table.position_x ?? centerX + index * 250,
+            position_y: table.position_y ?? centerY,
+            width: table.width ?? 200,
+            height: table.height ?? 150,
+            created_at: table.created_at || new Date().toISOString(),
+            last_modified_at: table.last_modified_at || new Date().toISOString(),
+          };
+
+          console.log(`[CreateTableDialog] Imported table ${index} (${importedTable.name}):`, {
+            id: importedTable.id,
+            primary_domain_id: importedTable.primary_domain_id,
+            selectedDomainId,
+            matches: importedTable.primary_domain_id === selectedDomainId,
+          });
+
+          return importedTable;
+        }
+      );
 
       // Add tables to store
       importedTables.forEach((table) => {
@@ -247,10 +256,10 @@ export const CreateTableDialog: React.FC<CreateTableDialogProps> = ({
       setImportYaml('');
       setImportFile(null);
       setError(null);
-      
+
       // Small delay to ensure store updates propagate before closing
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
       onClose();
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to import table';
@@ -297,7 +306,7 @@ export const CreateTableDialog: React.FC<CreateTableDialogProps> = ({
       };
 
       const table = await createTable(domainId, request);
-      
+
       // If a system is selected, add the table to that system
       if (selectedSystemId) {
         const selectedSystem = systems.find((s) => s.id === selectedSystemId);
@@ -307,7 +316,7 @@ export const CreateTableDialog: React.FC<CreateTableDialogProps> = ({
           updateSystem(selectedSystemId, { table_ids: uniqueTableIds });
         }
       }
-      
+
       addToast({
         type: 'success',
         message: `Table "${table.name}" created successfully${selectedSystemId ? ' and added to selected system' : ''}`,
@@ -324,8 +333,8 @@ export const CreateTableDialog: React.FC<CreateTableDialogProps> = ({
       }
 
       // Small delay to ensure store updates propagate before closing
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
       // Close dialog
       onClose();
     } catch (err) {
@@ -369,9 +378,7 @@ export const CreateTableDialog: React.FC<CreateTableDialogProps> = ({
               setError(null);
             }}
             className={`flex-1 px-4 py-2 text-sm font-medium rounded ${
-              !importMode
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              !importMode ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
           >
             Create New
@@ -385,9 +392,7 @@ export const CreateTableDialog: React.FC<CreateTableDialogProps> = ({
               setError(null);
             }}
             className={`flex-1 px-4 py-2 text-sm font-medium rounded ${
-              importMode
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              importMode ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
             title="Switch to import mode"
           >
@@ -406,168 +411,220 @@ export const CreateTableDialog: React.FC<CreateTableDialogProps> = ({
           {importMode ? (
             /* Import Mode */
             <div className="space-y-4 pb-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Import Format
-              </label>
-              <select
-                value={importFormat}
-                onChange={(e) => {
-                  setImportFormat(e.target.value as typeof importFormat);
-                  setImportYaml('');
-                  setImportFile(null);
-                }}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="odcs">ODCS 3.1.0</option>
-                <option value="sql">SQL (CREATE TABLE)</option>
-                <option value="avro">AVRO Schema</option>
-                <option value="json-schema">JSON Schema</option>
-                <option value="protobuf">Protobuf Schema</option>
-                <option value="openapi">OpenAPI Specification</option>
-              </select>
-            </div>
-
-            {importFormat === 'sql' && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  SQL Dialect
+                  Import Format
                 </label>
                 <select
-                  value={sqlDialect}
-                  onChange={(e) => setSqlDialect(e.target.value as typeof sqlDialect)}
+                  value={importFormat}
+                  onChange={(e) => {
+                    setImportFormat(e.target.value as typeof importFormat);
+                    setImportYaml('');
+                    setImportFile(null);
+                  }}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
-                  <option value="postgresql">PostgreSQL</option>
-                  <option value="mysql">MySQL</option>
-                  <option value="sqlite">SQLite</option>
-                  <option value="mssql">SQL Server</option>
-                  <option value="databricks">Databricks</option>
+                  <option value="odcs">ODCS 3.1.0</option>
+                  <option value="sql">SQL (CREATE TABLE)</option>
+                  <option value="avro">AVRO Schema</option>
+                  <option value="json-schema">JSON Schema</option>
+                  <option value="protobuf">Protobuf Schema</option>
+                  <option value="openapi">OpenAPI Specification</option>
                 </select>
               </div>
-            )}
 
-            {importFormat === 'openapi' && (
+              {importFormat === 'sql' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    SQL Dialect
+                  </label>
+                  <select
+                    value={sqlDialect}
+                    onChange={(e) => setSqlDialect(e.target.value as typeof sqlDialect)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="postgresql">PostgreSQL</option>
+                    <option value="mysql">MySQL</option>
+                    <option value="sqlite">SQLite</option>
+                    <option value="mssql">SQL Server</option>
+                    <option value="databricks">Databricks</option>
+                  </select>
+                </div>
+              )}
+
+              {importFormat === 'openapi' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    OpenAPI Format
+                  </label>
+                  <select
+                    value={openapiFormat}
+                    onChange={(e) => setOpenapiFormat(e.target.value as 'yaml' | 'json')}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="yaml">YAML</option>
+                    <option value="json">JSON</option>
+                  </select>
+                </div>
+              )}
+
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  OpenAPI Format
-                </label>
-                <select
-                  value={openapiFormat}
-                  onChange={(e) => setOpenapiFormat(e.target.value as 'yaml' | 'json')}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                <label
+                  htmlFor="import-file"
+                  className="block text-sm font-medium text-gray-700 mb-2"
                 >
-                  <option value="yaml">YAML</option>
-                  <option value="json">JSON</option>
-                </select>
-              </div>
-            )}
-
-            <div>
-              <label htmlFor="import-file" className="block text-sm font-medium text-gray-700 mb-2">
-                Load {importFormat === 'odcs' ? 'ODCS' : importFormat === 'sql' ? 'SQL' : importFormat === 'avro' ? 'AVRO' : importFormat === 'json-schema' ? 'JSON Schema' : importFormat === 'protobuf' ? 'Protobuf' : 'OpenAPI'} File (Optional)
-              </label>
-              <input
-                id="import-file"
-                type="file"
-                accept={
-                  importFormat === 'odcs' ? '.yaml,.yml' :
-                  importFormat === 'sql' ? '.sql' :
-                  importFormat === 'avro' ? '.avsc,.avro' :
-                  importFormat === 'json-schema' ? '.json,.schema.json' :
-                  importFormat === 'protobuf' ? '.proto' :
-                  importFormat === 'openapi' ? (openapiFormat === 'yaml' ? '.yaml,.yml' : '.json') :
-                  '*'
-                }
-                onChange={(e) => {
-                  const file = e.target.files?.[0] || null;
-                  setImportFile(file);
-                  if (file) {
-                    file.text().then((text) => {
-                      setImportYaml(text);
-                    }).catch((_error) => {
-                      addToast({
-                        type: 'error',
-                        message: 'Failed to read file',
-                      });
-                    });
+                  Load{' '}
+                  {importFormat === 'odcs'
+                    ? 'ODCS'
+                    : importFormat === 'sql'
+                      ? 'SQL'
+                      : importFormat === 'avro'
+                        ? 'AVRO'
+                        : importFormat === 'json-schema'
+                          ? 'JSON Schema'
+                          : importFormat === 'protobuf'
+                            ? 'Protobuf'
+                            : 'OpenAPI'}{' '}
+                  File (Optional)
+                </label>
+                <input
+                  id="import-file"
+                  type="file"
+                  accept={
+                    importFormat === 'odcs'
+                      ? '.yaml,.yml'
+                      : importFormat === 'sql'
+                        ? '.sql'
+                        : importFormat === 'avro'
+                          ? '.avsc,.avro'
+                          : importFormat === 'json-schema'
+                            ? '.json,.schema.json'
+                            : importFormat === 'protobuf'
+                              ? '.proto'
+                              : importFormat === 'openapi'
+                                ? openapiFormat === 'yaml'
+                                  ? '.yaml,.yml'
+                                  : '.json'
+                                : '*'
                   }
-                }}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
+                  onChange={(e) => {
+                    const file = e.target.files?.[0] || null;
+                    setImportFile(file);
+                    if (file) {
+                      file
+                        .text()
+                        .then((text) => {
+                          setImportYaml(text);
+                        })
+                        .catch((_error) => {
+                          addToast({
+                            type: 'error',
+                            message: 'Failed to read file',
+                          });
+                        });
+                    }
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
 
-            <div>
-              <label htmlFor="import-yaml" className="block text-sm font-medium text-gray-700 mb-2">
-                Or Paste {importFormat === 'odcs' ? 'ODCS' : importFormat === 'sql' ? 'SQL' : importFormat === 'avro' ? 'AVRO' : importFormat === 'json-schema' ? 'JSON Schema' : importFormat === 'protobuf' ? 'Protobuf' : 'OpenAPI'} Content
-              </label>
-              <textarea
-                id="import-yaml"
-                value={importYaml}
-                onChange={(e) => {
-                  setImportYaml(e.target.value);
-                  setImportFile(null);
-                }}
-                placeholder={
-                  importFormat === 'odcs' ? 'Paste your ODCS YAML schema here...' :
-                  importFormat === 'sql' ? 'Paste your SQL CREATE TABLE statement here...' :
-                  importFormat === 'avro' ? 'Paste your AVRO schema JSON here...' :
-                  importFormat === 'json-schema' ? 'Paste your JSON Schema here...' :
-                  importFormat === 'protobuf' ? 'Paste your Protobuf schema here...' :
-                  'Paste your OpenAPI specification here...'
-                }
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
-                rows={15}
-              />
+              <div>
+                <label
+                  htmlFor="import-yaml"
+                  className="block text-sm font-medium text-gray-700 mb-2"
+                >
+                  Or Paste{' '}
+                  {importFormat === 'odcs'
+                    ? 'ODCS'
+                    : importFormat === 'sql'
+                      ? 'SQL'
+                      : importFormat === 'avro'
+                        ? 'AVRO'
+                        : importFormat === 'json-schema'
+                          ? 'JSON Schema'
+                          : importFormat === 'protobuf'
+                            ? 'Protobuf'
+                            : 'OpenAPI'}{' '}
+                  Content
+                </label>
+                <textarea
+                  id="import-yaml"
+                  value={importYaml}
+                  onChange={(e) => {
+                    setImportYaml(e.target.value);
+                    setImportFile(null);
+                  }}
+                  placeholder={
+                    importFormat === 'odcs'
+                      ? 'Paste your ODCS YAML schema here...'
+                      : importFormat === 'sql'
+                        ? 'Paste your SQL CREATE TABLE statement here...'
+                        : importFormat === 'avro'
+                          ? 'Paste your AVRO schema JSON here...'
+                          : importFormat === 'json-schema'
+                            ? 'Paste your JSON Schema here...'
+                            : importFormat === 'protobuf'
+                              ? 'Paste your Protobuf schema here...'
+                              : 'Paste your OpenAPI specification here...'
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+                  rows={15}
+                />
+              </div>
             </div>
-          </div>
           ) : (
             /* Create Mode */
             <div className="space-y-4 pb-4">
-            <div>
-              <label htmlFor="table-name" className="block text-sm font-medium text-gray-700 mb-2">
-                Table Name *
-              </label>
-              <input
-                id="table-name"
-                type="text"
-                value={name}
-                onChange={(e) => {
-                  setName(e.target.value);
-                  setError(null);
-                }}
-                onKeyDown={handleKeyDown}
-                placeholder="e.g., Users, Orders, Products"
-                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                  error ? 'border-red-500' : 'border-gray-300'
-                }`}
-                autoFocus
-                disabled={isCreating}
-              />
-              <p className="mt-1 text-xs text-gray-500">
-                Alphanumeric characters and underscores only
-              </p>
-            </div>
+              <div>
+                <label
+                  htmlFor="table-name"
+                  className="block text-sm font-medium text-gray-700 mb-2"
+                >
+                  Table Name *
+                </label>
+                <input
+                  id="table-name"
+                  type="text"
+                  value={name}
+                  onChange={(e) => {
+                    setName(e.target.value);
+                    setError(null);
+                  }}
+                  onKeyDown={handleKeyDown}
+                  placeholder="e.g., Users, Orders, Products"
+                  className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                    error ? 'border-red-500' : 'border-gray-300'
+                  }`}
+                  autoFocus
+                  disabled={isCreating}
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  Alphanumeric characters and underscores only
+                </p>
+              </div>
 
-            <div>
-              <label htmlFor="table-alias" className="block text-sm font-medium text-gray-700 mb-2">
-                Alias (Optional)
-              </label>
-              <input
-                id="table-alias"
-                type="text"
-                value={alias}
-                onChange={(e) => setAlias(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="Display name for the table"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                disabled={isCreating}
-              />
+              <div>
+                <label
+                  htmlFor="table-alias"
+                  className="block text-sm font-medium text-gray-700 mb-2"
+                >
+                  Alias (Optional)
+                </label>
+                <input
+                  id="table-alias"
+                  type="text"
+                  value={alias}
+                  onChange={(e) => setAlias(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder="Display name for the table"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  disabled={isCreating}
+                />
+              </div>
             </div>
-          </div>
-        )}
+          )}
         </div>
-        
+
         {/* Fixed Footer with Action Buttons */}
         <div className="flex justify-end gap-2 pt-4 border-t border-gray-200 mt-4 flex-shrink-0">
           <button
@@ -599,4 +656,3 @@ export const CreateTableDialog: React.FC<CreateTableDialogProps> = ({
     </DraggableModal>
   );
 };
-
