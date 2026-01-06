@@ -37,12 +37,24 @@ describe('useCanvas', () => {
     vi.mocked(modelStore.useModelStore).mockReturnValue({
       tables: mockTables,
       relationships: [],
+      domains: [
+        {
+          id: 'domain-1',
+          workspace_id: 'workspace-1',
+          name: 'Test Domain',
+          model_type: 'conceptual',
+          is_primary: true,
+          created_at: '2025-01-01T00:00:00Z',
+          last_modified_at: '2025-01-01T00:00:00Z',
+        },
+      ],
       selectedTableId: null,
       selectedRelationshipId: null,
       selectedDomainId: 'domain-1',
       setSelectedTable: vi.fn(),
       setSelectedRelationship: vi.fn(),
       updateTable: vi.fn(),
+      updateDomain: vi.fn(),
       updateTableRemote: vi.fn().mockResolvedValue(mockTables[0]),
     } as any);
   });
@@ -61,12 +73,24 @@ describe('useCanvas', () => {
     vi.mocked(modelStore.useModelStore).mockReturnValue({
       tables: mockTables,
       relationships: [],
+      domains: [
+        {
+          id: 'domain-1',
+          workspace_id: 'workspace-1',
+          name: 'Test Domain',
+          model_type: 'conceptual',
+          is_primary: true,
+          created_at: '2025-01-01T00:00:00Z',
+          last_modified_at: '2025-01-01T00:00:00Z',
+        },
+      ],
       selectedTableId: null,
       selectedRelationshipId: null,
       selectedDomainId: 'domain-1',
       setSelectedTable,
       setSelectedRelationship: vi.fn(),
       updateTable: vi.fn(),
+      updateDomain: vi.fn(),
       updateTableRemote: vi.fn().mockResolvedValue(mockTables[0]),
     } as any);
 
@@ -84,12 +108,24 @@ describe('useCanvas', () => {
     vi.mocked(modelStore.useModelStore).mockReturnValue({
       tables: mockTables,
       relationships: [],
+      domains: [
+        {
+          id: 'domain-1',
+          workspace_id: 'workspace-1',
+          name: 'Test Domain',
+          model_type: 'conceptual',
+          is_primary: true,
+          created_at: '2025-01-01T00:00:00Z',
+          last_modified_at: '2025-01-01T00:00:00Z',
+        },
+      ],
       selectedTableId: null,
       selectedRelationshipId: null,
       selectedDomainId: 'domain-1',
       setSelectedTable: vi.fn(),
       setSelectedRelationship: vi.fn(),
       updateTable: vi.fn(),
+      updateDomain: vi.fn(),
       updateTableRemote,
     } as any);
 
@@ -98,14 +134,19 @@ describe('useCanvas', () => {
     await act(async () => {
       result.current.onNodeDragStop({} as any, {
         id: 'table-1',
+        type: 'table',
         position: { x: 200, y: 300 },
       } as any);
     });
 
-    expect(updateTableRemote).toHaveBeenCalledWith('domain-1', 'table-1', {
-      position_x: 200,
-      position_y: 300,
-    });
+    // Verify updateDomain was called to save view position
+    expect(updateDomain).toHaveBeenCalledWith('domain-1', expect.objectContaining({
+      view_positions: expect.objectContaining({
+        systems: expect.objectContaining({
+          'table-1': expect.objectContaining({ x: 200, y: 300 }),
+        }),
+      }),
+    }));
   });
 
   it('should handle edge click to select relationship', () => {
@@ -113,12 +154,24 @@ describe('useCanvas', () => {
     vi.mocked(modelStore.useModelStore).mockReturnValue({
       tables: mockTables,
       relationships: [],
+      domains: [
+        {
+          id: 'domain-1',
+          workspace_id: 'workspace-1',
+          name: 'Test Domain',
+          model_type: 'conceptual',
+          is_primary: true,
+          created_at: '2025-01-01T00:00:00Z',
+          last_modified_at: '2025-01-01T00:00:00Z',
+        },
+      ],
       selectedTableId: null,
       selectedRelationshipId: null,
       selectedDomainId: 'domain-1',
       setSelectedTable: vi.fn(),
       setSelectedRelationship,
       updateTable: vi.fn(),
+      updateDomain: vi.fn(),
       updateTableRemote: vi.fn().mockResolvedValue(mockTables[0]),
     } as any);
 

@@ -220,8 +220,10 @@ export function useCanvas(_workspaceId: string, domainId: string): UseCanvasRetu
           }
         }
         
+        // Always use UUIDs for relationship IDs
+        const { generateUUID } = await import('@/utils/validation');
         const relationship: import('@/types/relationship').Relationship = {
-          id: typeof crypto !== 'undefined' ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
+          id: generateUUID(),
           workspace_id: workspaceId,
           domain_id: domainId,
           source_id: connection.source,

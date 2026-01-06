@@ -333,8 +333,10 @@ const Home: React.FC = () => {
                       const name = formData.get('name') as string;
                       
                       try {
+                        // Always use UUIDs for workspace IDs
+                        const { generateUUID } = await import('@/utils/validation');
                         const workspace = {
-                          id: `offline-${Date.now()}`,
+                          id: generateUUID(),
                           name,
                           owner_id: 'offline-user',
                           created_at: new Date().toISOString(),

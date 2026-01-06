@@ -22,7 +22,7 @@ export interface ImportResult {
 
 class ImportExportService {
   /**
-   * Clean column structure for JSON Schema export (SDK 1.7.0+)
+   * Clean column structure for JSON Schema export (SDK 1.8.1+)
    * Preserves validation rules and constraints for JSON Schema export
    * Maps constraints/quality_rules to JSON Schema validation keywords
    */
@@ -45,7 +45,7 @@ class ImportExportService {
     if (column.default_value) cleaned.default_value = column.default_value;
     if (column.description) cleaned.description = column.description;
     
-    // Include constraints and quality_rules for JSON Schema export (SDK 1.7.0+ supports this)
+    // Include constraints and quality_rules for JSON Schema export (SDK 1.8.1+ supports this)
     // Map constraints to JSON Schema validation keywords as top-level properties
     // The SDK expects these as flattened properties, NOT nested in a constraints object
     // Nested objects cause "invalid type: map, expected a sequence" errors
@@ -55,7 +55,7 @@ class ImportExportService {
       const mergedConstraints = { ...constraints, ...qualityRules };
       
       // Map common constraint fields to JSON Schema format as top-level properties
-      // SDK 1.7.0+ expects these flattened at the column level, not nested
+      // SDK 1.8.1+ expects these flattened at the column level, not nested
       if (mergedConstraints.minLength !== undefined) cleaned.minLength = mergedConstraints.minLength;
       if (mergedConstraints.maxLength !== undefined) cleaned.maxLength = mergedConstraints.maxLength;
       if (mergedConstraints.pattern !== undefined) cleaned.pattern = mergedConstraints.pattern;
@@ -144,7 +144,7 @@ class ImportExportService {
   }
 
   /**
-   * Clean table structure for JSON Schema export (SDK 1.7.0+)
+   * Clean table structure for JSON Schema export (SDK 1.8.1+)
    * Preserves validation rules and constraints for JSON Schema export
    */
   private cleanTableForJSONSchemaExport(table: any): any {
@@ -255,7 +255,7 @@ class ImportExportService {
   }
 
   /**
-   * Prepare workspace for JSON Schema export (SDK 1.7.0+)
+   * Prepare workspace for JSON Schema export (SDK 1.8.1+)
    * Preserves validation rules and constraints for JSON Schema export
    */
   private async prepareWorkspaceForJSONSchemaExport(workspace: ODCSWorkspace): Promise<{ 
@@ -1342,7 +1342,7 @@ class ImportExportService {
    * Export to AVRO Schema
    * Uses API when online, WASM SDK when offline
    * 
-   * Note: SDK v1.7.0+ includes enhanced AVRO export/import support with improved validation
+   * Note: SDK v1.8.1+ includes enhanced AVRO export/import support with improved validation
    */
   async exportToAVRO(workspace: ODCSWorkspace, _options?: Record<string, unknown>): Promise<string> {
     const mode = await sdkModeDetector.getMode();
@@ -1451,7 +1451,7 @@ class ImportExportService {
    * Export to JSON Schema
    * Uses API when online, WASM SDK when offline
    * 
-   * Note: SDK v1.7.0+ includes enhanced JSON Schema export/import support with improved validation
+   * Note: SDK v1.8.1+ includes enhanced JSON Schema export/import support with improved validation
    */
   async exportToJSONSchema(workspace: ODCSWorkspace, _options?: Record<string, unknown>): Promise<string> {
     const mode = await sdkModeDetector.getMode();
@@ -1490,12 +1490,12 @@ class ImportExportService {
           throw new Error(`WASM SDK export_to_json_schema method not available. Available methods: ${availableMethods.join(', ')}`);
         }
         
-        // Prepare workspace structure for JSON Schema export (SDK 1.7.0+)
+        // Prepare workspace structure for JSON Schema export (SDK 1.8.1+)
         // This preserves validation rules and constraints for JSON Schema export
         const exportWorkspace = await this.prepareWorkspaceForJSONSchemaExport(workspace);
         const workspaceJson = JSON.stringify(exportWorkspace);
         
-        console.log('[ImportExportService] Calling export_to_json_schema with workspace (SDK 1.7.0+):', {
+        console.log('[ImportExportService] Calling export_to_json_schema with workspace (SDK 1.8.1+):', {
           tableCount: exportWorkspace.tables.length,
           relationshipCount: exportWorkspace.relationships.length,
           hasConstraints: exportWorkspace.tables.some(t => 
@@ -1526,7 +1526,7 @@ class ImportExportService {
    * Export to Protobuf Schema
    * Uses API when online, WASM SDK when offline
    * 
-   * Note: SDK v1.7.0+ includes enhanced Protobuf export/import support with improved validation
+   * Note: SDK v1.8.1+ includes enhanced Protobuf export/import support with improved validation
    */
   async exportToProtobuf(workspace: ODCSWorkspace, _options?: Record<string, unknown>): Promise<string> {
     const mode = await sdkModeDetector.getMode();

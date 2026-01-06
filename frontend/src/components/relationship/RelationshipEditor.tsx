@@ -173,8 +173,9 @@ export const RelationshipEditor: React.FC<RelationshipEditorProps> = ({
         });
 
         if (!reverseRelationship) {
-          // Create reverse relationship
-          const reverseId = typeof crypto !== 'undefined' ? crypto.randomUUID() : `rel-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+          // Create reverse relationship - always use UUIDs
+          const { generateUUID } = await import('@/utils/validation');
+          const reverseId = generateUUID();
           const reverseRel: Relationship = {
             id: reverseId,
             workspace_id: updatedRelationship.workspace_id,

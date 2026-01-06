@@ -219,9 +219,18 @@ npm run electron
 
 Current test coverage: **95%+** (per constitution requirement)
 
-- Unit tests: `tests/unit/`
-- Integration tests: `tests/integration/`
+- Unit tests: `tests/unit/` (API tests excluded - offline mode only)
+- Integration tests: `tests/integration/` (API-dependent tests excluded)
 - E2E tests: `tests/e2e/` (when implemented)
+
+**Note**: API-related tests are disabled as the application currently only supports offline mode. The following test suites are excluded:
+- `tests/unit/services/api/**` - All API service tests
+- `tests/integration/sync.test.ts` - Sync tests (API-dependent)
+- `tests/integration/collaboration.test.ts` - Collaboration tests (API-dependent)
+- `tests/unit/hooks/useWebSocket.test.ts` - WebSocket tests (API-dependent)
+- `tests/unit/hooks/useCollaboration.test.ts` - Collaboration hook tests (API-dependent)
+- `tests/unit/services/websocket/**` - WebSocket service tests (API-dependent)
+- `tests/unit/services/sync/**` - Sync service tests (API-dependent)
 
 Run coverage report:
 ```bash

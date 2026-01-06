@@ -1,40 +1,9 @@
 # Multi-stage build for frontend with WASM SDK
-# Stage 1: Build Rust SDK and WASM
-FROM rust:latest AS rust-builder
-
-WORKDIR /sdk
-
-# Install wasm-pack for building WASM SDK
-RUN curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
-
-# Clone and build the latest data-modelling-sdk
-# Uses the latest version from the main branch
-# For production, you may want to use a specific version/tag
-ARG SDK_REPO_URL=https://github.com/pixie79/data-modelling-sdk.git
-ARG SDK_VERSION=main
-
-# Clone SDK repository (with error handling)
-RUN git clone --depth 1 --branch ${SDK_VERSION} ${SDK_REPO_URL} . 2>&1 | tee /tmp/clone.log || \
-    (echo "⚠️  SDK repository clone failed - check /tmp/clone.log" && \
-     echo "   This is not fatal - build will continue and try local WASM build" && \
-     mkdir -p pkg)
-
-# Build WASM SDK if Cargo.toml exists (with wasm and openapi features)
-RUN if [ -f "Cargo.toml" ]; then \
-        echo "✅ Building WASM SDK from latest source (version: ${SDK_VERSION})..." && \
-        wasm-pack build --target web --out-dir pkg --features wasm,openapi 2>&1 | tee /tmp/wasm-build.log && \
-        echo "✅ WASM SDK built successfully"; \
-    else \
-        echo "⚠️  SDK Cargo.toml not found - WASM build skipped" && \
-        echo "   Build will continue and try local WASM build or use existing files" && \
-        mkdir -p pkg; \
-    fi
-
-# Stage 2: Build the frontend application
+# Stage 1: Build the frontend application
 FROM node:20-alpine AS builder
 
-# Install bash for build scripts (Alpine uses dash by default)
-RUN apk add --no-cache bash
+# Install bash and curl for build scripts and WASM SDK download
+RUN apk add --no-cache bash curl
 
 WORKDIR /app
 
@@ -42,6 +11,8 @@ WORKDIR /app
 ARG VITE_OFFLINE_MODE=true
 ARG VITE_API_BASE_URL=
 ARG VITE_WS_BASE_URL=
+ARG WASM_SDK_VERSION=latest
+ARG WASM_SDK_REPO=pixie79/data-modelling-sdk
 
 # Set environment variables for build
 ENV VITE_OFFLINE_MODE=${VITE_OFFLINE_MODE}
@@ -55,25 +26,55 @@ COPY package*.json ./
 # Install dependencies
 RUN npm ci
 
-# Copy source code
-COPY . .
-
-# Copy WASM SDK build from rust-builder if available
-COPY --from=rust-builder /sdk/pkg /tmp/sdk-pkg
-
-# Copy WASM SDK to public/wasm if built successfully
-RUN if [ -d "/tmp/sdk-pkg" ] && [ -f "/tmp/sdk-pkg/data_modelling_sdk.js" ]; then \
-        echo "Copying WASM SDK from Docker build..." && \
-        mkdir -p public/wasm && \
-        cp -r /tmp/sdk-pkg/* public/wasm/ && \
-        echo "✅ WASM SDK copied successfully from Docker build"; \
+# Download WASM SDK from GitHub Releases (REQUIRED)
+RUN set -e && \
+    echo "📥 Downloading WASM SDK from GitHub Releases (REQUIRED)..." && \
+    if [ "${WASM_SDK_VERSION}" = "latest" ]; then \
+        echo "   Fetching latest release tag..." && \
+        RELEASE_TAG=$(curl -s "https://api.github.com/repos/${WASM_SDK_REPO}/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/' || echo "") && \
+        if [ -z "$RELEASE_TAG" ]; then \
+            echo "❌ ERROR: Could not fetch latest release tag from ${WASM_SDK_REPO}" && \
+            echo "   Please ensure the SDK repository has published releases" && \
+            echo "   Or set WASM_SDK_VERSION build arg to a specific version (e.g., 1.7.0)" && \
+            exit 1; \
+        fi && \
+        VERSION_NUM=${RELEASE_TAG#v} && \
+        echo "   Latest release: ${RELEASE_TAG} (version ${VERSION_NUM})"; \
     else \
-        echo "⚠️  WASM SDK not found in Docker build - will try local build or use existing"; \
+        VERSION_NUM=${WASM_SDK_VERSION} && \
+        RELEASE_TAG="v${WASM_SDK_VERSION}" && \
+        echo "   Using specified version: ${VERSION_NUM}"; \
+    fi && \
+    ARCHIVE_URL="https://github.com/${WASM_SDK_REPO}/releases/download/${RELEASE_TAG}/data-modelling-sdk-wasm-v${VERSION_NUM}.tar.gz" && \
+    ARCHIVE_FILE="wasm-sdk.tar.gz" && \
+    echo "   Downloading from: ${ARCHIVE_URL}" && \
+    if curl -L -f -o "$ARCHIVE_FILE" "$ARCHIVE_URL"; then \
+        echo "✅ Downloaded WASM SDK successfully" && \
+        mkdir -p public/wasm && \
+        tar -xzf "$ARCHIVE_FILE" -C public/wasm && \
+        if [ ! -f "public/wasm/data_modelling_sdk.js" ]; then \
+            echo "❌ ERROR: WASM SDK extraction failed - data_modelling_sdk.js not found" && \
+            rm -f "$ARCHIVE_FILE" && \
+            exit 1; \
+        fi && \
+        rm -f "$ARCHIVE_FILE" && \
+        echo "✅ WASM SDK installed to public/wasm"; \
+    else \
+        echo "❌ ERROR: Failed to download WASM SDK from GitHub Releases" && \
+        echo "   URL: ${ARCHIVE_URL}" && \
+        echo "   The WASM SDK is REQUIRED for this application" && \
+        echo "" && \
+        echo "   Troubleshooting:" && \
+        echo "   1. Ensure the SDK repository (${WASM_SDK_REPO}) has published a release with tag ${RELEASE_TAG}" && \
+        echo "   2. Check that the release includes data-modelling-sdk-wasm-v${VERSION_NUM}.tar.gz" && \
+        echo "   3. Verify network connectivity to GitHub" && \
+        echo "   4. Try setting WASM_SDK_VERSION build arg to a different version" && \
+        rm -f "$ARCHIVE_FILE" && \
+        exit 1; \
     fi
 
-# Build WASM SDK locally if not already built (fallback)
-# This allows building even if SDK repo wasn't available during Docker build
-RUN npm run build:wasm || echo "⚠️  Local WASM build skipped (may use existing files)"
+# Copy source code
+COPY . .
 
 # Build the frontend application
 # Note: TypeScript errors are checked in CI/CD, but we allow Docker builds to proceed
@@ -81,7 +82,7 @@ RUN npm run build:wasm || echo "⚠️  Local WASM build skipped (may use existi
 # Use npx vite build directly to skip tsc checking in Docker (type checking happens in CI)
 RUN npx vite build --mode production
 
-# Stage 3: Production server with nginx
+# Stage 2: Production server with nginx
 FROM nginx:alpine
 
 # Copy built files from builder

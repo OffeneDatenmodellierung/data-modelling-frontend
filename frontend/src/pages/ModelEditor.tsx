@@ -521,9 +521,10 @@ const ModelEditor: React.FC = () => {
                 setSelectedDomain(firstDomain.id);
               }
             } else {
-              // Create a default domain if none exist
+              // Create a default domain if none exist - always use UUID
+              const { generateUUID } = await import('@/utils/validation');
               const defaultDomain = {
-                id: `domain-${workspaceId}`,
+                id: generateUUID(),
                 workspace_id: workspaceId,
                 name: 'Default',
                 model_type: 'conceptual' as const,

@@ -247,7 +247,11 @@ class LocalFileService {
     }
 
     // Use workspace ID from workspace.yaml if available, otherwise generate one
-    const workspaceId = workspaceMetadata?.id || `workspace-${Date.now()}`;
+    // Always use UUIDs for workspace IDs
+    const { generateUUID, isValidUUID } = await import('@/utils/validation');
+    const workspaceId = (workspaceMetadata?.id && isValidUUID(workspaceMetadata.id))
+      ? workspaceMetadata.id
+      : generateUUID();
     const domains: DomainType[] = [];
     const allTables: Table[] = [];
     const allRelationships: Relationship[] = [];
@@ -267,7 +271,6 @@ class LocalFileService {
     }
 
     // Process each domain folder
-    let domainIndex = 0;
     for (const [domainName, domainData] of domainMap.entries()) {
       // Load domain.yaml if present to get the actual domain ID, systems, and relationships
       // domain.yaml now contains domain metadata, systems, and relationships (merged structure)
@@ -331,8 +334,13 @@ class LocalFileService {
       }
 
       // Use domain ID from domain.yaml if available, otherwise generate one
-      const domainId = domainMetadata.id || `domain-${workspaceId}-${domainIndex++}`;
-      console.log(`[LocalFileService] Using domain ID for ${domainName}: ${domainId} (from domain.yaml: ${domainMetadata.id || 'generated'})`);
+      // Preserve domain ID from domain.yaml even if not a valid UUID (for backward compatibility with old files)
+      // Only generate a new UUID if domain.yaml doesn't have an ID at all
+      const { generateUUID, isValidUUID } = await import('@/utils/validation');
+      const domainId = domainMetadata.id 
+        ? domainMetadata.id  // Use ID from domain.yaml as-is, even if not a valid UUID
+        : generateUUID(); // Only generate if no ID present
+      console.log(`[LocalFileService] Using domain ID for ${domainName}: ${domainId} (from domain.yaml: ${domainMetadata.id ? 'yes' : 'generated UUID'}, isValidUUID: ${isValidUUID(domainId)})`);
 
       // If systems weren't loaded from domain.yaml, try loading from systems.yaml (backward compatibility)
       if (domainSystems.length === 0 && domainData.files.systems) {
@@ -757,8 +765,14 @@ class LocalFileService {
     
     // Convert ODCSWorkspace to Workspace format
     // ODCS files contain tables and relationships, but Workspace needs id, name, etc.
-    const workspaceId = odcsWorkspace.workspace_id || `workspace-${Date.now()}`;
-    const domainId = odcsWorkspace.domain_id || `domain-${workspaceId}`;
+    // Always use UUIDs for workspace and domain IDs
+    const { generateUUID, isValidUUID } = await import('@/utils/validation');
+    const workspaceId = (odcsWorkspace.workspace_id && isValidUUID(odcsWorkspace.workspace_id))
+      ? odcsWorkspace.workspace_id
+      : generateUUID();
+    const domainId = (odcsWorkspace.domain_id && isValidUUID(odcsWorkspace.domain_id))
+      ? odcsWorkspace.domain_id
+      : generateUUID();
     
     const workspace: Workspace & { tables?: any[]; relationships?: any[] } = {
       id: workspaceId,

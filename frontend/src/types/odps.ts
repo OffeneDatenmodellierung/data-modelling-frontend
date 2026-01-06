@@ -16,6 +16,8 @@ export interface DataProduct {
   custom_properties?: Record<string, unknown>;
   created_at: string; // ISO timestamp
   last_modified_at: string; // ISO timestamp
+  // Store raw ODPS data for round-trip preservation
+  _odps_raw?: any; // Full ODPS structure as parsed from YAML
 }
 
 export interface ODPSInputPort {

@@ -200,18 +200,35 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             if (mode === 'offline') {
               // In offline mode, create workspace with default domain
               const modelStoreModule = await import('@/stores/modelStore');
-              const { generateUUID } = await import('@/utils/validation');
+              const { generateUUID, isValidUUID } = await import('@/utils/validation');
+              
+              // Generate workspace ID first
+              const newWorkspaceId = generateUUID();
+              
+              // Create default domain with proper workspace_id
+              // Ensure domain ID is always a valid UUID
+              const domainId = generateUUID();
+              if (!isValidUUID(domainId)) {
+                throw new Error(`Failed to generate valid UUID for domain: ${domainId}`);
+              }
+              
               const defaultDomain = {
-                id: generateUUID(),
-                workspace_id: generateUUID(),
+                id: domainId, // Domain ID must be a valid UUID
+                workspace_id: newWorkspaceId, // Use the workspace ID, not a new UUID
                 name: request.name || 'Default Domain',
                 is_primary: true,
                 created_at: new Date().toISOString(),
                 last_modified_at: new Date().toISOString(),
               };
               
+              // Validate domain ID before creating workspace
+              if (!isValidUUID(defaultDomain.id)) {
+                console.error(`[WorkspaceStore] Invalid domain ID created: ${defaultDomain.id}`);
+                throw new Error(`Invalid domain ID: ${defaultDomain.id}`);
+              }
+              
               const newWorkspace: Workspace = {
-                id: generateUUID(),
+                id: newWorkspaceId,
                 name: request.name || 'Untitled Workspace',
                 owner_id: 'offline-user',
                 created_at: new Date().toISOString(),
@@ -219,12 +236,20 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                 domains: [defaultDomain],
               };
               
+              // Validate workspace domain ID before setting
+              if (newWorkspace.domains && newWorkspace.domains[0] && !isValidUUID(newWorkspace.domains[0].id)) {
+                console.error(`[WorkspaceStore] Invalid domain ID in workspace: ${newWorkspace.domains[0].id}`);
+                throw new Error(`Invalid domain ID in workspace: ${newWorkspace.domains[0].id}`);
+              }
+              
               modelStoreModule.useModelStore.getState().setDomains([defaultDomain]);
               set((state) => ({
                 workspaces: [...state.workspaces, newWorkspace],
                 currentWorkspaceId: newWorkspace.id,
                 isLoading: false,
               }));
+              
+              console.log(`[WorkspaceStore] Created workspace with domain ID: ${defaultDomain.id} (isValidUUID: ${isValidUUID(defaultDomain.id)})`);
               return newWorkspace;
             }
 
@@ -665,26 +690,31 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           const uiStoreModule = await import('@/stores/uiStore');
           
           if (mode === 'offline' && platform === 'browser') {
-            // Browser mode: Always prompt for directory access
+            // Browser mode: Check for cached directory handle first, only prompt if not available
             try {
               const { browserFileService } = await import('@/services/platform/browser');
               const { localFileService } = await import('@/services/storage/localFileService');
               const modelStoreModule = await import('@/stores/modelStore');
               const { tables, relationships, domains, products, computeAssets, bpmnProcesses, dmnDecisions, systems } = modelStoreModule.useModelStore.getState();
               
-              // Always request directory access (prompt user)
-              const directoryHandle = await browserFileService.requestDirectoryAccess(workspace.name || workspace.id);
+              // Check for cached directory handle first
+              let directoryHandle: FileSystemDirectoryHandle | null | undefined = browserFileService.getCachedDirectoryHandle(workspace.name || workspace.id);
               
               if (!directoryHandle) {
-                // User cancelled - offer ZIP download instead
-                const useZip = window.confirm(
-                  'Directory access was cancelled. Would you like to download a ZIP file with all domains instead?'
-                );
+                // No cached handle - request directory access (prompt user)
+                directoryHandle = await browserFileService.requestDirectoryAccess(workspace.name || workspace.id);
                 
-                if (!useZip) {
-                  return;
+                if (!directoryHandle) {
+                  // User cancelled - offer ZIP download instead
+                  const useZip = window.confirm(
+                    'Directory access was cancelled. Would you like to download a ZIP file with all domains instead?'
+                  );
+                  
+                  if (!useZip) {
+                    return;
+                  }
+                  // Note: Directory handle is not cached if user cancels, so auto-save will use IndexedDB only
                 }
-                // Note: Directory handle is not cached if user cancels, so auto-save will use IndexedDB only
               }
               // Directory handle is automatically cached by requestDirectoryAccess if granted
               // This allows auto-save to use the same directory in future saves
@@ -841,6 +871,52 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         autoSaveEnabled: state.autoSaveEnabled,
         lastSavedAt: state.lastSavedAt,
       }),
+      onRehydrateStorage: () => async (state, error) => {
+        if (error) {
+          console.error('[WorkspaceStore] Error rehydrating from storage:', error);
+          return;
+        }
+        
+        // Normalize domain IDs when loading from persisted state
+        // This ensures old workspaces with non-UUID domain IDs are migrated to UUIDs
+        if (state?.workspaces && Array.isArray(state.workspaces)) {
+          const { generateUUID, isValidUUID } = await import('@/utils/validation');
+          let needsUpdate = false;
+          
+          const normalizedWorkspaces = state.workspaces.map((workspace) => {
+            if (!workspace.domains || !Array.isArray(workspace.domains)) {
+              return workspace;
+            }
+            
+            const normalizedDomains = workspace.domains.map((domain) => {
+              // If domain ID is not a valid UUID, generate a new one
+              if (!domain.id || !isValidUUID(domain.id)) {
+                console.warn(`[WorkspaceStore] Normalizing invalid domain ID "${domain.id}" to UUID for domain "${domain.name}"`);
+                needsUpdate = true;
+                return {
+                  ...domain,
+                  id: generateUUID(),
+                };
+              }
+              return domain;
+            });
+            
+            return {
+              ...workspace,
+              domains: normalizedDomains,
+            };
+          });
+          
+          // If any domains were normalized, update the state
+          if (needsUpdate) {
+            // Update state with normalized workspaces
+            state.workspaces = normalizedWorkspaces;
+            // Persist the normalized state back to storage
+            const store = useWorkspaceStore.getState();
+            store.setWorkspaces(normalizedWorkspaces);
+          }
+        }
+      },
     }
   )
 );

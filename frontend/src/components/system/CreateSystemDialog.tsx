@@ -87,8 +87,9 @@ export const CreateSystemDialog: React.FC<CreateSystemDialogProps> = ({
         });
         onCreated(editingSystemId);
       } else {
-        // Create new system
-        const systemId = `system-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        // Create new system - always use UUIDs
+        const { generateUUID } = await import('@/utils/validation');
+        const systemId = generateUUID();
 
         const newSystem: System = {
           id: systemId,
@@ -146,7 +147,9 @@ export const CreateSystemDialog: React.FC<CreateSystemDialogProps> = ({
         return;
       }
 
-      const systemId = `system-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      // Always use UUIDs for system IDs
+      const { generateUUID } = await import('@/utils/validation');
+      const systemId = generateUUID();
       const newSystem: System = {
         id: systemId,
         domain_id: domainId,

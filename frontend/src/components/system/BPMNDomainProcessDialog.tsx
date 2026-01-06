@@ -80,10 +80,11 @@ export const BPMNDomainProcessDialog: React.FC<BPMNDomainProcessDialogProps> = (
           message: 'BPMN process updated successfully',
         });
       } else {
-        // Create new process
+        // Create new process - always use UUIDs
+        const { generateUUID } = await import('@/utils/validation');
         const newProcess: BPMNProcess = {
           ...process,
-          id: typeof crypto !== 'undefined' ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
+          id: generateUUID(),
           name: processName,
           domain_id: domainId,
           created_at: new Date().toISOString(),

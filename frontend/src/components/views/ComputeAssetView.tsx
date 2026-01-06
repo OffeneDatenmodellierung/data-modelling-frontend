@@ -41,10 +41,11 @@ export const ComputeAssetView: React.FC<ComputeAssetViewProps> = ({ domainId }) 
           name: name.trim() || process.name || 'Untitled Process',
         });
       } else {
-        // Create new process and link to asset
+        // Create new process and link to asset - always use UUIDs
+        const { generateUUID } = await import('@/utils/validation');
         const newProcess = {
           ...process,
-          id: typeof crypto !== 'undefined' ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
+          id: generateUUID(),
           name: name.trim() || process.name || 'Untitled Process',
           domain_id: domainId,
         };

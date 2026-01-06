@@ -52,9 +52,8 @@ describe('Offline Mode Integration', () => {
   describe('offline workspace creation', () => {
     it('should create workspace in offline mode', () => {
       const workspace: Workspace = {
-        id: 'offline-workspace-1',
+        id: 'd6fdd0ef-1e66-4c91-aa2f-c8ce7c0a8c37',
         name: 'Offline Workspace',
-        type: 'personal',
         owner_id: 'offline-user',
         created_at: new Date().toISOString(),
         last_modified_at: new Date().toISOString(),
@@ -69,7 +68,7 @@ describe('Offline Mode Integration', () => {
     it('should create tables in offline mode', () => {
       const table: Table = {
         id: 'table-1',
-        workspace_id: 'offline-workspace-1',
+        workspace_id: 'd6fdd0ef-1e66-4c91-aa2f-c8ce7c0a8c37',
         primary_domain_id: 'domain-1',
         name: 'Test Table',
         model_type: 'conceptual',
@@ -93,9 +92,8 @@ describe('Offline Mode Integration', () => {
   describe('offline workspace save', () => {
     it('should save workspace to local file', async () => {
       const workspace: Workspace = {
-        id: 'offline-workspace-1',
+        id: 'd6fdd0ef-1e66-4c91-aa2f-c8ce7c0a8c37',
         name: 'Offline Workspace',
-        type: 'personal',
         owner_id: 'offline-user',
         created_at: new Date().toISOString(),
         last_modified_at: new Date().toISOString(),
@@ -117,8 +115,9 @@ describe('Offline Mode Integration', () => {
       const mockFile = new File(['yaml-content'], 'workspace.yaml', { type: 'text/yaml' });
       
       vi.mocked(browserFileService.readFile).mockResolvedValue('yaml-content');
+      const expectedWorkspaceId = 'd6fdd0ef-1e66-4c91-aa2f-c8ce7c0a8c37';
       vi.mocked(odcsService.parseYAML).mockResolvedValue({
-        workspace_id: 'offline-workspace-1',
+        workspace_id: expectedWorkspaceId,
         tables: [],
         relationships: [],
         data_flow_diagrams: [],
@@ -127,7 +126,8 @@ describe('Offline Mode Integration', () => {
       const loadedWorkspace = await localFileService.loadWorkspace(mockFile);
 
       expect(loadedWorkspace).toBeDefined();
-      expect(loadedWorkspace.id).toBe('offline-workspace-1');
+      // The loadWorkspace method uses workspace_id from parsed YAML if it's a valid UUID, otherwise generates one
+      expect(loadedWorkspace.id).toBe(expectedWorkspaceId);
       expect(browserFileService.readFile).toHaveBeenCalledWith(mockFile);
       expect(odcsService.parseYAML).toHaveBeenCalledWith('yaml-content');
     });

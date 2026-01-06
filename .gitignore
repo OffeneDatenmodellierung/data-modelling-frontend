@@ -73,4 +73,7 @@ public/wasm/*.wasm
 
 docker-compose.override.yml
 
+# Husky
+.husky/_/
+
 

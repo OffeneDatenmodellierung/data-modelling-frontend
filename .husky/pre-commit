@@ -1,0 +1,33 @@
+#!/usr/bin/env sh
+# Husky v9+ - no longer need to source husky.sh
+
+# Run pre-commit checks from frontend directory
+cd frontend || exit
+
+# Run lint-staged (handles linting and formatting on staged files)
+echo "🔍 Running lint-staged (linting and formatting)..."
+npm run pre-commit || {
+  echo "❌ Lint-staged failed. Please fix linting/formatting issues before committing."
+  exit 1
+}
+
+# Run type check
+echo "🔍 Running type check..."
+npm run type-check || {
+  echo "❌ Type check failed. Please fix TypeScript errors before committing."
+  exit 1
+}
+
+# Run tests
+echo "🧪 Running tests..."
+npm test -- --run || {
+  echo "❌ Tests failed. Please fix failing tests before committing."
+  exit 1
+}
+
+# Run security audit (non-blocking, but will show warnings)
+echo "🔒 Running security audit..."
+npm run security:audit -- --audit-level=moderate || {
+  echo "⚠️  Security audit found issues (non-blocking). Review and fix when possible."
+}
+

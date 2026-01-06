@@ -457,9 +457,20 @@ class ElectronFileService {
       const parsed = yaml.load(domainContent) as any;
       
       // Extract domain metadata - use ID from workspace.yaml if available, then domain.yaml, otherwise generate
-      const domainId = domainIdFromWorkspace || parsed?.id || `domain-${Date.now()}`;
-      const source = domainIdFromWorkspace ? 'workspace.yaml' : (parsed?.id ? 'domain.yaml' : 'generated');
-      console.log(`[ElectronFileService] Using domain ID for ${domainName}: ${domainId} (from ${source})`);
+      // Preserve domain ID from files even if not a valid UUID (for backward compatibility with old files)
+      // Only generate a new UUID if no ID is present at all
+      const { generateUUID, isValidUUID } = await import('@/utils/validation');
+      const domainId = domainIdFromWorkspace
+        ? domainIdFromWorkspace  // Use ID from workspace.yaml as-is, even if not a valid UUID
+        : parsed?.id
+        ? parsed.id  // Use ID from domain.yaml as-is, even if not a valid UUID
+        : generateUUID(); // Only generate if no ID present
+      const source = domainIdFromWorkspace
+        ? 'workspace.yaml' 
+        : parsed?.id
+        ? 'domain.yaml' 
+        : 'generated UUID';
+      console.log(`[ElectronFileService] Using domain ID for ${domainName}: ${domainId} (from ${source}, isValidUUID: ${isValidUUID(domainId)})`);
       
       domain = {
         id: domainId,

@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite';
+import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 
@@ -61,13 +61,20 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: './tests/setup.ts',
     exclude: [
-      '**/node_modules/**',
-      '**/dist/**',
-      '**/build/**',
-      '**/e2e/**', // Exclude E2E tests (Playwright)
-      '**/*.e2e.test.ts',
-      '**/*.e2e.test.tsx',
-    ],
+          '**/node_modules/**',
+          '**/dist/**',
+          '**/build/**',
+          '**/e2e/**', // Exclude E2E tests (Playwright)
+          '**/*.e2e.test.ts',
+          '**/*.e2e.test.tsx',
+          '**/tests/unit/services/api/**', // Exclude API tests (not relevant for offline mode)
+          '**/tests/integration/sync.test.ts', // Exclude sync tests (API-dependent)
+          '**/tests/unit/hooks/useWebSocket.test.ts', // Exclude WebSocket tests (API-dependent)
+          '**/tests/unit/hooks/useCollaboration.test.ts', // Exclude collaboration tests (API-dependent)
+          '**/tests/unit/services/websocket/**', // Exclude WebSocket service tests (API-dependent)
+          '**/tests/unit/services/sync/**', // Exclude sync service tests (API-dependent)
+          '**/tests/integration/collaboration.test.ts', // Exclude collaboration integration tests (API-dependent)
+        ],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],

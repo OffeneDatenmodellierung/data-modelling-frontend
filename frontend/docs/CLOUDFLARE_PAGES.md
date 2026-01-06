@@ -8,7 +8,13 @@ When configuring in Cloudflare Pages dashboard, you need to set:
 
 ✅ **Build command**: `cd frontend && bash cloudflare-build.sh`  
 ✅ **Build output directory**: `frontend/dist`  
-✅ **Environment variables** (after project creation): `VITE_OFFLINE_MODE=true`, `VITE_BASE_PATH=/`  
+✅ **Environment variables** (after project creation): 
+   - `VITE_OFFLINE_MODE=true` (required)
+   - `VITE_BASE_PATH=/` (required)
+   - `WASM_SDK_VERSION=latest` (optional - defaults to latest release, or specify version like `1.8.1`)
+   - `WASM_SDK_REPO=pixie79/data-modelling-sdk` (optional - defaults to pixie79/data-modelling-sdk)
+   
+**Important**: The WASM SDK is **REQUIRED** - the build will fail if it cannot be downloaded. Do not set `CLOUDFLARE_SKIP_WASM` unless you understand the consequences.  
 
 **Note**: You don't need to select a framework preset - the custom build command handles everything. Just fill in the build command and output directory fields.
 
@@ -110,18 +116,23 @@ Set these in Cloudflare Pages dashboard → **Settings** → **Environment varia
 
 - `VITE_OFFLINE_MODE`: `true` (required for offline mode)
 - `VITE_BASE_PATH`: `/` (or your custom path)
-- `SDK_REPO_URL`: `https://github.com/pixie79/data-modelling-sdk.git` (optional, if using submodule)
-- `SDK_VERSION`: `main` (or specific version/tag)
+- `WASM_SDK_VERSION`: `latest` (optional - downloads latest pre-built WASM SDK from GitHub Releases, or specify version like `1.8.1`)
+- `WASM_SDK_REPO`: `pixie79/data-modelling-sdk` (optional - GitHub repo for WASM SDK releases)
+
+**Important**: The WASM SDK is **REQUIRED** - the build will fail if it cannot be downloaded. The build script automatically downloads pre-built WASM SDK from GitHub Releases (published by the SDK repository's CI/CD), which takes only seconds instead of building from source (15-20+ minutes).
 
 ### Build Command Details
 
 The build command `cd frontend && bash cloudflare-build.sh` runs a script that:
 
-1. **Installs Rust** (if not already installed) - takes ~2-3 minutes on first build
-2. **Installs wasm-pack** (if not already installed) - takes ~1 minute
-3. **Builds the WASM SDK** with `wasm` and `openapi` features enabled
-4. **Installs npm dependencies** (`npm ci`)
-5. **Builds the frontend application** (`npm run build`)
+1. **Installs npm dependencies** (`npm ci`) - takes ~1-2 minutes
+2. **Downloads pre-built WASM SDK** (REQUIRED):
+   - Downloads from GitHub Releases (latest or specified version) - takes ~10-30 seconds
+   - Extracts to `public/wasm/` directory
+   - **Build will fail if download fails** - WASM SDK is required
+3. **Builds the frontend application** (`npm run build`) - takes ~2-3 minutes
+
+**Note**: The WASM SDK is pre-built and published by the SDK repository's CI/CD, so Cloudflare Pages only needs to download it (fast) instead of building from source (slow). Total build time: ~3-5 minutes. The WASM SDK is **REQUIRED** - ensure the SDK repository has published releases before deploying.
 
 **Important**: Make sure the `cloudflare-build.sh` file has execute permissions. If it doesn't, Cloudflare Pages will fail. The script is already set with execute permissions in the repository.
 
@@ -130,7 +141,7 @@ The build command `cd frontend && bash cloudflare-build.sh` runs a script that:
 This directory contains:
 - `index.html` - Main HTML file
 - `assets/` - JavaScript and CSS bundles
-- `wasm/` - WASM SDK files (data_modelling_sdk.js, data_modelling_sdk_bg.wasm, etc.)
+- `wasm/` - WASM SDK files (data_modelling_sdk.js, data_modelling_sdk_bg.wasm, etc.) - **REQUIRED**
 - `_redirects` - SPA routing configuration
 
 ## SDK Build with OpenAPI Feature
@@ -210,7 +221,7 @@ If WASM files fail to load in production:
 If OpenAPI import/export doesn't work:
 
 1. **Verify SDK build**: Check build logs to ensure `--features wasm,openapi` was used
-2. **Check SDK version**: Ensure SDK version is 1.7.0+ (supports openapi feature)
+2. **Check SDK version**: Ensure SDK version is 1.8.1+ (supports openapi feature and proper ODPS import/export)
 3. **Rebuild**: Force a rebuild by clearing Cloudflare Pages cache
 
 ## Custom Domain
@@ -232,9 +243,13 @@ You can configure branch-specific settings in **Settings** → **Builds & deploy
 
 ## Build Time Considerations
 
-- **First build**: ~10-15 minutes (installs Rust, wasm-pack, builds SDK)
-- **Subsequent builds**: ~5-8 minutes (cached dependencies)
-- **Build timeout**: Cloudflare Pages has a 20-minute timeout (should be sufficient)
+- **With pre-built WASM SDK** (default - downloads from GitHub Releases):
+  - First build: ~3-5 minutes (npm install + WASM download + frontend build)
+  - Subsequent builds: ~2-3 minutes (cached dependencies)
+  - **No timeout risk**: Well within Cloudflare Pages limits
+  - **Functionality**: Full WASM features (REQUIRED)
+
+**Note**: The WASM SDK is automatically downloaded from GitHub Releases (published by the SDK repo's CI/CD), eliminating the need to build from source and avoiding timeouts. The WASM SDK is **REQUIRED** - builds will fail if it cannot be downloaded.
 
 ## File Structure
 

@@ -1,75 +1,66 @@
 #!/bin/bash
-# Build WASM SDK and copy to frontend/public/wasm/
+# Download pre-built WASM SDK from GitHub releases and copy to frontend/public/wasm/
 
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FRONTEND_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-PROJECT_ROOT="$(cd "$FRONTEND_DIR/.." && pwd)"
-
-# Try multiple possible SDK locations
-SDK_DIR=""
-for possible_path in "$PROJECT_ROOT/data-modelling-sdk" "$PROJECT_ROOT/../data-modelling-sdk" "$FRONTEND_DIR/../data-modelling-sdk"; do
-  if [ -d "$possible_path" ] && [ -f "$possible_path/Cargo.toml" ]; then
-    SDK_DIR="$possible_path"
-    break
-  fi
-done
-
 WASM_OUT_DIR="$FRONTEND_DIR/public/wasm"
+SDK_VERSION="1.8.3"
+GITHUB_REPO="pixie79/data-modelling-sdk"
+RELEASE_URL="https://github.com/$GITHUB_REPO/releases/download/v$SDK_VERSION/wasm-pkg.tar.gz"
 
-echo "Building WASM SDK (requires data-modelling-sdk version 1.7.0+)..."
+echo "Downloading pre-built WASM SDK v$SDK_VERSION from GitHub releases..."
 
-# Check if SDK directory exists
-if [ -z "$SDK_DIR" ]; then
-  echo "⚠️  Warning: SDK directory not found"
-  echo "   Searched in:"
-  echo "     - $PROJECT_ROOT/data-modelling-sdk"
-  echo "     - $PROJECT_ROOT/../data-modelling-sdk"
-  echo "     - $FRONTEND_DIR/../data-modelling-sdk"
-  echo ""
-      echo "   The WASM SDK is optional - offline mode will use a JavaScript YAML parser fallback."
-      echo "   To build the SDK, ensure data-modelling-sdk (version 1.7.0+) is available and contains Cargo.toml"
-  exit 0  # Exit successfully - this is not a fatal error
-fi
+# Create temporary directory for download
+TMP_DIR=$(mktemp -d)
+trap "rm -rf $TMP_DIR" EXIT
 
-echo "✅ Found SDK at: $SDK_DIR"
-
-# Check SDK version (if Cargo.toml exists)
-if [ -f "$SDK_DIR/Cargo.toml" ]; then
-  SDK_VERSION=$(grep -E '^version\s*=' "$SDK_DIR/Cargo.toml" | head -1 | sed 's/.*version\s*=\s*"\([^"]*\)".*/\1/' || echo "")
-  if [ -n "$SDK_VERSION" ]; then
-    echo "   SDK version: $SDK_VERSION"
-    # Check if version is 1.7.0 or higher
-    if [ "$(printf '%s\n' "1.7.0" "$SDK_VERSION" | sort -V | head -n1)" != "1.7.0" ]; then
-      echo "   ⚠️  Warning: Expected version 1.7.0+, found $SDK_VERSION"
-      echo "   The application requires data-modelling-sdk >= \"1.7.0\" for enhanced AVRO/Protobuf/JSON Schema export/import support"
-      echo "   Some features may not work correctly with older SDK versions"
-    else
-      echo "   ✅ SDK version $SDK_VERSION meets requirements (>= 1.7.0)"
-    fi
+# Download the pre-built WASM package
+echo "   Downloading from: $RELEASE_URL"
+if command -v curl &> /dev/null; then
+  if ! curl -L -f -o "$TMP_DIR/wasm-pkg.tar.gz" "$RELEASE_URL"; then
+    echo "   ❌ Error: Failed to download pre-built WASM from GitHub releases"
+    echo "   Please check:"
+    echo "     - Internet connection is available"
+    echo "     - GitHub release v$SDK_VERSION exists at $GITHUB_REPO"
+    echo "     - The release contains wasm-pkg.tar.gz asset"
+    exit 1
   fi
-fi
-
-# Check if wasm-pack is installed
-if ! command -v wasm-pack &> /dev/null; then
-  echo "Error: wasm-pack is not installed"
-  echo "Install it with: cargo install wasm-pack"
+elif command -v wget &> /dev/null; then
+  if ! wget -O "$TMP_DIR/wasm-pkg.tar.gz" "$RELEASE_URL"; then
+    echo "   ❌ Error: Failed to download pre-built WASM from GitHub releases"
+    echo "   Please check:"
+    echo "     - Internet connection is available"
+    echo "     - GitHub release v$SDK_VERSION exists at $GITHUB_REPO"
+    echo "     - The release contains wasm-pkg.tar.gz asset"
+    exit 1
+  fi
+else
+  echo "   ❌ Error: Neither curl nor wget is available for downloading"
+  echo "   Please install curl or wget to download the WASM SDK"
   exit 1
 fi
 
-# Build WASM SDK with wasm and openapi features
-cd "$SDK_DIR"
-echo "Building WASM module in $SDK_DIR..."
-wasm-pack build --target web --out-dir pkg --features wasm,openapi
+echo "   ✅ Downloaded WASM package (v$SDK_VERSION)"
+
+# Extract the archive
+echo "   Extracting WASM files..."
+cd "$TMP_DIR"
+tar -xzf wasm-pkg.tar.gz
 
 # Create wasm output directory if it doesn't exist
 mkdir -p "$WASM_OUT_DIR"
 
 # Copy WASM files to frontend/public/wasm/
-echo "Copying WASM files to $WASM_OUT_DIR..."
-cp -r "$SDK_DIR/pkg"/* "$WASM_OUT_DIR/"
+echo "   Copying WASM files to $WASM_OUT_DIR..."
+cp -r pkg/* "$WASM_OUT_DIR/" 2>/dev/null || {
+  # If pkg/ doesn't exist, try copying from root of archive
+  cp -r ./* "$WASM_OUT_DIR/" 2>/dev/null || {
+    echo "   ⚠️  Warning: Unexpected archive structure"
+    exit 0
+  }
+}
 
-echo "✅ WASM SDK built and copied successfully"
-echo "WASM files are now in $WASM_OUT_DIR"
-
+echo "✅ WASM SDK v$SDK_VERSION downloaded and installed successfully"
+echo "   WASM files are now in $WASM_OUT_DIR"

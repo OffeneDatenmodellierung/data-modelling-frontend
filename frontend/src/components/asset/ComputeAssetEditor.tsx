@@ -68,7 +68,7 @@ export const ComputeAssetEditor: React.FC<ComputeAssetEditorProps> = ({
     }
   }, [asset, isOpen]);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!name.trim()) {
       addToast({
         type: 'error',
@@ -77,8 +77,10 @@ export const ComputeAssetEditor: React.FC<ComputeAssetEditorProps> = ({
       return;
     }
 
+    // Always use UUIDs for compute asset IDs
+    const { generateUUID } = await import('@/utils/validation');
     const assetData: ComputeAsset = {
-      id: asset?.id || (typeof crypto !== 'undefined' ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`),
+      id: asset?.id || generateUUID(),
       domain_id: domainId,
       name: name.trim(),
       type,

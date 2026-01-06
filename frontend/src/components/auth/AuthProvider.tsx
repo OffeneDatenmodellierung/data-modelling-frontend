@@ -35,18 +35,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         // Check current mode from store directly (don't trigger API check)
         const state = useSDKModeStore.getState();
         const mode = state.mode;
-        
+
         // Skip auth initialization in offline mode
         if (mode === 'offline') {
           setIsLoading(false);
           return;
         }
-        
+
         // Only initialize if manually set to online (don't auto-detect)
         if (state.isManualOverride && mode === 'online') {
           // Initialize auth only in online mode
           authService.initialize();
-          
+
           if (authService.isAuthenticated()) {
             const currentUser = await authService.getCurrentUser();
             setUser(currentUser);
@@ -74,22 +74,25 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         return;
       }
 
-      const refreshInterval = setInterval(async () => {
-        try {
-          // Check mode again before refresh (from store, don't trigger API check)
-          const currentState = useSDKModeStore.getState();
-          if (currentState.mode === 'offline') {
-            clearInterval(refreshInterval);
-            return;
+      const refreshInterval = setInterval(
+        async () => {
+          try {
+            // Check mode again before refresh (from store, don't trigger API check)
+            const currentState = useSDKModeStore.getState();
+            if (currentState.mode === 'offline') {
+              clearInterval(refreshInterval);
+              return;
+            }
+
+            await authService.refreshToken();
+          } catch (error) {
+            console.error('Token refresh failed:', error);
+            // Token refresh failed - user will need to re-authenticate
+            await logout();
           }
-          
-          await authService.refreshToken();
-        } catch (error) {
-          console.error('Token refresh failed:', error);
-          // Token refresh failed - user will need to re-authenticate
-          await logout();
-        }
-      }, 15 * 60 * 1000); // Refresh every 15 minutes
+        },
+        15 * 60 * 1000
+      ); // Refresh every 15 minutes
 
       return () => clearInterval(refreshInterval);
     };
@@ -98,7 +101,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     return () => {
       cleanup.then((fn) => fn && fn());
     };
-  }, [authService.isAuthenticated()]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const login = async (tokens: { access_token: string; refresh_token: string }) => {
     try {
@@ -191,4 +195,3 @@ export const useAuth = (): AuthContextType => {
   }
   return context;
 };
-

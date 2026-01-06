@@ -327,18 +327,23 @@ export const DomainTabs: React.FC<DomainTabsProps> = ({ workspaceId }) => {
         setIsSaving(true);
         setShowSaveMenu(false);
 
-        // Always request directory access (prompt user like Electron)
-        const directoryHandle = await browserFileService.requestDirectoryAccess(workspace.name || workspace.id);
+        // Check for cached directory handle first, only prompt if not available
+        let directoryHandle: FileSystemDirectoryHandle | null | undefined = browserFileService.getCachedDirectoryHandle(workspace.name || workspace.id);
         
         if (!directoryHandle) {
-          // User cancelled - offer ZIP download instead
-          const useZip = window.confirm(
-            'Directory access was cancelled. Would you like to download a ZIP file instead?'
-          );
+          // No cached handle - request directory access (prompt user)
+          directoryHandle = await browserFileService.requestDirectoryAccess(workspace.name || workspace.id);
           
-          if (!useZip) {
-            setIsSaving(false);
-            return;
+          if (!directoryHandle) {
+            // User cancelled - offer ZIP download instead
+            const useZip = window.confirm(
+              'Directory access was cancelled. Would you like to download a ZIP file instead?'
+            );
+            
+            if (!useZip) {
+              setIsSaving(false);
+              return;
+            }
           }
         }
 
@@ -596,18 +601,23 @@ export const DomainTabs: React.FC<DomainTabsProps> = ({ workspaceId }) => {
         setIsSaving(true);
         setShowSaveMenu(false);
 
-        // Always request directory access (prompt user like Electron)
-        const directoryHandle = await browserFileService.requestDirectoryAccess(workspace.name || workspace.id);
+        // Check for cached directory handle first, only prompt if not available
+        let directoryHandle: FileSystemDirectoryHandle | null | undefined = browserFileService.getCachedDirectoryHandle(workspace.name || workspace.id);
         
         if (!directoryHandle) {
-          // User cancelled - offer ZIP download instead
-          const useZip = window.confirm(
-            'Directory access was cancelled. Would you like to download a ZIP file with all domains instead?'
-          );
+          // No cached handle - request directory access (prompt user)
+          directoryHandle = await browserFileService.requestDirectoryAccess(workspace.name || workspace.id);
           
-          if (!useZip) {
-            setIsSaving(false);
-            return;
+          if (!directoryHandle) {
+            // User cancelled - offer ZIP download instead
+            const useZip = window.confirm(
+              'Directory access was cancelled. Would you like to download a ZIP file with all domains instead?'
+            );
+            
+            if (!useZip) {
+              setIsSaving(false);
+              return;
+            }
           }
         }
 

@@ -29,6 +29,24 @@ A domain-centric data modelling application built with React and Electron. Creat
   cargo install wasm-pack
   ```
 
+## Pre-commit Hooks
+
+This project uses pre-commit hooks to ensure code quality. After cloning, run:
+
+```bash
+cd frontend
+npm install
+```
+
+The hooks will automatically run on `git commit` and check:
+- **Linting** (ESLint) - Auto-fixes issues
+- **Formatting** (Prettier) - Ensures consistent code style
+- **Type Checking** (TypeScript) - Validates types
+- **Tests** (Vitest) - Runs unit and integration tests
+- **Security Audit** (npm audit) - Checks for vulnerabilities (non-blocking)
+
+See [frontend/PRE_COMMIT_SETUP.md](frontend/PRE_COMMIT_SETUP.md) for detailed setup instructions.
+
 ## Quick Start
 
 ### Option 1: Docker (Web Version)

@@ -1,6 +1,6 @@
 import { app, BrowserWindow, dialog, ipcMain, nativeImage } from 'electron';
 import { readFile, writeFile, mkdir, readdir, unlink } from 'fs/promises';
-import { existsSync, statSync } from 'fs';
+import { existsSync } from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
 import { createRequire } from 'module';
@@ -10,7 +10,6 @@ const __dirname = fileURLToPath(new URL('.', import.meta.url));
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 try {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
   if (require('electron-squirrel-startup')) {
     app.quit();
   }
@@ -28,7 +27,7 @@ const getIconPath = (): string | undefined => {
     path.join(app.getAppPath(), 'electron/icons/icon.png'),
     path.join(app.getAppPath(), 'electron/icons/icon.icns'),
   ];
-  
+
   for (const iconFile of possiblePaths) {
     if (existsSync(iconFile)) {
       console.log('[Electron] Found icon:', iconFile);
@@ -42,7 +41,7 @@ const getIconPath = (): string | undefined => {
 const createWindow = (): void => {
   // Determine icon path based on platform and availability
   const iconPath = getIconPath();
-  
+
   // Convert icon path to nativeImage for better cross-platform support
   let iconImage: Electron.NativeImage | undefined;
   if (iconPath) {
@@ -71,10 +70,11 @@ const createWindow = (): void => {
       webSecurity: true,
     },
   });
-  
+
   // Set Content Security Policy for file:// protocol
   mainWindow.webContents.session.webRequest.onHeadersReceived((details, callback) => {
-    const csp = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self';";
+    const csp =
+      "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self';";
     callback({
       responseHeaders: {
         ...details.responseHeaders,
@@ -82,19 +82,23 @@ const createWindow = (): void => {
       },
     });
   });
-  
+
   // Also set CSP via meta tag injection for file:// protocol
   mainWindow.webContents.on('did-finish-load', () => {
-    mainWindow.webContents.executeJavaScript(`
+    mainWindow.webContents
+      .executeJavaScript(
+        `
       if (!document.querySelector('meta[http-equiv="Content-Security-Policy"]')) {
         const meta = document.createElement('meta');
         meta.httpEquiv = 'Content-Security-Policy';
         meta.content = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self';";
         document.head.appendChild(meta);
       }
-    `).catch(() => {
-      // Ignore errors
-    });
+    `
+      )
+      .catch(() => {
+        // Ignore errors
+      });
   });
 
   // Load the app
@@ -102,20 +106,20 @@ const createWindow = (): void => {
   // If NODE_ENV=production, always use production build (offline mode)
   // Only use dev server if explicitly in development mode
   const isProduction = process.env.NODE_ENV === 'production';
-  
+
   // Resolve path relative to the main process file location
   // __dirname points to dist-electron/ when running built Electron app
   // app.getAppPath() returns the app's directory (frontend/ in dev, app.asar in packaged)
   const appPath = app.getAppPath();
   const indexPath = path.join(appPath, 'dist', 'index.html');
   const indexPathResolved = path.resolve(indexPath);
-  
+
   console.log('app.getAppPath():', appPath);
   console.log('__dirname:', __dirname);
   console.log('indexPath:', indexPath);
   console.log('indexPath (resolved):', indexPathResolved);
   console.log('File exists:', existsSync(indexPathResolved));
-  
+
   if (isProduction || existsSync(indexPathResolved)) {
     // Production mode: load from built files (offline mode)
     console.log('Loading production build from:', indexPathResolved);
@@ -159,7 +163,7 @@ const createWindow = (): void => {
     });
     mainWindow.webContents.openDevTools();
   }
-  
+
   // Log any loading errors
   mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
     console.error('Failed to load:', {
@@ -176,7 +180,9 @@ ipcMain.handle('read-file', async (_event, path: string) => {
     const content = await readFile(path, 'utf-8');
     return content;
   } catch (error) {
-    throw new Error(`Failed to read file: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    throw new Error(
+      `Failed to read file: ${error instanceof Error ? error.message : 'Unknown error'}`
+    );
   }
 });
 
@@ -190,7 +196,8 @@ ipcMain.handle('write-file', async (_event, filePath: string, data: string) => {
         await mkdir(dirPath, { recursive: true });
         console.log(`[Electron] Directory created successfully: ${dirPath}`);
       } catch (mkdirError) {
-        const mkdirErrorMessage = mkdirError instanceof Error ? mkdirError.message : 'Unknown error';
+        const mkdirErrorMessage =
+          mkdirError instanceof Error ? mkdirError.message : 'Unknown error';
         console.error(`[Electron] Failed to create directory: ${dirPath}`, mkdirErrorMessage);
         throw new Error(`Failed to create directory ${dirPath}: ${mkdirErrorMessage}`);
       }
@@ -223,8 +230,8 @@ ipcMain.handle('read-directory', async (_event, dirPath: string) => {
   try {
     const entries = await readdir(dirPath, { withFileTypes: true });
     const files = entries
-      .filter(entry => entry.isFile())
-      .map(entry => ({
+      .filter((entry) => entry.isFile())
+      .map((entry) => ({
         name: entry.name,
         path: path.join(dirPath, entry.name),
       }));
@@ -311,4 +318,3 @@ app.on('activate', () => {
     createWindow();
   }
 });
-

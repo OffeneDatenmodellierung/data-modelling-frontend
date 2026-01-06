@@ -10,7 +10,11 @@ import type { BPMNProcess } from '@/types/bpmn';
 
 // Mock dependencies
 vi.mock('@/services/sdk/bpmnService');
-vi.mock('@/services/storage/localFileService');
+vi.mock('@/services/platform/browser', () => ({
+  browserFileService: {
+    downloadFile: vi.fn().mockResolvedValue(undefined),
+  },
+}));
 vi.mock('@/services/sdk/sdkMode', () => ({
   sdkModeDetector: {
     isOnline: vi.fn().mockReturnValue(false),
@@ -18,7 +22,6 @@ vi.mock('@/services/sdk/sdkMode', () => ({
 }));
 
 const mockBpmnService = vi.mocked(bpmnService);
-const mockLocalFileService = vi.mocked(localFileService);
 
 describe('BPMN Process Creation and Saving', () => {
   const sampleBPMNXML = `<?xml version="1.0" encoding="UTF-8"?>
@@ -86,16 +89,23 @@ describe('BPMN Process Creation and Saving', () => {
   });
 
   it('should save BPMN process to file service', async () => {
-    mockBpmnService.toXML.mockResolvedValue(sampleBPMNXML);
-    mockLocalFileService.saveBPMNProcess.mockResolvedValue();
+    // Mock bpmnService since saveBPMNProcess calls it internally
+    const { bpmnService: actualBpmnService } = await import('@/services/sdk/bpmnService');
+    vi.spyOn(actualBpmnService, 'toXML').mockResolvedValue(sampleBPMNXML);
+    
+    // Mock browserFileService.downloadFile
+    const { browserFileService } = await import('@/services/platform/browser');
+    const downloadFileSpy = vi.spyOn(browserFileService, 'downloadFile').mockResolvedValue();
 
     await localFileService.saveBPMNProcess('workspace-123', 'domain-123', sampleProcess);
 
-    expect(mockBpmnService.toXML).toHaveBeenCalledWith(sampleProcess);
-    expect(mockLocalFileService.saveBPMNProcess).toHaveBeenCalledWith(
-      'workspace-123',
-      'domain-123',
-      sampleProcess
+    // Verify bpmnService.toXML was called with the process
+    expect(actualBpmnService.toXML).toHaveBeenCalledWith(sampleProcess);
+    // Verify downloadFile was called with the XML content and correct filename
+    expect(downloadFileSpy).toHaveBeenCalledWith(
+      sampleBPMNXML,
+      'Test Process.bpmn',
+      'application/xml'
     );
   });
 

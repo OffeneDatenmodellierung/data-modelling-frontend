@@ -140,8 +140,10 @@ export const CreateNodeDialog: React.FC<CreateNodeDialogProps> = ({
       const centerX = window.innerWidth / 2 - 200;
       const centerY = window.innerHeight / 2 - 150;
 
+      // Always use UUIDs for compute asset IDs
+      const { generateUUID } = await import('@/utils/validation');
       const asset: ComputeAsset = {
-        id: crypto.randomUUID(),
+        id: generateUUID(),
         domain_id: domainId,
         name: name.trim(),
         type,

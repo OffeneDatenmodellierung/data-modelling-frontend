@@ -20,36 +20,44 @@ docker-compose down
 ## What's Included
 
 - **Frontend Service**: React application with Nginx serving static files
-- **WASM SDK**: Built from the latest Rust SDK during Docker build
+- **WASM SDK**: Downloaded from GitHub Releases (pre-built, required)
 - **Offline Mode**: Application operates entirely offline (no API required)
 
 ## Building
 
 The Dockerfile uses a multi-stage build:
 
-1. **Rust Builder Stage**: Builds the latest WASM SDK from source
-2. **Node Builder Stage**: Builds the React frontend application
-3. **Nginx Stage**: Serves the built application
+1. **Node Builder Stage**: Downloads WASM SDK from GitHub Releases and builds the React frontend application
+2. **Nginx Stage**: Serves the built application
 
 ### Building with Latest SDK
 
 The Dockerfile automatically:
-- Clones the latest `data-modelling-sdk` repository
-- Builds WASM using `wasm-pack`
-- Copies WASM files to the frontend build
+- Downloads the latest pre-built WASM SDK from GitHub Releases
+- Extracts WASM files to `public/wasm/`
+- Builds the frontend application
 
-**Note**: If the SDK repository is not available, the build will continue using any existing WASM files or skip WASM build.
+**Note**: The WASM SDK is **REQUIRED** - the build will fail if it cannot be downloaded. Ensure the SDK repository has published releases before building.
 
 ### Custom SDK Version
 
-To use a specific SDK version, modify the Dockerfile:
+To use a specific SDK version, set the `WASM_SDK_VERSION` build argument:
 
-```dockerfile
-# In rust-builder stage, checkout specific version
-RUN git clone https://github.com/pixie79/data-modelling-sdk.git . && \
-    git checkout v1.6.2 && \
-    wasm-pack build --target web --out-dir pkg --features wasm
+```bash
+# Build with specific SDK version
+docker-compose build --build-arg WASM_SDK_VERSION=1.7.0 frontend
+
+# Or in docker-compose.yml
+services:
+  frontend:
+    build:
+      args:
+        WASM_SDK_VERSION: "1.7.0"
 ```
+
+**Build Arguments**:
+- `WASM_SDK_VERSION`: SDK version to download (defaults to `latest`)
+- `WASM_SDK_REPO`: GitHub repository (defaults to `pixie79/data-modelling-sdk`)
 
 ## Configuration
 
@@ -87,19 +95,17 @@ Once started, access the application at:
 
 ## Troubleshooting
 
-### Build Fails - SDK Not Found
+### Build Fails - WASM SDK Download Failed
 
-If the SDK repository is not accessible during build:
+If the WASM SDK cannot be downloaded:
 
-1. **Option 1**: Ensure the SDK repository is publicly accessible
-2. **Option 2**: Copy WASM files manually before building:
+1. **Check GitHub Releases**: Ensure the SDK repository has published releases with WASM artifacts
+2. **Verify Version**: Check that the specified `WASM_SDK_VERSION` exists in releases
+3. **Network Connectivity**: Ensure Docker build can access GitHub (check firewall/proxy settings)
+4. **Use Specific Version**: Try setting `WASM_SDK_VERSION` to a known working version:
+
    ```bash
-   # Build WASM SDK locally first
-   cd frontend
-   npm run build:wasm
-   
-   # Then build Docker image
-   docker-compose build
+   docker-compose build --build-arg WASM_SDK_VERSION=1.7.0 frontend
    ```
 
 ### WASM Files Not Loading
