@@ -63,30 +63,75 @@ class SDKLoader {
   }
 
   /**
+   * Load WASM module via script tag (for dev mode)
+   */
+  private async _loadViaScriptTag(scriptPath: string): Promise<SDKModule> {
+    return new Promise((resolve, reject) => {
+      // Check if already loaded
+      if ((window as any).wasm_bindgen) {
+        console.log('[SDKLoader] WASM module already loaded via script tag');
+        const initFn = (window as any).wasm_bindgen;
+        initFn()
+          .then(() => {
+            resolve((window as any).wasm_bindgen as SDKModule);
+          })
+          .catch(reject);
+        return;
+      }
+
+      const script = document.createElement('script');
+      script.src = scriptPath;
+      script.type = 'module';
+
+      script.onload = async () => {
+        console.log('[SDKLoader] Script loaded, initializing WASM');
+        try {
+          // The script exposes wasm_bindgen globally
+          const initFn = (window as any).wasm_bindgen;
+          if (!initFn) {
+            throw new Error('wasm_bindgen not found after script load');
+          }
+          // Initialize the WASM module
+          await initFn();
+          resolve((window as any).wasm_bindgen as SDKModule);
+        } catch (err) {
+          reject(err);
+        }
+      };
+
+      script.onerror = () => {
+        reject(new Error(`Failed to load script: ${scriptPath}`));
+      };
+
+      document.head.appendChild(script);
+    });
+  }
+
+  /**
    * Internal method to load the WASM module
    */
   private async _loadModule(): Promise<SDKModule> {
     try {
       // Load WASM module from SDK pkg directory
-      // The pkg directory should be copied to frontend/public/wasm/ during build
-      // Using dynamic import with string literal to avoid TypeScript errors
-      // Note: The WASM file will be loaded by the JS file, and we need to ensure
-      // the correct MIME type is set for the .wasm file itself
+      // In dev mode (Vite), files in /public are served at root but cannot be imported
+      // In production, Vite copies public/wasm/ to dist/wasm/
+      // In Electron, use relative paths for file:// protocol
 
-      // In Electron, use relative path for file:// protocol
       const isElectron = typeof window !== 'undefined' && window.location.protocol === 'file:';
+      const isDev = import.meta.env.DEV;
 
-      // Determine the correct path based on where we're running from
-      // In Electron with file:// protocol, we need to resolve relative to the HTML file location
-      // The HTML file is at dist/index.html, so ./wasm/ should resolve to dist/wasm/
-      // Vite copies public/wasm/ to dist/wasm/ during build
-      // However, Vite might also put files in dist/assets/wasm/, so we try multiple paths
+      // In dev mode, load via script tag since we can't import from /public
+      if (isDev && !isElectron) {
+        return await this._loadViaScriptTag('/wasm/data_modelling_sdk.js');
+      }
+
+      // In production or Electron, use dynamic import
       const possiblePaths = isElectron
         ? [
-            './wasm/data_modelling_sdk.js', // Primary: dist/wasm/ (Vite copies public/wasm/ here)
-            './assets/wasm/data_modelling_sdk.js', // Alternative: dist/assets/wasm/ (Vite might put it here)
-            '../wasm/data_modelling_sdk.js', // Fallback: parent directory wasm/ (dist-electron/wasm/)
-            '../public/wasm/data_modelling_sdk.js', // Fallback: public/wasm/ (source)
+            './wasm/data_modelling_sdk.js',
+            './assets/wasm/data_modelling_sdk.js',
+            '../wasm/data_modelling_sdk.js',
+            '../public/wasm/data_modelling_sdk.js',
           ]
         : ['/wasm/data_modelling_sdk.js'];
 
@@ -98,8 +143,6 @@ class SDKLoader {
           console.log('[SDKLoader] Attempting to load WASM module from:', wasmPath);
           wasmModule = await import(/* @vite-ignore */ wasmPath);
           if (wasmModule.default) {
-            // The default export is the init function which loads the WASM file
-            // It will use WebAssembly.instantiateStreaming which requires correct MIME type
             await wasmModule.default();
           }
           console.log('[SDKLoader] WASM module loaded successfully from:', wasmPath);
@@ -107,7 +150,6 @@ class SDKLoader {
         } catch (err) {
           lastError = err instanceof Error ? err : new Error(String(err));
           console.warn(`[SDKLoader] Failed to load from ${wasmPath}:`, lastError.message);
-          // Try next path
         }
       }
 
