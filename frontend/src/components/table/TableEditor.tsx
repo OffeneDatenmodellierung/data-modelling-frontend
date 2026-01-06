@@ -295,16 +295,6 @@ export const TableEditor: React.FC<TableEditorProps> = ({ tableId, workspaceId, 
     setHasUnsavedChanges(true);
   };
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  // @ts-expect-error - Unused function kept for potential future use
-  const _handleTableMetadataSave = async (_tableId: string, _updates: Partial<Table>) => {
-    // updateTable(tableId, updates);
-
-    if (mode === 'online' && selectedDomainId) {
-      await updateTableRemote(selectedDomainId, _tableId, _updates);
-    }
-  };
-
   const handleColumnDetailsSave = async (columnId: string, updates: Partial<Column>) => {
     handleColumnChange(columnId, updates);
 

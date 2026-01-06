@@ -25,7 +25,7 @@ export const TableProperties: React.FC<TablePropertiesProps> = ({
   const { tables, updateTableRemote, updateColumn, updateColumnRemote } = useModelStore();
   const { mode } = useSDKModeStore();
   const table = tables.find((t) => t.id === tableId);
-  
+
   const [selectedColumnId, setSelectedColumnId] = useState<string | null>(null);
   const [showTableMetadata, setShowTableMetadata] = useState(false);
 
@@ -40,7 +40,7 @@ export const TableProperties: React.FC<TablePropertiesProps> = ({
   const handleColumnSave = async (columnId: string, updates: Partial<Column>) => {
     // Update local state
     updateColumn(tableId, columnId, updates);
-    
+
     // Update remote if online
     if (mode === 'online') {
       try {
@@ -52,24 +52,9 @@ export const TableProperties: React.FC<TablePropertiesProps> = ({
     }
   };
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  // @ts-expect-error - Unused function kept for potential future use
-  const _handleTableSave = async (_tableId: string, _updates: Partial<Table>) => {
-    // Update local state
-    // updateTable(tableId, updates);
-    
-    // Update remote if online
-    if (mode === 'online') {
-      try {
-        await updateTableRemote(workspaceId, _tableId, _updates);
-      } catch (error) {
-        console.error('Failed to update table:', error);
-        throw error;
-      }
-    }
-  };
-
-  const selectedColumn = selectedColumnId ? table.columns.find((c) => c.id === selectedColumnId) : null;
+  const selectedColumn = selectedColumnId
+    ? table.columns.find((c) => c.id === selectedColumnId)
+    : null;
 
   return (
     <>
@@ -216,4 +201,3 @@ export const TableProperties: React.FC<TablePropertiesProps> = ({
     </>
   );
 };
-

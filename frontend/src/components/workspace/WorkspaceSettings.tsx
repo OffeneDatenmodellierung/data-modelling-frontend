@@ -65,7 +65,7 @@ export const WorkspaceSettings: React.FC<WorkspaceSettingsProps> = ({
         type: 'success',
         message: 'Workspace name updated',
       });
-    } catch (error) {
+    } catch {
       addToast({
         type: 'error',
         message: 'Failed to update workspace name',
@@ -94,7 +94,7 @@ export const WorkspaceSettings: React.FC<WorkspaceSettingsProps> = ({
       });
       setNewCollaboratorEmail('');
       await loadCollaborators();
-    } catch (error) {
+    } catch {
       addToast({
         type: 'error',
         message: 'Failed to add collaborator',
@@ -113,7 +113,7 @@ export const WorkspaceSettings: React.FC<WorkspaceSettingsProps> = ({
         message: 'Collaborator removed',
       });
       await loadCollaborators();
-    } catch (error) {
+    } catch {
       addToast({
         type: 'error',
         message: 'Failed to remove collaborator',
@@ -132,7 +132,7 @@ export const WorkspaceSettings: React.FC<WorkspaceSettingsProps> = ({
         message: 'Collaborator access updated',
       });
       await loadCollaborators();
-    } catch (error) {
+    } catch {
       addToast({
         type: 'error',
         message: 'Failed to update collaborator access',
