@@ -200,6 +200,83 @@ export function checkCircularRelationshipWarning(
 }
 
 /**
+ * Process nested columns from SQL import (e.g., Databricks STRUCT/ARRAY types)
+ * Columns with dot notation (e.g., "parent.child") are converted to a hierarchy
+ * and assigned UUIDs with parent_column_id references
+ */
+export function processNestedColumns(columns: any[], tableId: string): any[] {
+  if (!Array.isArray(columns) || columns.length === 0) {
+    return columns;
+  }
+
+  const columnMap = new Map<string, any>(); // Map column names to column objects
+  const rootColumns: any[] = []; // Top-level columns (no parent)
+
+  // First pass: Assign UUIDs to all columns and detect nesting
+  columns.forEach((col, index) => {
+    const colCopy = { ...col };
+
+    // Assign UUID if missing
+    if (!colCopy.id) {
+      colCopy.id = generateUUID();
+    }
+
+    // Ensure table_id is set
+    if (!colCopy.table_id) {
+      colCopy.table_id = tableId;
+    }
+
+    // Ensure order is set
+    if (colCopy.order === undefined) {
+      colCopy.order = index;
+    }
+
+    columnMap.set(colCopy.name, colCopy);
+  });
+
+  // Second pass: Build hierarchy by detecting dot notation
+  columnMap.forEach((col) => {
+    const nameParts = col.name.split('.');
+
+    if (nameParts.length > 1) {
+      // This is a nested column (e.g., "parent.child")
+      const parentName = nameParts.slice(0, -1).join('.');
+      const parentCol = columnMap.get(parentName);
+
+      if (parentCol) {
+        // Link to parent
+        col.parent_column_id = parentCol.id;
+
+        // Add to parent's nested_columns array
+        if (!parentCol.nested_columns) {
+          parentCol.nested_columns = [];
+        }
+        parentCol.nested_columns.push(col);
+      } else {
+        // Parent not found - treat as root column
+        rootColumns.push(col);
+      }
+    } else {
+      // Top-level column (no parent)
+      rootColumns.push(col);
+    }
+  });
+
+  // Return all columns in a flat array (TableEditor will use parent_column_id for hierarchy)
+  // Sort to maintain order: root columns first, then nested columns
+  const allColumns = Array.from(columnMap.values()).sort((a, b) => {
+    // Root columns come first
+    if (!a.parent_column_id && b.parent_column_id) return -1;
+    if (a.parent_column_id && !b.parent_column_id) return 1;
+
+    // Within same level, sort by order
+    return a.order - b.order;
+  });
+
+  return allColumns;
+}
+
+/**
  * Normalize UUIDs in a workspace object to ensure all UUID fields are valid
  * This is critical for SDK export functions which require valid UUIDs
  */
@@ -254,13 +331,21 @@ export function normalizeWorkspaceUUIDs(workspace: any): any {
         normalizedTable.table_id = normalizeUUID(normalizedTable.table_id);
       }
 
-      // Normalize columns
+      // Normalize columns - process nested columns first, then normalize UUIDs
       if (Array.isArray(normalizedTable.columns)) {
-        normalizedTable.columns = normalizedTable.columns.map((col: any) => {
+        // Process nested columns to build hierarchy
+        const processedColumns = processNestedColumns(normalizedTable.columns, normalizedTable.id);
+
+        normalizedTable.columns = processedColumns.map((col: any) => {
           const normalizedCol = { ...col };
+
+          // Ensure UUID is valid (processNestedColumns already assigned UUIDs)
           if (normalizedCol.id) {
             normalizedCol.id = normalizeUUID(normalizedCol.id);
+          } else {
+            normalizedCol.id = generateUUID();
           }
+
           if (normalizedCol.table_id) {
             normalizedCol.table_id = normalizedTable.id; // Use normalized table ID
           }
@@ -271,6 +356,9 @@ export function normalizeWorkspaceUUIDs(workspace: any): any {
           }
           if (normalizedCol.compound_key_id) {
             normalizedCol.compound_key_id = normalizeUUID(normalizedCol.compound_key_id);
+          }
+          if (normalizedCol.parent_column_id) {
+            normalizedCol.parent_column_id = normalizeUUID(normalizedCol.parent_column_id);
           }
           return normalizedCol;
         });

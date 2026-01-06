@@ -71,6 +71,7 @@ export const TableEditor: React.FC<TableEditorProps> = ({ tableId, workspaceId, 
   >('postgresql');
   const [showSqlDialectSelector, setShowSqlDialectSelector] = useState(false);
   const [showIndexes, setShowIndexes] = useState(false);
+  const [expandedColumns, setExpandedColumns] = useState<Set<string>>(new Set());
 
   // Check if table is editable (must be primary domain)
   // Normalize both IDs for comparison in case one is invalid
@@ -115,25 +116,11 @@ export const TableEditor: React.FC<TableEditorProps> = ({ tableId, workspaceId, 
       setDescription(table.description || '');
       setDataLevel(table.data_level || 'operational');
 
-      // Ensure all columns have unique IDs - fix any duplicates
-      const columnsWithUniqueIds = table.columns.map((col, index) => {
-        // Check if this ID is duplicated
-        const duplicateCount = table.columns.filter((c) => c.id === col.id).length;
-        if (duplicateCount > 1 || !col.id) {
-          // Generate a new unique ID
-          const newId = `col-${tableId}-${col.name || 'col'}-${index}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-          console.warn('[TableEditor] Found duplicate or missing column ID, generating new one:', {
-            oldId: col.id,
-            newId,
-            columnName: col.name,
-          });
-          return { ...col, id: newId };
-        }
-        return col;
-      });
-
-      setColumns(columnsWithUniqueIds);
+      // Columns now have IDs assigned during import by processNestedColumns
+      // No need to regenerate IDs here - they should already be unique
+      setColumns(table.columns || []);
       setCompoundKeys(table.compoundKeys || []);
+
       // Load indexes from metadata
       if (
         table.metadata &&
@@ -605,6 +592,88 @@ export const TableEditor: React.FC<TableEditorProps> = ({ tableId, workspaceId, 
     }
   };
 
+  // Helper function to toggle column expansion
+  const toggleColumnExpansion = (columnId: string) => {
+    setExpandedColumns((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(columnId)) {
+        newSet.delete(columnId);
+      } else {
+        newSet.add(columnId);
+      }
+      return newSet;
+    });
+  };
+
+  // Helper function to render column hierarchy with nested columns
+  const renderColumnHierarchy = (allColumns: Column[], parentId?: string, depth: number = 0) => {
+    // Filter columns for current level (root or children of parentId)
+    const columnsAtLevel = allColumns
+      .filter((col) => {
+        if (parentId === undefined) {
+          // Root level - columns without parent_column_id
+          return !col.parent_column_id;
+        } else {
+          // Child level - columns with matching parent_column_id
+          return col.parent_column_id === parentId;
+        }
+      })
+      .sort((a, b) => a.order - b.order);
+
+    return columnsAtLevel.map((column) => {
+      // Check if this column has children
+      const hasChildren = allColumns.some((c) => c.parent_column_id === column.id);
+      const isExpanded = expandedColumns.has(column.id);
+      const indentClass = depth > 0 ? `ml-${depth * 4}` : '';
+
+      return (
+        <div key={column.id} className="space-y-1">
+          <div
+            className={`flex items-center gap-2 ${indentClass}`}
+            style={{ marginLeft: `${depth * 1.5}rem` }}
+          >
+            {/* Expand/collapse button for columns with children */}
+            {hasChildren && (
+              <button
+                onClick={() => toggleColumnExpansion(column.id)}
+                className="w-5 h-5 flex items-center justify-center text-gray-600 hover:bg-gray-100 rounded"
+                title={isExpanded ? 'Collapse' : 'Expand'}
+              >
+                {isExpanded ? '▼' : '▶'}
+              </button>
+            )}
+            {/* Spacer for columns without children to align with parent columns */}
+            {!hasChildren && depth > 0 && <div className="w-5" />}
+
+            <div className="flex-1">
+              <ColumnEditor
+                column={column}
+                compoundKeys={compoundKeys}
+                allColumns={columns}
+                onChange={(updates) => handleColumnChange(column.id, updates)}
+                onDelete={() => handleDeleteColumn(column.id)}
+              />
+            </div>
+            <button
+              onClick={() => setSelectedColumnId(column.id)}
+              className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
+              title="Edit column details"
+            >
+              Details
+            </button>
+          </div>
+
+          {/* Render children if expanded */}
+          {hasChildren && isExpanded && (
+            <div className="space-y-1">
+              {renderColumnHierarchy(allColumns, column.id, depth + 1)}
+            </div>
+          )}
+        </div>
+      );
+    });
+  };
+
   if (!table) {
     return (
       <div className="p-4 text-gray-500">
@@ -870,28 +939,7 @@ export const TableEditor: React.FC<TableEditorProps> = ({ tableId, workspaceId, 
                 No columns. Add one to get started.
               </p>
             ) : (
-              columns
-                .sort((a, b) => a.order - b.order)
-                .map((column) => (
-                  <div key={column.id} className="flex items-center gap-2">
-                    <div className="flex-1">
-                      <ColumnEditor
-                        column={column}
-                        compoundKeys={compoundKeys}
-                        allColumns={columns}
-                        onChange={(updates) => handleColumnChange(column.id, updates)}
-                        onDelete={() => handleDeleteColumn(column.id)}
-                      />
-                    </div>
-                    <button
-                      onClick={() => setSelectedColumnId(column.id)}
-                      className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
-                      title="Edit column details"
-                    >
-                      Details
-                    </button>
-                  </div>
-                ))
+              renderColumnHierarchy(columns)
             )}
           </div>
         </div>

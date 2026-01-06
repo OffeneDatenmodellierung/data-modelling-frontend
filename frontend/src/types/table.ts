@@ -78,7 +78,7 @@ export interface Table {
   is_owned_by_domain: boolean; // True if owned by current domain (for cross-domain viewing)
   created_at: string; // ISO timestamp
   last_modified_at: string; // ISO timestamp
-  
+
   // ODCS 3.0.2+ fields
   owner?: Owner;
   roles?: Role[]; // Array of roles that provide user access to the dataset
@@ -117,6 +117,8 @@ export interface Column {
   quality_rules?: Record<string, unknown>; // Column-level quality rules (ODCS)
   order: number; // display order
   created_at: string; // ISO timestamp
+  parent_column_id?: string; // UUID of parent column (for nested columns in STRUCT/ARRAY types)
+  nested_columns?: Column[]; // Child columns (for STRUCT/ARRAY types) - used for display hierarchy
 }
 
 export interface CompoundKey {
@@ -127,4 +129,3 @@ export interface CompoundKey {
   is_primary: boolean; // true for compound primary key, false for compound unique key
   created_at: string; // ISO timestamp
 }
-
