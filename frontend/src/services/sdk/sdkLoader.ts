@@ -66,45 +66,28 @@ class SDKLoader {
    * Load WASM module via script tag (for dev mode)
    */
   private async _loadViaScriptTag(scriptPath: string): Promise<SDKModule> {
-    return new Promise((resolve, reject) => {
-      // Check if already loaded
-      if ((window as any).wasm_bindgen) {
-        console.log('[SDKLoader] WASM module already loaded via script tag');
-        const initFn = (window as any).wasm_bindgen;
-        initFn()
-          .then(() => {
-            resolve((window as any).wasm_bindgen as SDKModule);
-          })
-          .catch(reject);
-        return;
-      }
+    console.log('[SDKLoader] Loading WASM module from:', scriptPath);
 
-      const script = document.createElement('script');
-      script.src = scriptPath;
-      script.type = 'module';
+    // In dev mode, use full URL for import
+    const fullUrl = new URL(scriptPath, window.location.origin).href;
+    console.log('[SDKLoader] Full URL:', fullUrl);
 
-      script.onload = async () => {
-        console.log('[SDKLoader] Script loaded, initializing WASM');
-        try {
-          // The script exposes wasm_bindgen globally
-          const initFn = (window as any).wasm_bindgen;
-          if (!initFn) {
-            throw new Error('wasm_bindgen not found after script load');
-          }
-          // Initialize the WASM module
-          await initFn();
-          resolve((window as any).wasm_bindgen as SDKModule);
-        } catch (err) {
-          reject(err);
-        }
-      };
+    const wasmModule = await import(/* @vite-ignore */ fullUrl);
+    console.log('[SDKLoader] Module imported, available exports:', Object.keys(wasmModule));
 
-      script.onerror = () => {
-        reject(new Error(`Failed to load script: ${scriptPath}`));
-      };
+    // Call the default export (init function) to initialize WASM
+    if (wasmModule.default) {
+      await wasmModule.default();
+      console.log('[SDKLoader] WASM initialized');
+    }
 
-      document.head.appendChild(script);
-    });
+    // The module exports all the WASM functions directly
+    console.log(
+      '[SDKLoader] Available methods:',
+      Object.keys(wasmModule).filter((k) => typeof (wasmModule as any)[k] === 'function')
+    );
+
+    return wasmModule as SDKModule;
   }
 
   /**
