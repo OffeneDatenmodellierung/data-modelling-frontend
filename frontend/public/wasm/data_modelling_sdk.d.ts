@@ -911,18 +911,18 @@ export interface InitOutput {
   readonly validate_pattern_exclusivity: (a: number, b: number) => [number, number, number, number];
   readonly validate_table_name: (a: number, b: number) => [number, number, number, number];
   readonly validate_uuid: (a: number, b: number) => [number, number, number, number];
-  readonly wasm_bindgen__convert__closures________invoke__h45b2f24db2feab69: (a: number, b: number, c: any) => void;
-  readonly wasm_bindgen__closure__destroy__hdae3aa893cc8b3d0: (a: number, b: number) => void;
   readonly wasm_bindgen__convert__closures_____invoke__h05ea8688cde0d495: (a: number, b: number, c: any) => void;
   readonly wasm_bindgen__closure__destroy__h90087f72df793db4: (a: number, b: number) => void;
+  readonly wasm_bindgen__convert__closures________invoke__h781faee131f1ba2a: (a: number, b: number, c: any) => void;
+  readonly wasm_bindgen__closure__destroy__h7b1a074730315092: (a: number, b: number) => void;
   readonly wasm_bindgen__convert__closures_____invoke__h3f04f8768b5c65b3: (a: number, b: number, c: any, d: any) => void;
   readonly __wbindgen_malloc: (a: number, b: number) => number;
   readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
   readonly __wbindgen_exn_store: (a: number) => void;
   readonly __externref_table_alloc: () => number;
   readonly __wbindgen_externrefs: WebAssembly.Table;
-  readonly __wbindgen_free: (a: number, b: number, c: number) => void;
   readonly __externref_table_dealloc: (a: number) => void;
+  readonly __wbindgen_free: (a: number, b: number, c: number) => void;
   readonly __wbindgen_start: () => void;
 }
 
