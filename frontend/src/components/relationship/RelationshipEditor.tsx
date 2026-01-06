@@ -1,0 +1,537 @@
+/**
+ * Relationship Editor
+ * Dialog for editing relationship properties (type, cardinality, bidirectional)
+ */
+
+import React, { useState, useEffect } from 'react';
+import { DraggableModal } from '@/components/common/DraggableModal';
+import { useModelStore } from '@/stores/modelStore';
+import { useUIStore } from '@/stores/uiStore';
+import { useSDKModeStore } from '@/services/sdk/sdkMode';
+import type { Relationship, RelationshipType, Cardinality } from '@/types/relationship';
+
+export interface RelationshipEditorProps {
+  relationshipId: string;
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+export const RelationshipEditor: React.FC<RelationshipEditorProps> = ({
+  relationshipId,
+  isOpen,
+  onClose,
+}) => {
+  const { relationships, tables, systems, computeAssets, updateRelationship, updateRelationshipRemote, removeRelationship, selectedDomainId } = useModelStore();
+  const { addToast } = useUIStore();
+  const { mode } = useSDKModeStore();
+  
+  const relationship = relationships.find((r) => r.id === relationshipId);
+  
+  const [relationshipType, setRelationshipType] = useState<RelationshipType>('one-to-one');
+  const [sourceCardinality, setSourceCardinality] = useState<Cardinality>('1');
+  const [targetCardinality, setTargetCardinality] = useState<Cardinality>('1');
+  const [sourceKey, setSourceKey] = useState<string>('');
+  const [targetKey, setTargetKey] = useState<string>('');
+  const [label, setLabel] = useState('');
+  const [description, setDescription] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Load relationship data when dialog opens
+  useEffect(() => {
+    if (relationship && isOpen) {
+      setRelationshipType(relationship.type);
+      setSourceCardinality(relationship.source_cardinality);
+      setTargetCardinality(relationship.target_cardinality);
+      setSourceKey(relationship.source_key || '');
+      setTargetKey(relationship.target_key || '');
+      setLabel(relationship.label || '');
+      setDescription(relationship.description || '');
+    }
+  }, [relationship, isOpen, relationships]);
+
+  // Get available keys for a table (primary keys and compound keys)
+  const getTableKeys = (tableId: string): Array<{ id: string; name: string; type: 'primary' | 'compound' }> => {
+    const table = tables.find(t => t.id === tableId);
+    if (!table) return [];
+
+    const keys: Array<{ id: string; name: string; type: 'primary' | 'compound' }> = [];
+
+    // Add single column primary keys
+    table.columns
+      .filter(col => col.is_primary_key)
+      .forEach(col => {
+        keys.push({
+          id: col.id,
+          name: `${col.name} (Primary Key)`,
+          type: 'primary',
+        });
+      });
+
+    // Add compound keys
+    if (table.compoundKeys) {
+      table.compoundKeys.forEach(ck => {
+        const columnNames = ck.column_ids
+          .map(colId => table.columns.find(c => c.id === colId)?.name)
+          .filter(Boolean)
+          .join(', ');
+        keys.push({
+          id: ck.id,
+          name: `${ck.name || 'Compound Key'} (${columnNames})`,
+          type: 'compound',
+        });
+      });
+    }
+
+    return keys;
+  };
+
+  // Get source and target node names for display
+  const getNodeName = (nodeId: string, nodeType: 'table' | 'system' | 'compute-asset'): string => {
+    if (nodeType === 'table') {
+      const table = tables.find((t) => t.id === nodeId);
+      return table?.name || table?.alias || nodeId;
+    } else if (nodeType === 'system') {
+      const system = systems.find((s) => s.id === nodeId);
+      return system?.name || nodeId;
+    } else {
+      const asset = computeAssets.find((a) => a.id === nodeId);
+      return asset?.name || nodeId;
+    }
+  };
+
+  if (!relationship) {
+    return null;
+  }
+
+  const sourceName = getNodeName(relationship.source_id, relationship.source_type);
+  const targetName = getNodeName(relationship.target_id, relationship.target_type);
+  const isTableToTable = relationship.source_type === 'table' && relationship.target_type === 'table';
+
+  const handleSave = async () => {
+    if (!relationship || !selectedDomainId) return;
+    
+    setIsSaving(true);
+    try {
+      const updates = {
+        type: relationshipType,
+        source_cardinality: sourceCardinality,
+        target_cardinality: targetCardinality,
+        source_key: isTableToTable && sourceKey ? sourceKey : undefined,
+        target_key: isTableToTable && targetKey ? targetKey : undefined,
+        label: label.trim() || undefined,
+        description: description.trim() || undefined,
+        last_modified_at: new Date().toISOString(),
+      };
+
+      console.log('[RelationshipEditor] Saving relationship:', { relationshipId, updates, currentRelationship: relationship });
+
+      // Update remote first if in online mode (this also updates local store)
+      if (mode === 'online') {
+        try {
+          const updatedRel = await updateRelationshipRemote(selectedDomainId, relationshipId, updates);
+          console.log('[RelationshipEditor] Relationship updated remotely:', updatedRel);
+          // updateRelationshipRemote already updates the store, so we don't need to call updateRelationship again
+          // But ensure the relationshipId matches
+          if (updatedRel.id !== relationshipId) {
+            console.warn('[RelationshipEditor] Remote relationship has different ID:', { localId: relationshipId, remoteId: updatedRel.id });
+            // The store should already be updated by updateRelationshipRemote, but log for debugging
+          }
+        } catch (error) {
+          addToast({
+            type: 'error',
+            message: error instanceof Error ? error.message : 'Failed to update relationship on server',
+          });
+          setIsSaving(false);
+          return;
+        }
+      } else {
+        // Offline mode: update locally only
+        updateRelationship(relationshipId, updates);
+      }
+
+      // For table-to-table relationships, always create/update bidirectional relationship
+      if (isTableToTable) {
+        // Get fresh relationships from store AFTER the update to avoid stale closure
+        // This ensures we see the most recent state including any updates
+        const currentRelationships = useModelStore.getState().relationships;
+        
+        // Also get the updated relationship to ensure we have the latest data
+        const updatedRelationship = currentRelationships.find((r) => r.id === relationshipId) || relationship;
+        
+        // Check if reverse relationship exists (exclude current relationship)
+        const reverseRelationship = currentRelationships.find(
+          (r) => r.id !== relationshipId && r.source_id === updatedRelationship.target_id && r.target_id === updatedRelationship.source_id
+        );
+        
+        console.log('[RelationshipEditor] Checking reverse relationship:', { 
+          relationshipId, 
+          sourceId: updatedRelationship.source_id, 
+          targetId: updatedRelationship.target_id,
+          reverseFound: !!reverseRelationship,
+          reverseId: reverseRelationship?.id,
+          totalRelationships: currentRelationships.length
+        });
+
+        if (!reverseRelationship) {
+          // Create reverse relationship - always use UUIDs
+          const { generateUUID } = await import('@/utils/validation');
+          const reverseId = generateUUID();
+          const reverseRel: Relationship = {
+            id: reverseId,
+            workspace_id: updatedRelationship.workspace_id,
+            domain_id: updatedRelationship.domain_id,
+            source_id: updatedRelationship.target_id,
+            target_id: updatedRelationship.source_id,
+            source_type: updatedRelationship.target_type,
+            target_type: updatedRelationship.source_type,
+            source_table_id: updatedRelationship.target_id,
+            target_table_id: updatedRelationship.source_id,
+            type: relationshipType,
+            source_cardinality: targetCardinality, // Swapped
+            target_cardinality: sourceCardinality, // Swapped
+            label: label.trim() || undefined,
+            description: description.trim() || undefined,
+            model_type: updatedRelationship.model_type,
+            is_circular: updatedRelationship.is_circular,
+            created_at: new Date().toISOString(),
+            last_modified_at: new Date().toISOString(),
+          };
+          useModelStore.getState().addRelationship(reverseRel);
+          
+          // Create reverse relationship remotely if in online mode
+          if (mode === 'online') {
+            try {
+              const { relationshipService } = await import('@/services/api/relationshipService');
+              if (!reverseRel.source_table_id || !reverseRel.target_table_id) {
+                throw new Error('Reverse relationship missing source or target table ID');
+              }
+              await relationshipService.createRelationship(selectedDomainId, {
+                source_table_id: reverseRel.source_table_id,
+                target_table_id: reverseRel.target_table_id,
+                type: reverseRel.type,
+                source_cardinality: reverseRel.source_cardinality,
+                target_cardinality: reverseRel.target_cardinality,
+                label: reverseRel.label,
+              });
+            } catch (error) {
+              console.warn('Failed to create reverse relationship on server:', error);
+            }
+          }
+        } else {
+          // Update reverse relationship
+          const reverseUpdates = {
+            type: relationshipType,
+            source_cardinality: targetCardinality, // Swapped
+            target_cardinality: sourceCardinality, // Swapped
+            label: label.trim() || undefined,
+            description: description.trim() || undefined,
+            last_modified_at: new Date().toISOString(),
+          };
+          updateRelationship(reverseRelationship.id, reverseUpdates);
+          
+          // Update reverse relationship remotely if in online mode
+          if (mode === 'online') {
+            try {
+              await updateRelationshipRemote(selectedDomainId, reverseRelationship.id, reverseUpdates);
+            } catch (error) {
+              console.warn('Failed to update reverse relationship on server:', error);
+            }
+          }
+        }
+      }
+
+      addToast({
+        type: 'success',
+        message: 'Relationship updated successfully',
+      });
+      onClose();
+    } catch (error) {
+      addToast({
+        type: 'error',
+        message: error instanceof Error ? error.message : 'Failed to update relationship',
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleReverse = () => {
+    if (!relationship) return;
+    
+    // Swap source and target
+    const newSourceId = relationship.target_id;
+    const newTargetId = relationship.source_id;
+    const newSourceType = relationship.target_type;
+    const newTargetType = relationship.source_type;
+    
+    // Swap cardinalities
+    const newSourceCardinality = relationship.target_cardinality;
+    const newTargetCardinality = relationship.source_cardinality;
+    
+    // Update the relationship
+    updateRelationship(relationshipId, {
+      source_id: newSourceId,
+      target_id: newTargetId,
+      source_type: newSourceType,
+      target_type: newTargetType,
+      source_cardinality: newSourceCardinality,
+      target_cardinality: newTargetCardinality,
+      source_table_id: newSourceType === 'table' ? newSourceId : undefined,
+      target_table_id: newTargetType === 'table' ? newTargetId : undefined,
+      last_modified_at: new Date().toISOString(),
+    });
+    
+    // Update local state to reflect the swap
+    setSourceCardinality(newSourceCardinality);
+    setTargetCardinality(newTargetCardinality);
+    
+    addToast({
+      type: 'success',
+      message: 'Relationship reversed successfully',
+    });
+  };
+
+  const handleDelete = () => {
+    if (window.confirm('Are you sure you want to delete this relationship?')) {
+      removeRelationship(relationshipId);
+      
+      // Also remove reverse relationship if it exists
+      const reverseRelationship = relationships.find(
+        (r) => r.source_id === relationship.target_id && r.target_id === relationship.source_id
+      );
+      if (reverseRelationship) {
+        removeRelationship(reverseRelationship.id);
+      }
+
+      addToast({
+        type: 'success',
+        message: 'Relationship deleted successfully',
+      });
+      onClose();
+    }
+  };
+
+  return (
+    <DraggableModal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Edit Relationship"
+      size="md"
+      initialPosition={{
+        x: window.innerWidth / 2 - 250,
+        y: window.innerHeight / 2 - 200,
+      }}
+    >
+      <div className="flex flex-col max-h-[70vh]">
+        <div className="space-y-4 overflow-y-auto flex-1 pr-2">
+          {/* Relationship Info */}
+          <div className="p-3 bg-gray-50 rounded-md">
+            <div className="text-sm text-gray-600">
+              <span className="font-medium">{sourceName}</span>
+              <span className="mx-2">→</span>
+              <span className="font-medium">{targetName}</span>
+            </div>
+            <div className="text-xs text-gray-500 mt-1">
+              {relationship.source_type} to {relationship.target_type}
+            </div>
+          </div>
+
+        {/* Relationship Type (only for table-to-table) */}
+        {isTableToTable && (
+          <>
+            <div>
+              <label htmlFor="relationship-type" className="block text-sm font-medium text-gray-700 mb-2">
+                Relationship Type
+              </label>
+              <select
+                id="relationship-type"
+                value={relationshipType}
+                onChange={(e) => {
+                  const newType = e.target.value as RelationshipType;
+                  setRelationshipType(newType);
+                  
+                  // Auto-update cardinalities based on type
+                  if (newType === 'one-to-one') {
+                    setSourceCardinality('1');
+                    setTargetCardinality('1');
+                  } else if (newType === 'one-to-many') {
+                    setSourceCardinality('1');
+                    setTargetCardinality('N');
+                  } else if (newType === 'many-to-many') {
+                    setSourceCardinality('N');
+                    setTargetCardinality('N');
+                  }
+                }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="one-to-one">One-to-One</option>
+                <option value="one-to-many">One-to-Many</option>
+                <option value="many-to-many">Many-to-Many</option>
+              </select>
+            </div>
+
+            {/* Source Key Selection */}
+            <div>
+              <label htmlFor="source-key" className="block text-sm font-medium text-gray-700 mb-2">
+                Source Key (from {sourceName})
+              </label>
+              <select
+                id="source-key"
+                value={sourceKey}
+                onChange={(e) => setSourceKey(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Select a key...</option>
+                {getTableKeys(relationship.source_id).map(key => (
+                  <option key={key.id} value={key.id}>
+                    {key.name}
+                  </option>
+                ))}
+              </select>
+              {getTableKeys(relationship.source_id).length === 0 && (
+                <p className="mt-1 text-xs text-yellow-600">
+                  No keys found. Add a primary key or compound key to the source table.
+                </p>
+              )}
+            </div>
+
+            {/* Target Key Selection */}
+            <div>
+              <label htmlFor="target-key" className="block text-sm font-medium text-gray-700 mb-2">
+                Target Key (from {targetName})
+              </label>
+              <select
+                id="target-key"
+                value={targetKey}
+                onChange={(e) => setTargetKey(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Select a key...</option>
+                {getTableKeys(relationship.target_id).map(key => (
+                  <option key={key.id} value={key.id}>
+                    {key.name}
+                  </option>
+                ))}
+              </select>
+              {getTableKeys(relationship.target_id).length === 0 && (
+                <p className="mt-1 text-xs text-yellow-600">
+                  No keys found. Add a primary key or compound key to the target table.
+                </p>
+              )}
+            </div>
+          </>
+        )}
+
+        {/* Cardinality (only for table-to-table) */}
+        {isTableToTable && (
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="source-cardinality" className="block text-sm font-medium text-gray-700 mb-2">
+                Source Cardinality ({sourceName})
+              </label>
+              <select
+                id="source-cardinality"
+                value={sourceCardinality}
+                onChange={(e) => setSourceCardinality(e.target.value as Cardinality)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="0">0 (Optional)</option>
+                <option value="1">1 (Required)</option>
+                <option value="N">N (Many)</option>
+              </select>
+            </div>
+            <div>
+              <label htmlFor="target-cardinality" className="block text-sm font-medium text-gray-700 mb-2">
+                Target Cardinality ({targetName})
+              </label>
+              <select
+                id="target-cardinality"
+                value={targetCardinality}
+                onChange={(e) => setTargetCardinality(e.target.value as Cardinality)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="0">0 (Optional)</option>
+                <option value="1">1 (Required)</option>
+                <option value="N">N (Many)</option>
+              </select>
+            </div>
+          </div>
+        )}
+
+        {/* Label */}
+        <div>
+          <label htmlFor="relationship-label" className="block text-sm font-medium text-gray-700 mb-2">
+            Label (Optional)
+          </label>
+          <input
+            id="relationship-label"
+            type="text"
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+            placeholder="e.g., 'belongs to', 'contains', 'references'"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <p className="mt-1 text-xs text-gray-500">
+            This label will appear on the canvas next to the relationship line
+          </p>
+        </div>
+
+        {/* Description/Notes */}
+        <div>
+          <label htmlFor="relationship-description" className="block text-sm font-medium text-gray-700 mb-2">
+            Description / Notes (Optional)
+          </label>
+          <textarea
+            id="relationship-description"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="Add notes or description about this relationship..."
+            rows={4}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+
+        </div>
+
+        {/* Actions - Fixed at bottom */}
+        <div className="flex justify-between items-center gap-2 pt-4 mt-4 border-t border-gray-200 flex-shrink-0">
+          <div className="flex gap-2 flex-1">
+            {/* Only show Reverse Direction for non-table-to-table relationships */}
+            {!isTableToTable && (
+              <button
+                onClick={handleReverse}
+                className="px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-md hover:bg-blue-100 transition-colors w-full"
+                title="Reverse the direction of this relationship (swap source and target)"
+              >
+                Reverse Direction
+              </button>
+            )}
+            <button
+              onClick={handleDelete}
+              className="px-4 py-2 text-sm font-medium text-red-600 bg-red-50 rounded-md hover:bg-red-100 transition-colors w-full"
+            >
+              Delete
+            </button>
+          </div>
+          <div className="flex gap-2 flex-1">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed w-full"
+              disabled={isSaving}
+            >
+              Close
+            </button>
+            <button
+              onClick={handleSave}
+              className="px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors w-full"
+              disabled={isSaving}
+            >
+              {isSaving ? 'Saving...' : 'Save'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </DraggableModal>
+  );
+};
+

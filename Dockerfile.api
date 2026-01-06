@@ -1,0 +1,70 @@
+# Dockerfile for data-modelling-api
+# This assumes the API is available as a Rust crate on crates.io
+# Note: Requires Rust 1.84+ for edition2024 support (stabilized in 1.84.0)
+# Using Debian-based image for better OpenSSL and package support
+
+FROM rustlang/rust:nightly AS builder
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y \
+    pkg-config \
+    libssl-dev \
+    libpq-dev \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Install the API from crates.io
+# Note: The vendored feature doesn't exist in the crate, so we install without it
+RUN set -euxo pipefail && \
+    CARGO_HOME=${CARGO_HOME:-/usr/local/cargo} && \
+    echo "Cargo home: $CARGO_HOME" && \
+    cargo install data-modelling-api --version 1.1.2 2>&1 | tee /tmp/install.log && \
+    echo "Checking installed binaries:" && \
+    ls -la "$CARGO_HOME/bin/" && \
+    if [ ! -f "$CARGO_HOME/bin/api" ]; then \
+        echo "ERROR: api binary not found in $CARGO_HOME/bin/" && \
+        echo "Install log:" && \
+        cat /tmp/install.log && \
+        echo "Contents of $CARGO_HOME/bin/:" && \
+        ls -la "$CARGO_HOME/bin/" && \
+        exit 1; \
+    fi && \
+    echo "Binary found: $CARGO_HOME/bin/api" && \
+    file "$CARGO_HOME/bin/api" && \
+    # Create symlink for consistency
+    ln -sf "$CARGO_HOME/bin/api" "$CARGO_HOME/bin/data-modelling-api"
+
+# Runtime stage
+FROM debian:bookworm-slim
+
+# Install runtime dependencies
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    libssl3 \
+    libpq5 \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy binary from builder
+# The binary is named 'api', copy it and create symlink for consistency
+COPY --from=builder --chmod=755 /usr/local/cargo/bin/api /usr/local/bin/data-modelling-api
+RUN chmod +x /usr/local/bin/data-modelling-api && \
+    /usr/local/bin/data-modelling-api --version || echo "Binary copied successfully"
+
+# Create non-root user
+RUN groupadd -r -g 1000 api && \
+    useradd -r -u 1000 -g api api
+
+USER api
+
+WORKDIR /app
+
+EXPOSE 8081
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+  CMD curl -f http://localhost:8081/api/v1/health || exit 1
+
+CMD ["data-modelling-api"]

@@ -1,0 +1,35 @@
+appId: com.datamodelling.app
+productName: Open Data Modelling
+copyright: Copyright © 2025
+
+directories:
+  buildResources: build
+  output: release
+
+files:
+  - dist/**/*
+  - electron/dist-electron/**/*
+  - package.json
+
+mac:
+  category: public.app-category.developer-tools
+  target:
+    - target: default
+      arch:
+        - x64
+        - arm64
+  icon: electron/icons/icon.icns
+  # Fallback to PNG if ICNS not available
+  # icon: electron/icons/icon.png
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: electron/entitlements.mac.plist
+  entitlementsInherit: electron/entitlements.mac.plist
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+
+publish: null
+
+

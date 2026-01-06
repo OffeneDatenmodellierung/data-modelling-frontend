@@ -1,0 +1,353 @@
+/**
+ * Validation utilities
+ */
+
+/**
+ * Validate email format
+ */
+export function isValidEmail(email: string): boolean {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+}
+
+/**
+ * Validate UUID format
+ */
+export function isValidUUID(uuid: string): boolean {
+  if (!uuid || typeof uuid !== 'string') {
+    return false;
+  }
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(uuid);
+}
+
+/**
+ * Generate a valid UUID v4
+ * Always returns a properly formatted UUID, even if crypto.randomUUID is not available
+ */
+export function generateUUID(): string {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  
+  // Fallback: Generate UUID v4 manually
+  // Format: xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
+  // where x is any hexadecimal digit and y is one of 8, 9, A, or B
+  const hex = '0123456789abcdef';
+  const r = () => Math.floor(Math.random() * 16);
+  const v = () => (Math.floor(Math.random() * 4) + 8).toString(16); // 8, 9, a, or b
+  
+  return [
+    Array.from({ length: 8 }, () => hex[r()]).join(''),
+    Array.from({ length: 4 }, () => hex[r()]).join(''),
+    '4' + Array.from({ length: 3 }, () => hex[r()]).join(''),
+    v() + Array.from({ length: 3 }, () => hex[r()]).join(''),
+    Array.from({ length: 12 }, () => hex[r()]).join(''),
+  ].join('-');
+}
+
+/**
+ * Normalize a string to a valid UUID
+ * If the input is already a valid UUID, returns it unchanged
+ * Otherwise, generates a new UUID
+ */
+export function normalizeUUID(value: string | undefined | null): string {
+  if (!value || typeof value !== 'string') {
+    return generateUUID();
+  }
+  if (isValidUUID(value)) {
+    return value;
+  }
+  // Invalid UUID - generate a new one
+  console.warn(`[normalizeUUID] Invalid UUID format detected: "${value}". Generating new UUID.`);
+  return generateUUID();
+}
+
+/**
+ * Validate non-empty string
+ */
+export function isNonEmptyString(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+/**
+ * Validate positive number
+ */
+export function isPositiveNumber(value: unknown): value is number {
+  return typeof value === 'number' && value > 0 && !isNaN(value);
+}
+
+/**
+ * Validate non-negative number
+ */
+export function isNonNegativeNumber(value: unknown): value is number {
+  return typeof value === 'number' && value >= 0 && !isNaN(value);
+}
+
+/**
+ * Validate table name (max 255 chars, alphanumeric + underscore)
+ */
+export function isValidTableName(name: string): boolean {
+  if (!name || name.length > 255) {
+    return false;
+  }
+  const nameRegex = /^[a-zA-Z0-9_]+$/;
+  return nameRegex.test(name);
+}
+
+/**
+ * Validate column name (max 255 chars, alphanumeric + underscore)
+ */
+export function isValidColumnName(name: string): boolean {
+  if (!name || name.length > 255) {
+    return false;
+  }
+  const nameRegex = /^[a-zA-Z0-9_]+$/;
+  return nameRegex.test(name);
+}
+
+/**
+ * Sanitize string input (remove dangerous characters)
+ */
+export function sanitizeString(input: string): string {
+  return input.replace(/[<>\"']/g, '');
+}
+
+/**
+ * Detect circular relationships in a set of relationships
+ * Returns true if adding a relationship from source to target would create a cycle
+ */
+export function detectCircularRelationship(
+  relationships: Array<{ source_table_id: string; target_table_id: string }>,
+  sourceTableId: string,
+  targetTableId: string
+): { isCircular: boolean; path?: string[] } {
+  // Build adjacency map
+  const graph = new Map<string, string[]>();
+  
+  // Add existing relationships
+  relationships.forEach((rel) => {
+    if (!graph.has(rel.source_table_id)) {
+      graph.set(rel.source_table_id, []);
+    }
+    graph.get(rel.source_table_id)!.push(rel.target_table_id);
+  });
+
+  // Add the potential new relationship
+  if (!graph.has(sourceTableId)) {
+    graph.set(sourceTableId, []);
+  }
+  graph.get(sourceTableId)!.push(targetTableId);
+
+  // DFS to detect cycle
+  const visited = new Set<string>();
+  const recStack = new Set<string>();
+  const path: string[] = [];
+
+  const dfs = (node: string): boolean => {
+    if (recStack.has(node)) {
+      // Found a cycle
+      path.push(node);
+      return true;
+    }
+    if (visited.has(node)) {
+      return false;
+    }
+
+    visited.add(node);
+    recStack.add(node);
+    path.push(node);
+
+    const neighbors = graph.get(node) || [];
+    for (const neighbor of neighbors) {
+      if (dfs(neighbor)) {
+        return true;
+      }
+    }
+
+    recStack.delete(node);
+    path.pop();
+    return false;
+  };
+
+  // Check all nodes
+  for (const node of graph.keys()) {
+    if (!visited.has(node)) {
+      if (dfs(node)) {
+        return { isCircular: true, path: [...path] };
+      }
+    }
+  }
+
+  return { isCircular: false };
+}
+
+/**
+ * Check if a relationship would create a circular dependency
+ * Returns warning message if circular, null otherwise
+ */
+export function checkCircularRelationshipWarning(
+  relationships: Array<{ source_table_id: string; target_table_id: string }>,
+  sourceTableId: string,
+  targetTableId: string
+): string | null {
+  const result = detectCircularRelationship(relationships, sourceTableId, targetTableId);
+  if (result.isCircular) {
+    const pathStr = result.path ? result.path.join(' → ') : 'unknown path';
+    return `Warning: This relationship creates a circular dependency: ${pathStr}. Circular relationships are allowed but may indicate a design issue.`;
+  }
+  return null;
+}
+
+/**
+ * Normalize UUIDs in a workspace object to ensure all UUID fields are valid
+ * This is critical for SDK export functions which require valid UUIDs
+ */
+export function normalizeWorkspaceUUIDs(workspace: any): any {
+  if (!workspace || typeof workspace !== 'object') {
+    return workspace;
+  }
+
+  const normalized = { ...workspace };
+  const uuidMap = new Map<string, string>(); // Map old invalid UUIDs to new valid ones
+
+  // Normalize workspace-level UUIDs
+  if (normalized.workspace_id) {
+    const oldId = normalized.workspace_id;
+    normalized.workspace_id = normalizeUUID(oldId);
+    if (oldId !== normalized.workspace_id) {
+      uuidMap.set(oldId, normalized.workspace_id);
+    }
+  }
+
+  if (normalized.domain_id) {
+    const oldId = normalized.domain_id;
+    normalized.domain_id = normalizeUUID(oldId);
+    if (oldId !== normalized.domain_id) {
+      uuidMap.set(oldId, normalized.domain_id);
+    }
+  }
+
+  // Normalize tables
+  if (Array.isArray(normalized.tables)) {
+    normalized.tables = normalized.tables.map((table: any) => {
+      const normalizedTable = { ...table };
+      
+      // Normalize table-level UUIDs
+      if (normalizedTable.id) {
+        const oldId = normalizedTable.id;
+        normalizedTable.id = normalizeUUID(oldId);
+        if (oldId !== normalizedTable.id) {
+          uuidMap.set(oldId, normalizedTable.id);
+        }
+      }
+      if (normalizedTable.workspace_id) {
+        normalizedTable.workspace_id = uuidMap.get(normalizedTable.workspace_id) || normalizeUUID(normalizedTable.workspace_id);
+      }
+      if (normalizedTable.primary_domain_id) {
+        normalizedTable.primary_domain_id = uuidMap.get(normalizedTable.primary_domain_id) || normalizeUUID(normalizedTable.primary_domain_id);
+      }
+      if (normalizedTable.table_id) {
+        normalizedTable.table_id = normalizeUUID(normalizedTable.table_id);
+      }
+
+      // Normalize columns
+      if (Array.isArray(normalizedTable.columns)) {
+        normalizedTable.columns = normalizedTable.columns.map((col: any) => {
+          const normalizedCol = { ...col };
+          if (normalizedCol.id) {
+            normalizedCol.id = normalizeUUID(normalizedCol.id);
+          }
+          if (normalizedCol.table_id) {
+            normalizedCol.table_id = normalizedTable.id; // Use normalized table ID
+          }
+          if (normalizedCol.foreign_key_reference) {
+            normalizedCol.foreign_key_reference = normalizeUUID(normalizedCol.foreign_key_reference);
+          }
+          if (normalizedCol.compound_key_id) {
+            normalizedCol.compound_key_id = normalizeUUID(normalizedCol.compound_key_id);
+          }
+          return normalizedCol;
+        });
+      }
+
+      // Normalize compound keys
+      if (Array.isArray(normalizedTable.compoundKeys)) {
+        normalizedTable.compoundKeys = normalizedTable.compoundKeys.map((ck: any) => {
+          const normalizedCK = { ...ck };
+          if (normalizedCK.id) {
+            normalizedCK.id = normalizeUUID(normalizedCK.id);
+          }
+          if (normalizedCK.table_id) {
+            normalizedCK.table_id = normalizedTable.id; // Use normalized table ID
+          }
+          if (Array.isArray(normalizedCK.column_ids)) {
+            // Map column IDs to normalized column IDs
+            normalizedCK.column_ids = normalizedCK.column_ids.map((colId: string) => {
+              const col = normalizedTable.columns?.find((c: any) => c.id === colId || c.id === uuidMap.get(colId));
+              return col?.id || normalizeUUID(colId);
+            });
+          }
+          return normalizedCK;
+        });
+      }
+
+      // Normalize indexes in metadata
+      if (normalizedTable.metadata && Array.isArray(normalizedTable.metadata.indexes)) {
+        normalizedTable.metadata.indexes = normalizedTable.metadata.indexes.map((idx: any) => {
+          const normalizedIdx = { ...idx };
+          if (normalizedIdx.id) {
+            normalizedIdx.id = normalizeUUID(normalizedIdx.id);
+          }
+          if (Array.isArray(normalizedIdx.column_ids)) {
+            normalizedIdx.column_ids = normalizedIdx.column_ids.map((colId: string) => {
+              const col = normalizedTable.columns?.find((c: any) => c.id === colId || c.id === uuidMap.get(colId));
+              return col?.id || normalizeUUID(colId);
+            });
+          }
+          return normalizedIdx;
+        });
+      }
+
+      return normalizedTable;
+    });
+  }
+
+  // Normalize relationships
+  if (Array.isArray(normalized.relationships)) {
+    normalized.relationships = normalized.relationships.map((rel: any) => {
+      const normalizedRel = { ...rel };
+      if (normalizedRel.id) {
+        normalizedRel.id = normalizeUUID(normalizedRel.id);
+      }
+      if (normalizedRel.workspace_id) {
+        normalizedRel.workspace_id = uuidMap.get(normalizedRel.workspace_id) || normalizeUUID(normalizedRel.workspace_id);
+      }
+      if (normalizedRel.domain_id) {
+        normalizedRel.domain_id = uuidMap.get(normalizedRel.domain_id) || normalizeUUID(normalizedRel.domain_id);
+      }
+      if (normalizedRel.source_id) {
+        normalizedRel.source_id = uuidMap.get(normalizedRel.source_id) || normalizeUUID(normalizedRel.source_id);
+      }
+      if (normalizedRel.target_id) {
+        normalizedRel.target_id = uuidMap.get(normalizedRel.target_id) || normalizeUUID(normalizedRel.target_id);
+      }
+      if (normalizedRel.source_table_id) {
+        normalizedRel.source_table_id = uuidMap.get(normalizedRel.source_table_id) || normalizeUUID(normalizedRel.source_table_id);
+      }
+      if (normalizedRel.target_table_id) {
+        normalizedRel.target_table_id = uuidMap.get(normalizedRel.target_table_id) || normalizeUUID(normalizedRel.target_table_id);
+      }
+      if (normalizedRel.source_key) {
+        normalizedRel.source_key = normalizeUUID(normalizedRel.source_key);
+      }
+      if (normalizedRel.target_key) {
+        normalizedRel.target_key = normalizeUUID(normalizedRel.target_key);
+      }
+      return normalizedRel;
+    });
+  }
+
+  return normalized;
+}
+
