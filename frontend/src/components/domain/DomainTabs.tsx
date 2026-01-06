@@ -946,7 +946,7 @@ export const DomainTabs: React.FC<DomainTabsProps> = ({ workspaceId }) => {
       </div>
 
       {/* BPMN Process Links */}
-      {selectedDomainId && bpmnProcesses.length > 0 && (
+      {selectedDomainId && bpmnProcesses && bpmnProcesses.length > 0 && (
         <div className="bg-gray-50 border-b border-gray-200 px-4 py-2">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-xs font-medium text-gray-600">BPMN Processes:</span>
