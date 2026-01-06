@@ -614,6 +614,14 @@ export const DomainCanvas: React.FC<DomainCanvasProps> = ({ workspaceId, domainI
 
   // Convert relationships to ReactFlow edges
   const initialEdges: Edge[] = useMemo(() => {
+    console.log('[DomainCanvas] Computing initialEdges from relationships:', {
+      relationshipCount: domainRelationships.length,
+      relationshipIds: domainRelationships.map((r) => r.id),
+      duplicateRelIds: domainRelationships
+        .map((r) => r.id)
+        .filter((id, index, arr) => arr.indexOf(id) !== index),
+    });
+
     const relationshipEdges = domainRelationships
       .filter((rel) => {
         // Get source and target IDs (support both new format and legacy format)
@@ -786,6 +794,13 @@ export const DomainCanvas: React.FC<DomainCanvasProps> = ({ workspaceId, domainI
   }, [visibleTables, domainComputeAssets, domainSystems, currentView, initialNodes, setNodes]);
 
   useEffect(() => {
+    console.log('[DomainCanvas] Updating edges:', {
+      edgeCount: initialEdges.length,
+      edgeIds: initialEdges.map((e) => e.id),
+      duplicateIds: initialEdges
+        .map((e) => e.id)
+        .filter((id, index, arr) => arr.indexOf(id) !== index),
+    });
     setEdges(initialEdges);
   }, [initialEdges, setEdges]);
 
