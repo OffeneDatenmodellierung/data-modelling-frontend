@@ -43,8 +43,9 @@ export const EditorModal: React.FC<EditorModalProps> = ({
       isOpen={isOpen}
       onClose={onClose}
       title={title}
-      size={size === 'full' ? 'xl' : size}
+      size={size === 'full' ? 'xxl' : size}
       noPadding={true}
+      resizable={true}
     >
       {type === 'bpmn' && <BPMNEditor {...bpmnProps} onSave={handleSave} onClose={onClose} />}
       {type === 'dmn' && <DMNEditor {...dmnProps} onSave={handleSave} onClose={onClose} />}
