@@ -365,9 +365,7 @@ export const CardinalityEdge: React.FC<EdgeProps<CardinalityEdgeData>> = ({
         if (otherEdge.type !== 'cardinality') continue; // Only check cardinality edges
 
         // Get node connection points for other edge
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const otherSourcePos = (otherEdge as any).sourcePosition ?? 'bottom';
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const otherTargetPos = (otherEdge as any).targetPosition ?? 'top';
         const otherSourcePoint = getNodeConnectionPoint(otherEdge.source, otherSourcePos);
         const otherTargetPoint = getNodeConnectionPoint(otherEdge.target, otherTargetPos);

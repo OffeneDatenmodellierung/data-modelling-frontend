@@ -86,21 +86,22 @@ export const TagFilter: React.FC<TagFilterProps> = ({
                 <span className="font-medium">Simple:</span>
                 <code className="ml-2 px-1 bg-gray-100 rounded">production</code>
                 <p className="text-xs text-gray-600 mt-1">
-                  Matches any tag containing "production"
+                  Matches any tag containing &quot;production&quot;
                 </p>
               </div>
               <div>
                 <span className="font-medium">Keyword:</span>
                 <code className="ml-2 px-1 bg-gray-100 rounded">env:production</code>
                 <p className="text-xs text-gray-600 mt-1">
-                  Matches tags with key "env" and value "production"
+                  Matches tags with key &quot;env&quot; and value &quot;production&quot;
                 </p>
               </div>
               <div>
                 <span className="font-medium">Keyword with list:</span>
                 <code className="ml-2 px-1 bg-gray-100 rounded">product:food,beverage</code>
                 <p className="text-xs text-gray-600 mt-1">
-                  Matches tags with key "product" and value "food" or "beverage"
+                  Matches tags with key &quot;product&quot; and value &quot;food&quot; or
+                  &quot;beverage&quot;
                 </p>
               </div>
               <div className="pt-2 border-t border-gray-200 mt-2">

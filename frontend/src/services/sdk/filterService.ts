@@ -81,6 +81,7 @@ export async function filterByTags(
     const filteredTables = filteredWorkspace.nodes
       .filter((n: any) => n.type === 'table')
       .map((n: any) => {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { type, ...table } = n;
         return table as Table;
       });
@@ -88,6 +89,7 @@ export async function filterByTags(
     const filteredAssets = filteredWorkspace.nodes
       .filter((n: any) => n.type === 'compute_asset')
       .map((n: any) => {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { type, ...asset } = n;
         return asset as ComputeAsset;
       });

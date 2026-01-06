@@ -5,7 +5,7 @@
     "Mark Olliver"
   ],
   "description": "Shared SDK for model operations across platforms (API, WASM, Native)",
-  "version": "1.9.0",
+  "version": "1.10.0",
   "license": "MIT",
   "repository": {
     "type": "git",
