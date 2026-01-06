@@ -1,22 +1,57 @@
 # Cloudflare Pages Deployment Guide
 
-This guide explains how to build and deploy the Open Data Modelling webapp to Cloudflare Pages, including building the WASM SDK with the `openapi` feature enabled.
+This guide explains how to build and deploy the Open Data Modelling webapp to Cloudflare Pages using GitHub Actions and Wrangler.
 
-## Quick Start Checklist
+## Quick Start (Recommended Method)
 
-When configuring in Cloudflare Pages dashboard, you need to set:
+This project uses **GitHub Actions** to automatically deploy to Cloudflare Pages. This is the recommended approach as it provides full control over the build configuration.
 
-✅ **Build command**: `cd frontend && bash cloudflare-build.sh`  
-✅ **Build output directory**: `frontend/dist`  
-✅ **Environment variables** (after project creation): 
-   - `VITE_OFFLINE_MODE=true` (required)
-   - `VITE_BASE_PATH=/` (required)
-   - `WASM_SDK_VERSION=latest` (optional - defaults to latest release, or specify version like `1.8.1`)
-   - `WASM_SDK_REPO=pixie79/data-modelling-sdk` (optional - defaults to pixie79/data-modelling-sdk)
-   
-**Important**: The WASM SDK is **REQUIRED** - the build will fail if it cannot be downloaded. Do not set `CLOUDFLARE_SKIP_WASM` unless you understand the consequences.  
+### Prerequisites
 
-**Note**: You don't need to select a framework preset - the custom build command handles everything. Just fill in the build command and output directory fields.
+1. **Cloudflare Account**: Sign up at [cloudflare.com](https://www.cloudflare.com/)
+2. **GitHub Repository Secrets**: Add these to your repository settings:
+   - `CLOUDFLARE_API_TOKEN`: Your Cloudflare API token (with Pages permissions)
+   - `CLOUDFLARE_ACCOUNT_ID`: Your Cloudflare account ID
+
+### Setup Steps
+
+1. **Get Cloudflare Account ID**:
+   - Log in to Cloudflare Dashboard
+   - Go to any domain or Workers & Pages
+   - Your Account ID is shown in the right sidebar
+
+2. **Create Cloudflare API Token**:
+   - Go to [Cloudflare API Tokens](https://dash.cloudflare.com/profile/api-tokens)
+   - Click "Create Token"
+   - Use "Edit Cloudflare Workers" template or create custom with:
+     - Permissions: `Account - Cloudflare Pages - Edit`
+   - Copy the token (you won't see it again!)
+
+3. **Add Secrets to GitHub**:
+   - Go to your GitHub repository → Settings → Secrets and variables → Actions
+   - Add `CLOUDFLARE_API_TOKEN` with your API token
+   - Add `CLOUDFLARE_ACCOUNT_ID` with your account ID
+
+4. **Deploy**:
+   - Push to `main` or `release/v1.1.0` branch
+   - GitHub Actions will automatically build and deploy
+   - Check the Actions tab for deployment status
+
+**That's it!** Every push to these branches will trigger a new deployment.
+
+## Configuration Files
+
+The project includes two configuration approaches:
+
+### 1. GitHub Actions (Recommended)
+
+See `.github/workflows/deploy-cloudflare.yml` - automatically deploys on push.
+
+### 2. Wrangler Configuration
+
+See `wrangler.toml` in the project root - defines build settings and output directory.
+
+**Note**: The WASM SDK is **REQUIRED** - the build will fail if it cannot be downloaded from GitHub releases.
 
 ## Prerequisites
 
