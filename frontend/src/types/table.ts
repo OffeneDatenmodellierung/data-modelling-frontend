@@ -99,6 +99,30 @@ export interface TableIndex {
   description?: string; // Optional description
 }
 
+/**
+ * Authoritative Definition reference (ODCS v3.1.0)
+ * Links to external authoritative sources for data definitions
+ */
+export interface AuthoritativeDefinition {
+  type: string; // Type of definition source (e.g., "business-glossary", "data-dictionary")
+  url: string; // URL to the authoritative definition
+}
+
+/**
+ * Logical Type Options (ODCS v3.1.0)
+ * Additional validation and metadata for logical data types
+ */
+export interface LogicalTypeOptions {
+  minLength?: number; // Minimum string length
+  maxLength?: number; // Maximum string length
+  pattern?: string; // Regex pattern for validation
+  format?: string; // Format specifier (e.g., "email", "date", "uuid")
+  minimum?: number; // Minimum numeric value
+  maximum?: number; // Maximum numeric value
+  precision?: number; // Numeric precision (total digits)
+  scale?: number; // Numeric scale (decimal places)
+}
+
 export interface Column {
   id: string; // UUID
   table_id: string; // UUID
@@ -119,6 +143,26 @@ export interface Column {
   created_at: string; // ISO timestamp
   parent_column_id?: string; // UUID of parent column (for nested columns in STRUCT/ARRAY types)
   nested_columns?: Column[]; // Child columns (for STRUCT/ARRAY types) - used for display hierarchy
+
+  // ODCS v3.1.0 fields (SDK 1.11.0+)
+  businessName?: string; // Business-friendly name for the column
+  physicalName?: string; // Physical storage name (may differ from logical name)
+  logicalTypeOptions?: LogicalTypeOptions; // Validation and metadata for logical types
+  primaryKeyPosition?: number; // Position in composite primary key (1-indexed)
+  unique?: boolean; // Whether column values must be unique
+  partitioned?: boolean; // Whether column is used for table partitioning
+  partitionKeyPosition?: number; // Position in partition key (1-indexed)
+  clustered?: boolean; // Whether column is used for clustering
+  classification?: string; // Data classification level (e.g., "PII", "confidential")
+  criticalDataElement?: boolean; // Whether this is a critical data element requiring special handling
+  encryptedName?: string; // Name of the encrypted version of this column (if applicable)
+  transformSourceObjects?: string[]; // Source objects used in transformation logic
+  transformLogic?: string; // Transformation logic or formula applied to this column
+  transformDescription?: string; // Description of the transformation logic
+  examples?: string[]; // Example values for documentation and testing
+  authoritativeDefinitions?: AuthoritativeDefinition[]; // Links to authoritative definitions
+  tags?: Array<{ key?: string; value: string }>; // Column-level tags
+  customProperties?: Record<string, unknown>; // Custom metadata properties
 }
 
 export interface CompoundKey {

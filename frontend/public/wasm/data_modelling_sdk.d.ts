@@ -1,4 +1,5 @@
 /* tslint:disable */
+/* eslint-disable */
 
 /**
  * Add a CADS node to a domain in a DataModel.
@@ -1138,19 +1139,19 @@ export interface InitOutput {
   readonly validate_pattern_exclusivity: (a: number, b: number) => [number, number, number, number];
   readonly validate_table_name: (a: number, b: number) => [number, number, number, number];
   readonly validate_uuid: (a: number, b: number) => [number, number, number, number];
-  readonly wasm_bindgen__convert__closures________invoke__h47db7ae62ca5beb1: (
+  readonly wasm_bindgen__convert__closures________invoke__h77a3054d216d9e82: (
     a: number,
     b: number,
     c: any
   ) => void;
-  readonly wasm_bindgen__closure__destroy__hac0da26c8d89e90d: (a: number, b: number) => void;
-  readonly wasm_bindgen__convert__closures_____invoke__h05ea8688cde0d495: (
+  readonly wasm_bindgen__closure__destroy__h5f86de003d865d06: (a: number, b: number) => void;
+  readonly wasm_bindgen__convert__closures_____invoke__h3aa4f50d9cb64e36: (
     a: number,
     b: number,
     c: any
   ) => void;
-  readonly wasm_bindgen__closure__destroy__h90087f72df793db4: (a: number, b: number) => void;
-  readonly wasm_bindgen__convert__closures_____invoke__h3f04f8768b5c65b3: (
+  readonly wasm_bindgen__closure__destroy__he59d4bc392497fcb: (a: number, b: number) => void;
+  readonly wasm_bindgen__convert__closures_____invoke__h7a1f4b234d01e50d: (
     a: number,
     b: number,
     c: any,
