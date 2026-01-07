@@ -25,6 +25,9 @@ import type { BPMNProcess } from '@/types/bpmn';
 import type { DMNDecision } from '@/types/dmn';
 import type { System } from '@/types/system';
 import type { Relationship } from '@/types/relationship';
+import { FileMigration } from '@/utils/fileMigration';
+import { WorkspaceV2Loader } from './workspaceV2Loader';
+import { WorkspaceV2Saver } from './workspaceV2Saver';
 // Helper function to join paths
 // Uses simple string concatenation to avoid bundling Node.js 'path' module for browser
 // This file is only used in Electron, but Vite tries to bundle it for browser builds
@@ -1030,6 +1033,157 @@ class ElectronFileService {
       );
       return null;
     }
+  }
+
+  /**
+   * Load workspace from folder (supports both v1 and v2 formats)
+   * Detects format automatically and routes to appropriate loader
+   */
+  async loadWorkspaceFromFolder(workspacePath: string): Promise<Workspace | null> {
+    if (getPlatform() !== 'electron') {
+      throw new Error('Electron file service can only be used in Electron environment');
+    }
+
+    try {
+      // List all files in workspace directory
+      const files = await platformFileService.readDirectory(workspacePath);
+      const fileNames = files.map((f) => f.name);
+
+      // Detect format
+      const format = FileMigration.detectWorkspaceFormat(fileNames);
+      console.log(`[ElectronFileService] Detected workspace format: ${format}`);
+
+      if (format === 'v2') {
+        // Convert file paths to File objects for v2 loader
+        const fileObjects: File[] = [];
+        for (const file of files) {
+          try {
+            const content = await platformFileService.readFile(file.path);
+            const blob = new Blob([content], { type: 'text/plain' });
+            const fileObj = new File([blob], file.name, { type: 'text/plain' });
+            fileObjects.push(fileObj);
+          } catch (error) {
+            console.warn(`[ElectronFileService] Failed to read file ${file.name}:`, error);
+          }
+        }
+
+        // Use v2 loader
+        const fileList = {
+          length: fileObjects.length,
+          item: (index: number) => fileObjects[index] || null,
+          [Symbol.iterator]: function* () {
+            for (const file of fileObjects) {
+              yield file;
+            }
+          },
+        } as FileList;
+
+        return await WorkspaceV2Loader.loadFromFiles(fileList);
+      }
+
+      // V1 format - use existing loadDomainFolder logic
+      return await this.loadWorkspaceFromFolderV1(workspacePath);
+    } catch (error) {
+      console.error(`[ElectronFileService] Failed to load workspace from ${workspacePath}:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Load workspace from folder (v1 format - folder-based structure)
+   * This is the original implementation
+   */
+  private async loadWorkspaceFromFolderV1(workspacePath: string): Promise<Workspace | null> {
+    if (getPlatform() !== 'electron') {
+      throw new Error('Electron file service can only be used in Electron environment');
+    }
+
+    try {
+      // Load workspace metadata
+      const workspaceMetadata = await this.loadWorkspaceMetadata(workspacePath);
+
+      // List domain folders
+      const files = await platformFileService.readDirectory(workspacePath);
+      // Filter for directories by checking if name doesn't have extension
+      const domainFolders = files.filter((f) => !f.name.includes('.') && f.name !== '.git');
+
+      // Load all domains
+      const domains: DomainType[] = [];
+      const allTables: Table[] = [];
+      const allProducts: DataProduct[] = [];
+      const allAssets: ComputeAsset[] = [];
+      const allBpmnProcesses: BPMNProcess[] = [];
+      const allDmnDecisions: DMNDecision[] = [];
+      const allSystems: System[] = [];
+      const allRelationships: Relationship[] = [];
+
+      for (const folder of domainFolders) {
+        const domainData = await this.loadDomainFolder(folder.path);
+        domains.push(domainData.domain);
+        allTables.push(...domainData.tables);
+        allProducts.push(...domainData.products);
+        allAssets.push(...domainData.assets);
+        allBpmnProcesses.push(...domainData.bpmnProcesses);
+        allDmnDecisions.push(...domainData.dmnDecisions);
+        allSystems.push(...domainData.systems);
+        allRelationships.push(...domainData.relationships);
+      }
+
+      // Build workspace object
+      const workspace: Workspace = {
+        id: workspaceMetadata?.id || '',
+        name: workspaceMetadata?.name || 'Workspace',
+        owner_id: '',
+        created_at: workspaceMetadata?.created_at || new Date().toISOString(),
+        last_modified_at: workspaceMetadata?.last_modified_at || new Date().toISOString(),
+        domains,
+      };
+
+      return workspace;
+    } catch (error) {
+      console.error(`[ElectronFileService] Failed to load workspace from ${workspacePath}:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Save workspace in v2 format (flat file structure)
+   */
+  async saveWorkspaceV2(
+    workspacePath: string,
+    workspace: Workspace,
+    domains: DomainType[],
+    allTables: Table[],
+    allSystems: System[],
+    allProducts: DataProduct[],
+    allAssets: ComputeAsset[],
+    allBpmnProcesses: BPMNProcess[],
+    allDmnDecisions: DMNDecision[]
+  ): Promise<void> {
+    if (getPlatform() !== 'electron') {
+      throw new Error('Electron file service can only be used in Electron environment');
+    }
+
+    // Generate v2 files
+    const files = await WorkspaceV2Saver.generateFiles(
+      workspace,
+      domains,
+      allTables,
+      allSystems,
+      allProducts,
+      allAssets,
+      allBpmnProcesses,
+      allDmnDecisions
+    );
+
+    // Write files to disk
+    for (const file of files) {
+      const filePath = joinPath(workspacePath, file.name);
+      await platformFileService.writeFile(filePath, file.content);
+      console.log(`[ElectronFileService] Wrote v2 file: ${file.name}`);
+    }
+
+    console.log(`[ElectronFileService] Saved workspace in v2 format to ${workspacePath}`);
   }
 
   /**
