@@ -138,7 +138,8 @@ export interface Column {
   default_value?: string;
   constraints?: Record<string, unknown>; // JSON object with constraint definitions and quality rules
   description?: string; // Column description
-  quality_rules?: Record<string, unknown>; // Column-level quality rules (ODCS)
+  quality_rules?: Record<string, unknown> | unknown[]; // Column-level quality rules (ODCS object or ODCL array)
+  quality?: unknown[]; // Raw quality array from SDK (ODCL format with great-expectations rules)
   order: number; // display order
   created_at: string; // ISO timestamp
   parent_column_id?: string; // UUID of parent column (for nested columns in STRUCT/ARRAY types)

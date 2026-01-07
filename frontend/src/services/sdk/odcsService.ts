@@ -73,18 +73,27 @@ class ODCSService {
               name: result.tables[0].name,
               columnsCount: result.tables[0].columns?.length,
               hasQualityRules: !!result.tables[0].quality_rules,
+              firstColumnQuality: result.tables[0].columns?.[0]?.quality,
               firstColumnSample: result.tables[0].columns?.[0],
             });
           }
 
+          // SDK 1.8.4+: Normalize tables to ensure quality rules are in expected format
+          // The SDK returns 'quality' array on columns, but UI expects 'quality_rules'
+          const normalizedTables = (result.tables || []).map((table: any, index: number) =>
+            this.normalizeTable(table, index, {}, {})
+          );
+
           // SDK 1.8.4+: Returns complete, validated data - preserve all fields
+          // Spread result first, then override tables with normalized version
+          const { tables: _rawTables, ...restResult } = result;
           return {
+            ...restResult, // Preserve any additional fields from SDK
             workspace_id: result.workspace_id,
             domain_id: result.domain_id,
-            tables: result.tables || [],
+            tables: normalizedTables,
             relationships: result.relationships || [],
             data_flow_diagrams: result.data_flow_diagrams || [],
-            ...result, // Preserve any additional fields from SDK
           };
         } catch (error) {
           console.error('[ODCSService] Error parsing ODCS with SDK:', error);
@@ -146,19 +155,27 @@ class ODCSService {
               name: result.tables[0].name,
               columnsCount: result.tables[0].columns?.length,
               hasQualityRules: !!result.tables[0].quality_rules,
+              firstColumnQuality: result.tables[0].columns?.[0]?.quality,
               firstColumnSample: result.tables[0].columns?.[0],
             });
           }
 
+          // SDK 1.8.4+: Normalize tables to ensure quality rules are in expected format
+          // The SDK returns 'quality' array on columns, but UI expects 'quality_rules'
+          const normalizedTables = (result.tables || []).map((table: any, index: number) =>
+            this.normalizeTable(table, index, {}, {})
+          );
+
           // SDK 1.8.4+ returns complete workspace structure with all ODCL metadata
-          // Preserve all fields from SDK result
+          // Spread result first, then override tables with normalized version
+          const { tables: _rawTables, ...restResult } = result;
           return {
+            ...restResult, // Preserve any additional fields from SDK
             workspace_id: result.workspace_id,
             domain_id: result.domain_id,
-            tables: result.tables || [],
+            tables: normalizedTables,
             relationships: result.relationships || [],
             data_flow_diagrams: result.data_flow_diagrams || [],
-            ...result, // Preserve any additional fields from SDK
           };
         } catch (error) {
           console.error('[ODCSService] Error parsing ODCL with SDK:', error);
