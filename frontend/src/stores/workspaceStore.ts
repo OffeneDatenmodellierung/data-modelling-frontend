@@ -695,11 +695,13 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           const uiStoreModule = await import('@/stores/uiStore');
 
           if (mode === 'offline' && platform === 'browser') {
-            // Browser mode: Check for cached directory handle first, only prompt if not available
+            // Browser mode: Save in V2 flat file format
             try {
-              const { browserFileService } = await import('@/services/platform/browser');
               const { localFileService } = await import('@/services/storage/localFileService');
               const modelStoreModule = await import('@/stores/modelStore');
+              const decisionStoreModule = await import('@/stores/decisionStore');
+              const knowledgeStoreModule = await import('@/stores/knowledgeStore');
+
               const {
                 tables,
                 relationships,
@@ -711,76 +713,29 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                 systems,
               } = modelStoreModule.useModelStore.getState();
 
-              // Check for cached directory handle first
-              let directoryHandle: FileSystemDirectoryHandle | null | undefined =
-                browserFileService.getCachedDirectoryHandle(workspace.name || workspace.id);
+              const { articles } = knowledgeStoreModule.useKnowledgeStore.getState();
+              const { decisions } = decisionStoreModule.useDecisionStore.getState();
 
-              if (!directoryHandle) {
-                // No cached handle - request directory access (prompt user)
-                directoryHandle = await browserFileService.requestDirectoryAccess(
-                  workspace.name || workspace.id
-                );
-
-                if (!directoryHandle) {
-                  // User cancelled - offer ZIP download instead
-                  const useZip = window.confirm(
-                    'Directory access was cancelled. Would you like to download a ZIP file with all domains instead?'
-                  );
-
-                  if (!useZip) {
-                    return;
-                  }
-                  // Note: Directory handle is not cached if user cancels, so auto-save will use IndexedDB only
-                }
-              }
-              // Directory handle is automatically cached by requestDirectoryAccess if granted
-              // This allows auto-save to use the same directory in future saves
-
-              // Save each domain
-              for (const domain of domains) {
-                const domainTables = tables.filter((t) => t.primary_domain_id === domain.id);
-                const domainProducts = products.filter((p) => p.domain_id === domain.id);
-                const domainAssets = computeAssets.filter((a) => a.domain_id === domain.id);
-                const domainBpmn = bpmnProcesses.filter((p) => p.domain_id === domain.id);
-                const domainDmn = dmnDecisions.filter((d) => d.domain_id === domain.id);
-                const domainSystems = systems.filter((s) => s.domain_id === domain.id);
-                const domainRelationships = relationships.filter((r) => r.domain_id === domain.id);
-
-                await localFileService.saveDomainFolder(
-                  workspace.name || workspace.id,
-                  domain,
-                  domainTables,
-                  domainProducts,
-                  domainAssets,
-                  domainBpmn,
-                  domainDmn,
-                  domainSystems,
-                  domainRelationships
-                );
-              }
-
-              // Save workspace.yaml if we have directory access
-              if (directoryHandle) {
-                const workspaceMetadata = {
-                  id: workspace.id,
-                  name: workspace.name || workspace.id,
-                  created_at: workspace.created_at || new Date().toISOString(),
-                  last_modified_at: new Date().toISOString(),
-                  domains: domains.map((d) => ({ id: d.id, name: d.name })),
-                };
-                await localFileService.saveWorkspaceMetadata(
-                  workspace.name || workspace.id,
-                  workspaceMetadata
-                );
-              }
+              // Save workspace in V2 format (prompts for directory or falls back to ZIP)
+              await localFileService.saveWorkspaceV2(
+                workspace,
+                domains,
+                tables,
+                systems,
+                relationships,
+                products,
+                computeAssets,
+                bpmnProcesses,
+                dmnDecisions,
+                articles,
+                decisions
+              );
 
               set({ pendingChanges: false, lastSavedAt: new Date().toISOString() });
 
               uiStoreModule.useUIStore.getState().addToast({
                 type: 'success',
-                message: directoryHandle
-                  ? `Saved all ${domains.length} domain(s) to directory`
-                  : `Downloaded all ${domains.length} domain(s) as ZIP files`,
+                message: `Saved workspace "${workspace.name}" with ${domains.length} domain(s) in V2 format`,
               });
             } catch (error) {
               console.error('Failed to manually save workspace:', error);
