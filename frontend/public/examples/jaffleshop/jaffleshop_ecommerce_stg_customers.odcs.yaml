@@ -1,4 +1,4 @@
-version: "1.0.0"
+version: '1.0.0'
 apiVersion: v3.1.0
 kind: DataContract
 id: 4ec969d7-7f62-40b8-81dc-86ab915dd26a
@@ -31,10 +31,8 @@ schema:
 customProperties:
   - property: system_id
     value: ad789620-a825-4bc4-afd7-429db96a6359
-  - property: data_level
-    value: silver
 
 tags:
   - staging
   - customers
-  - silver
+  - dm_level:Silver

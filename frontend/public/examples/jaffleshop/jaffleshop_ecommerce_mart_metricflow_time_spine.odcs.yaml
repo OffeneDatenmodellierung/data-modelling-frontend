@@ -1,4 +1,4 @@
-version: "1.0.0"
+version: '1.0.0'
 apiVersion: v3.1.0
 kind: DataContract
 id: 1a5e3e4e-80ee-4ecd-836a-fc303bad3d36
@@ -81,12 +81,10 @@ schema:
 customProperties:
   - property: system_id
     value: ad789620-a825-4bc4-afd7-429db96a6359
-  - property: data_level
-    value: gold
 
 tags:
   - mart
   - time
   - dimension
   - metricflow
-  - gold
+  - dm_level:Gold

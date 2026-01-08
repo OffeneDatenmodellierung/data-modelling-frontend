@@ -1,4 +1,4 @@
-version: "1.0.0"
+version: '1.0.0'
 apiVersion: v3.1.0
 kind: DataContract
 id: 6d7a3e84-2b63-4815-8613-789fe04592d0
@@ -46,10 +46,8 @@ schema:
 customProperties:
   - property: system_id
     value: ad789620-a825-4bc4-afd7-429db96a6359
-  - property: data_level
-    value: bronze
 
 tags:
   - raw
   - supplies
-  - bronze
+  - dm_level:Bronze

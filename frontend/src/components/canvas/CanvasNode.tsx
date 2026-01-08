@@ -15,10 +15,17 @@ export interface TableNodeData {
   nodeType?: 'table' | 'system' | 'product' | 'compute-asset';
   isOwnedByDomain?: boolean; // True if owned by current domain
   isShared?: boolean; // True if this is a shared resource from another domain
+  expandColumns?: boolean; // True to show all columns without max-height limit
 }
 
 export const CanvasNode: React.FC<NodeProps<TableNodeData>> = memo(({ data, selected }) => {
-  const { table, modelType = 'conceptual', isOwnedByDomain, isShared = false } = data;
+  const {
+    table,
+    modelType = 'conceptual',
+    isOwnedByDomain,
+    isShared = false,
+    expandColumns = false,
+  } = data;
   const { selectedDomainId, bpmnProcesses } = useModelStore();
   const isPrimaryDomain = table.primary_domain_id === selectedDomainId;
   const isReadOnly = !isPrimaryDomain || (isOwnedByDomain !== undefined && !isOwnedByDomain);
@@ -102,15 +109,181 @@ export const CanvasNode: React.FC<NodeProps<TableNodeData>> = memo(({ data, sele
       role="group"
       aria-label={ariaLabel}
     >
-      {/* Connection handles */}
-      <Handle type="target" position={Position.Top} className="w-3 h-3" />
-      <Handle type="target" position={Position.Bottom} className="w-3 h-3" />
-      <Handle type="target" position={Position.Left} className="w-3 h-3" />
-      <Handle type="target" position={Position.Right} className="w-3 h-3" />
-      <Handle type="source" position={Position.Top} className="w-3 h-3" />
-      <Handle type="source" position={Position.Bottom} className="w-3 h-3" />
-      <Handle type="source" position={Position.Left} className="w-3 h-3" />
-      <Handle type="source" position={Position.Right} className="w-3 h-3" />
+      {/* Connection handles - corners */}
+      <Handle
+        type="target"
+        position={Position.Top}
+        id="top-left"
+        style={{ left: '0%' }}
+        className="w-2 h-2"
+      />
+      <Handle
+        type="target"
+        position={Position.Top}
+        id="top-right"
+        style={{ left: '100%' }}
+        className="w-2 h-2"
+      />
+      <Handle
+        type="target"
+        position={Position.Bottom}
+        id="bottom-left"
+        style={{ left: '0%' }}
+        className="w-2 h-2"
+      />
+      <Handle
+        type="target"
+        position={Position.Bottom}
+        id="bottom-right"
+        style={{ left: '100%' }}
+        className="w-2 h-2"
+      />
+      <Handle
+        type="source"
+        position={Position.Top}
+        id="src-top-left"
+        style={{ left: '0%' }}
+        className="w-2 h-2"
+      />
+      <Handle
+        type="source"
+        position={Position.Top}
+        id="src-top-right"
+        style={{ left: '100%' }}
+        className="w-2 h-2"
+      />
+      <Handle
+        type="source"
+        position={Position.Bottom}
+        id="src-bottom-left"
+        style={{ left: '0%' }}
+        className="w-2 h-2"
+      />
+      <Handle
+        type="source"
+        position={Position.Bottom}
+        id="src-bottom-right"
+        style={{ left: '100%' }}
+        className="w-2 h-2"
+      />
+
+      {/* Connection handles - top and bottom center */}
+      <Handle
+        type="target"
+        position={Position.Top}
+        id="top-center"
+        style={{ left: '50%' }}
+        className="w-2 h-2"
+      />
+      <Handle
+        type="target"
+        position={Position.Bottom}
+        id="bottom-center"
+        style={{ left: '50%' }}
+        className="w-2 h-2"
+      />
+      <Handle
+        type="source"
+        position={Position.Top}
+        id="src-top-center"
+        style={{ left: '50%' }}
+        className="w-2 h-2"
+      />
+      <Handle
+        type="source"
+        position={Position.Bottom}
+        id="src-bottom-center"
+        style={{ left: '50%' }}
+        className="w-2 h-2"
+      />
+
+      {/* Connection handles - left side (3 evenly spaced: 25%, 50%, 75%) */}
+      <Handle
+        type="target"
+        position={Position.Left}
+        id="left-top"
+        style={{ top: '25%' }}
+        className="w-2 h-2"
+      />
+      <Handle
+        type="target"
+        position={Position.Left}
+        id="left-center"
+        style={{ top: '50%' }}
+        className="w-2 h-2"
+      />
+      <Handle
+        type="target"
+        position={Position.Left}
+        id="left-bottom"
+        style={{ top: '75%' }}
+        className="w-2 h-2"
+      />
+      <Handle
+        type="source"
+        position={Position.Left}
+        id="src-left-top"
+        style={{ top: '25%' }}
+        className="w-2 h-2"
+      />
+      <Handle
+        type="source"
+        position={Position.Left}
+        id="src-left-center"
+        style={{ top: '50%' }}
+        className="w-2 h-2"
+      />
+      <Handle
+        type="source"
+        position={Position.Left}
+        id="src-left-bottom"
+        style={{ top: '75%' }}
+        className="w-2 h-2"
+      />
+
+      {/* Connection handles - right side (3 evenly spaced: 25%, 50%, 75%) */}
+      <Handle
+        type="target"
+        position={Position.Right}
+        id="right-top"
+        style={{ top: '25%' }}
+        className="w-2 h-2"
+      />
+      <Handle
+        type="target"
+        position={Position.Right}
+        id="right-center"
+        style={{ top: '50%' }}
+        className="w-2 h-2"
+      />
+      <Handle
+        type="target"
+        position={Position.Right}
+        id="right-bottom"
+        style={{ top: '75%' }}
+        className="w-2 h-2"
+      />
+      <Handle
+        type="source"
+        position={Position.Right}
+        id="src-right-top"
+        style={{ top: '25%' }}
+        className="w-2 h-2"
+      />
+      <Handle
+        type="source"
+        position={Position.Right}
+        id="src-right-center"
+        style={{ top: '50%' }}
+        className="w-2 h-2"
+      />
+      <Handle
+        type="source"
+        position={Position.Right}
+        id="src-right-bottom"
+        style={{ top: '75%' }}
+        className="w-2 h-2"
+      />
 
       {/* Table header with quality tier color */}
       <div
@@ -155,7 +328,9 @@ export const CanvasNode: React.FC<NodeProps<TableNodeData>> = memo(({ data, sele
 
       {/* Columns list - only show in logical/physical views */}
       {showColumns && (
-        <div className="p-2 max-h-[300px] overflow-y-auto table-columns-scrollable">
+        <div
+          className={`p-2 ${expandColumns ? '' : 'max-h-[300px] overflow-y-auto'} table-columns-scrollable`}
+        >
           {visibleColumns.length === 0 ? (
             <div className="text-sm text-gray-400 italic py-2">
               {modelType === 'logical' ? 'No keys' : 'No columns'}

@@ -45,7 +45,26 @@ export const RelationshipEditor: React.FC<RelationshipEditorProps> = ({
   const [description, setDescription] = useState('');
   const [color, setColor] = useState<string>('#000000');
   const [drawioEdgeId, setDrawioEdgeId] = useState<string>('');
+  const [sourceHandle, setSourceHandle] = useState<string>('');
+  const [targetHandle, setTargetHandle] = useState<string>('');
   const [isSaving, setIsSaving] = useState(false);
+
+  // Available connection handle options (matching handles defined in CanvasNode/SystemNode/ComputeAssetNode)
+  const handleOptions = [
+    { value: '', label: 'Auto (default)' },
+    { value: 'top-left', label: 'Top Left' },
+    { value: 'top-center', label: 'Top Center' },
+    { value: 'top-right', label: 'Top Right' },
+    { value: 'right-top', label: 'Right Top' },
+    { value: 'right-center', label: 'Right Center' },
+    { value: 'right-bottom', label: 'Right Bottom' },
+    { value: 'bottom-right', label: 'Bottom Right' },
+    { value: 'bottom-center', label: 'Bottom Center' },
+    { value: 'bottom-left', label: 'Bottom Left' },
+    { value: 'left-bottom', label: 'Left Bottom' },
+    { value: 'left-center', label: 'Left Center' },
+    { value: 'left-top', label: 'Left Top' },
+  ];
 
   // Load relationship data when dialog opens
   useEffect(() => {
@@ -59,6 +78,8 @@ export const RelationshipEditor: React.FC<RelationshipEditorProps> = ({
       setDescription(relationship.description || '');
       setColor(relationship.color || '#000000');
       setDrawioEdgeId(relationship.drawio_edge_id || '');
+      setSourceHandle(relationship.source_handle || '');
+      setTargetHandle(relationship.target_handle || '');
     }
   }, [relationship, isOpen, relationships]);
 
@@ -100,6 +121,16 @@ export const RelationshipEditor: React.FC<RelationshipEditorProps> = ({
     return keys;
   };
 
+  // Derive relationship type from cardinalities
+  const getRelationshipTypeFromCardinalities = (
+    source: Cardinality,
+    target: Cardinality
+  ): RelationshipType => {
+    if (source === 'N' && target === 'N') return 'many-to-many';
+    if (source === 'N' || target === 'N') return 'one-to-many';
+    return 'one-to-one';
+  };
+
   // Get source and target node names for display
   const getNodeName = (nodeId: string, nodeType: 'table' | 'system' | 'compute-asset'): string => {
     if (nodeType === 'table') {
@@ -134,6 +165,8 @@ export const RelationshipEditor: React.FC<RelationshipEditorProps> = ({
         target_cardinality: targetCardinality,
         source_key: isTableToTable && sourceKey ? sourceKey : undefined,
         target_key: isTableToTable && targetKey ? targetKey : undefined,
+        source_handle: sourceHandle || undefined,
+        target_handle: targetHandle || undefined,
         label: label.trim() || undefined,
         description: description.trim() || undefined,
         color: color !== '#000000' ? color : undefined,
@@ -332,41 +365,64 @@ export const RelationshipEditor: React.FC<RelationshipEditorProps> = ({
             </div>
           </div>
 
-          {/* Relationship Type (only for table-to-table) */}
+          {/* Cardinality (only for table-to-table) */}
           {isTableToTable && (
             <>
-              <div>
-                <label
-                  htmlFor="relationship-type"
-                  className="block text-sm font-medium text-gray-700 mb-2"
-                >
-                  Relationship Type
-                </label>
-                <select
-                  id="relationship-type"
-                  value={relationshipType}
-                  onChange={(e) => {
-                    const newType = e.target.value as RelationshipType;
-                    setRelationshipType(newType);
-
-                    // Auto-update cardinalities based on type
-                    if (newType === 'one-to-one') {
-                      setSourceCardinality('1');
-                      setTargetCardinality('1');
-                    } else if (newType === 'one-to-many') {
-                      setSourceCardinality('1');
-                      setTargetCardinality('N');
-                    } else if (newType === 'many-to-many') {
-                      setSourceCardinality('N');
-                      setTargetCardinality('N');
-                    }
-                  }}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="one-to-one">One-to-One</option>
-                  <option value="one-to-many">One-to-Many</option>
-                  <option value="many-to-many">Many-to-Many</option>
-                </select>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label
+                    htmlFor="source-cardinality"
+                    className="block text-sm font-medium text-gray-700 mb-2"
+                    title="Crow's Foot notation: 0 = zero/optional, 1 = one/required, N = many"
+                  >
+                    Source Cardinality ({sourceName})
+                  </label>
+                  <select
+                    id="source-cardinality"
+                    value={sourceCardinality}
+                    onChange={(e) => {
+                      const newCardinality = e.target.value as Cardinality;
+                      setSourceCardinality(newCardinality);
+                      // Update relationship type based on new cardinalities
+                      setRelationshipType(
+                        getRelationshipTypeFromCardinalities(newCardinality, targetCardinality)
+                      );
+                    }}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    title="0 = zero/optional, 1 = one/required, N = many"
+                  >
+                    <option value="0">0 (Zero/Optional)</option>
+                    <option value="1">1 (One/Required)</option>
+                    <option value="N">N (Many)</option>
+                  </select>
+                </div>
+                <div>
+                  <label
+                    htmlFor="target-cardinality"
+                    className="block text-sm font-medium text-gray-700 mb-2"
+                    title="Crow's Foot notation: 0 = zero/optional, 1 = one/required, N = many"
+                  >
+                    Target Cardinality ({targetName})
+                  </label>
+                  <select
+                    id="target-cardinality"
+                    value={targetCardinality}
+                    onChange={(e) => {
+                      const newCardinality = e.target.value as Cardinality;
+                      setTargetCardinality(newCardinality);
+                      // Update relationship type based on new cardinalities
+                      setRelationshipType(
+                        getRelationshipTypeFromCardinalities(sourceCardinality, newCardinality)
+                      );
+                    }}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    title="0 = zero/optional, 1 = one/required, N = many"
+                  >
+                    <option value="0">0 (Zero/Optional)</option>
+                    <option value="1">1 (One/Required)</option>
+                    <option value="N">N (Many)</option>
+                  </select>
+                </div>
               </div>
 
               {/* Source Key Selection */}
@@ -427,47 +483,52 @@ export const RelationshipEditor: React.FC<RelationshipEditorProps> = ({
             </>
           )}
 
-          {/* Cardinality (only for table-to-table) */}
-          {isTableToTable && (
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label
-                  htmlFor="source-cardinality"
-                  className="block text-sm font-medium text-gray-700 mb-2"
-                >
-                  Source Cardinality ({sourceName})
-                </label>
-                <select
-                  id="source-cardinality"
-                  value={sourceCardinality}
-                  onChange={(e) => setSourceCardinality(e.target.value as Cardinality)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="0">0 (Optional)</option>
-                  <option value="1">1 (Required)</option>
-                  <option value="N">N (Many)</option>
-                </select>
-              </div>
-              <div>
-                <label
-                  htmlFor="target-cardinality"
-                  className="block text-sm font-medium text-gray-700 mb-2"
-                >
-                  Target Cardinality ({targetName})
-                </label>
-                <select
-                  id="target-cardinality"
-                  value={targetCardinality}
-                  onChange={(e) => setTargetCardinality(e.target.value as Cardinality)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="0">0 (Optional)</option>
-                  <option value="1">1 (Required)</option>
-                  <option value="N">N (Many)</option>
-                </select>
-              </div>
+          {/* Connection Points */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label
+                htmlFor="source-handle"
+                className="block text-sm font-medium text-gray-700 mb-2"
+              >
+                Source Connection Point
+              </label>
+              <select
+                id="source-handle"
+                value={sourceHandle}
+                onChange={(e) => setSourceHandle(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                {handleOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
             </div>
-          )}
+            <div>
+              <label
+                htmlFor="target-handle"
+                className="block text-sm font-medium text-gray-700 mb-2"
+              >
+                Target Connection Point
+              </label>
+              <select
+                id="target-handle"
+                value={targetHandle}
+                onChange={(e) => setTargetHandle(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                {handleOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <p className="text-xs text-gray-500 -mt-2">
+            Choose where the relationship line connects on each node
+          </p>
 
           {/* Label */}
           <div>
@@ -570,16 +631,13 @@ export const RelationshipEditor: React.FC<RelationshipEditorProps> = ({
         {/* Actions - Fixed at bottom */}
         <div className="flex justify-between items-center gap-2 pt-4 mt-4 border-t border-gray-200 flex-shrink-0">
           <div className="flex gap-2 flex-1">
-            {/* Only show Reverse Direction for non-table-to-table relationships */}
-            {!isTableToTable && (
-              <button
-                onClick={handleReverse}
-                className="px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-md hover:bg-blue-100 transition-colors w-full"
-                title="Reverse the direction of this relationship (swap source and target)"
-              >
-                Reverse Direction
-              </button>
-            )}
+            <button
+              onClick={handleReverse}
+              className="px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-md hover:bg-blue-100 transition-colors w-full"
+              title="Reverse the direction of this relationship (swap source and target)"
+            >
+              Reverse Direction
+            </button>
             <button
               onClick={handleDelete}
               className="px-4 py-2 text-sm font-medium text-red-600 bg-red-50 rounded-md hover:bg-red-100 transition-colors w-full"

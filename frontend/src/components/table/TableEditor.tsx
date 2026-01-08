@@ -265,7 +265,18 @@ export const TableEditor: React.FC<TableEditorProps> = ({ tableId, workspaceId, 
 
   const handleDataLevelChange = async (newLevel: DataLevel) => {
     setDataLevel(newLevel);
-    updateTable(tableId, { data_level: newLevel });
+
+    // Update both the data_level field and the dm_level tag
+    const currentTags = table?.tags || [];
+
+    // Remove existing dm_level tag if present (tags are strings like "dm_level:Gold")
+    const filteredTags = currentTags.filter((tag) => !tag.toLowerCase().startsWith('dm_level:'));
+
+    // Add new dm_level tag (capitalize first letter for display)
+    const levelDisplay = newLevel.charAt(0).toUpperCase() + newLevel.slice(1);
+    const newTags = [...filteredTags, `dm_level:${levelDisplay}`];
+
+    updateTable(tableId, { data_level: newLevel, tags: newTags });
     setHasUnsavedChanges(true);
   };
 

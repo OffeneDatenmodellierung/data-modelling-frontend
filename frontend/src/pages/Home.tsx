@@ -18,6 +18,12 @@ import { WorkspaceSelector } from '@/components/workspace/WorkspaceSelector';
 import { workspaceService } from '@/services/api/workspaceService';
 import { apiClient } from '@/services/api/apiClient';
 import { authService } from '@/services/api/authService';
+import {
+  getAvailableExamples,
+  loadExampleWorkspace,
+  markExamplesLoaded,
+  type ExampleWorkspaceInfo,
+} from '@/services/exampleWorkspaces';
 
 const Home: React.FC = () => {
   const navigate = useNavigate();
@@ -40,6 +46,8 @@ const Home: React.FC = () => {
     Array<{ email: string; domains: string[] }>
   >([]);
   const [availableEmails, setAvailableEmails] = useState<string[]>([]);
+  const [exampleWorkspaces, setExampleWorkspaces] = useState<ExampleWorkspaceInfo[]>([]);
+  const [loadingExample, setLoadingExample] = useState<string | null>(null);
   const { addToast } = useUIStore();
 
   // Initialize mode on mount
@@ -50,6 +58,19 @@ const Home: React.FC = () => {
     };
     initMode();
   }, [initialize]);
+
+  // Load example workspaces
+  useEffect(() => {
+    const loadExamples = async () => {
+      try {
+        const examples = await getAvailableExamples();
+        setExampleWorkspaces(examples);
+      } catch (error) {
+        console.warn('Failed to load example workspaces:', error);
+      }
+    };
+    loadExamples();
+  }, []);
 
   // Load available emails from session when authenticated and online (only once)
   // This happens right after authentication, before workspace selection
@@ -146,6 +167,85 @@ const Home: React.FC = () => {
     );
   }
 
+  // Handle opening an example workspace
+  const handleOpenExample = async (example: ExampleWorkspaceInfo) => {
+    setLoadingExample(example.id);
+    try {
+      addToast({
+        type: 'info',
+        message: `Loading example: ${example.name}...`,
+      });
+
+      const workspace = await loadExampleWorkspace(example);
+
+      // Populate model store with loaded data
+      const { useModelStore } = await import('@/stores/modelStore');
+      const modelStore = useModelStore.getState();
+
+      if ((workspace as any).domains) {
+        modelStore.setDomains((workspace as any).domains);
+      }
+      if ((workspace as any).tables) {
+        modelStore.setTables((workspace as any).tables);
+      }
+      if ((workspace as any).relationships) {
+        modelStore.setRelationships((workspace as any).relationships);
+      }
+      if ((workspace as any).systems) {
+        modelStore.setSystems((workspace as any).systems);
+      }
+      if ((workspace as any).products) {
+        modelStore.setProducts((workspace as any).products);
+      }
+      if ((workspace as any).assets) {
+        modelStore.setComputeAssets((workspace as any).assets);
+      }
+      if ((workspace as any).bpmnProcesses) {
+        modelStore.setBPMNProcesses((workspace as any).bpmnProcesses);
+      }
+      if ((workspace as any).dmnDecisions) {
+        modelStore.setDMNDecisions((workspace as any).dmnDecisions);
+      }
+      if ((workspace as any).knowledgeArticles) {
+        const { useKnowledgeStore } = await import('@/stores/knowledgeStore');
+        useKnowledgeStore.getState().setArticles((workspace as any).knowledgeArticles);
+      }
+      if ((workspace as any).decisionRecords) {
+        const { useDecisionStore } = await import('@/stores/decisionStore');
+        useDecisionStore.getState().setDecisions((workspace as any).decisionRecords);
+      }
+
+      // Select first domain if available
+      if ((workspace as any).domains && (workspace as any).domains.length > 0) {
+        modelStore.setSelectedDomain((workspace as any).domains[0].id);
+      }
+
+      // Add workspace to store
+      const existingWorkspace = workspaces.find((w) => w.id === workspace.id);
+      if (!existingWorkspace) {
+        addWorkspace(workspace);
+      }
+
+      setCurrentWorkspace(workspace.id);
+      markExamplesLoaded();
+
+      addToast({
+        type: 'success',
+        message: `Opened example: ${example.name}`,
+      });
+
+      navigate(`/workspace/${workspace.id}`);
+    } catch (error) {
+      console.error('Failed to open example workspace:', error);
+      addToast({
+        type: 'error',
+        message: `Failed to open example: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      });
+    } finally {
+      setLoadingExample(null);
+    }
+  };
+
   // Handle opening local workspace folder in offline mode
   const handleOpenLocalFolder = async () => {
     try {
@@ -167,46 +267,12 @@ const Home: React.FC = () => {
 
       // Set domains
       if ((workspace as any).domains) {
-        console.log(
-          `[Home] Setting ${(workspace as any).domains.length} domain(s) in model store:`,
-          (workspace as any).domains.map((d: any) => ({ id: d.id, name: d.name }))
-        );
         modelStore.setDomains((workspace as any).domains);
       }
 
       // Set tables
       if ((workspace as any).tables) {
-        const tablesToSet = (workspace as any).tables;
-        console.log(
-          `[Home] Setting ${tablesToSet.length} table(s) in model store:`,
-          tablesToSet.map((t: any) => ({
-            id: t.id,
-            name: t.name,
-            primary_domain_id: t.primary_domain_id,
-            visible_domains: t.visible_domains,
-          }))
-        );
-        modelStore.setTables(tablesToSet);
-        // Wait a tick to ensure state update
-        await new Promise((resolve) => setTimeout(resolve, 0));
-        const tablesAfterSet = useModelStore.getState().tables;
-        console.log(
-          `[Home] Tables in store after setting: ${tablesAfterSet.length}`,
-          tablesAfterSet.map((t: any) => ({
-            id: t.id,
-            name: t.name,
-            primary_domain_id: t.primary_domain_id,
-            visible_domains: t.visible_domains,
-          }))
-        );
-        if (tablesAfterSet.length === 0) {
-          console.error(
-            `[Home] ERROR: Tables were not persisted! Expected ${tablesToSet.length}, got ${tablesAfterSet.length}`
-          );
-        }
-      } else {
-        console.log(`[Home] No tables found in workspace object`);
-        console.log(`[Home] Workspace object keys:`, Object.keys(workspace as any));
+        modelStore.setTables((workspace as any).tables);
       }
 
       // Set relationships
@@ -216,111 +282,44 @@ const Home: React.FC = () => {
 
       // Set systems
       if ((workspace as any).systems) {
-        const systemsToSet = (workspace as any).systems;
-        console.log(
-          `[Home] Setting ${systemsToSet.length} system(s) in model store:`,
-          systemsToSet.map((s: any) => ({
-            id: s.id,
-            name: s.name,
-            table_ids: s.table_ids || [],
-            table_count: (s.table_ids || []).length,
-          }))
-        );
-        modelStore.setSystems(systemsToSet);
-        // Wait a tick to ensure state update
-        await new Promise((resolve) => setTimeout(resolve, 0));
-        const systemsAfterSet = useModelStore.getState().systems;
-        console.log(
-          `[Home] Systems in store after setting: ${systemsAfterSet.length}`,
-          systemsAfterSet.map((s: any) => ({
-            id: s.id,
-            name: s.name,
-            table_ids: s.table_ids || [],
-            table_count: (s.table_ids || []).length,
-          }))
-        );
-        if (systemsAfterSet.length === 0) {
-          console.error(
-            `[Home] ERROR: Systems were not persisted! Expected ${systemsToSet.length}, got ${systemsAfterSet.length}`
-          );
-        }
-      } else {
-        console.log(`[Home] No systems found in workspace object`);
-      }
-
-      // Set relationships
-      if ((workspace as any).relationships) {
-        console.log(
-          `[Home] Setting ${(workspace as any).relationships.length} relationship(s) in model store`
-        );
-        modelStore.setRelationships((workspace as any).relationships);
-      } else {
-        console.log(`[Home] No relationships found in workspace object`);
+        modelStore.setSystems((workspace as any).systems);
       }
 
       // Set products
       if ((workspace as any).products) {
-        console.log(
-          `[Home] Setting ${(workspace as any).products.length} product(s) in model store`
-        );
         modelStore.setProducts((workspace as any).products);
       }
 
       // Set assets
       if ((workspace as any).assets) {
-        console.log(`[Home] Setting ${(workspace as any).assets.length} asset(s) in model store`);
         modelStore.setComputeAssets((workspace as any).assets);
       }
 
       // Set BPMN processes
       if ((workspace as any).bpmnProcesses) {
-        console.log(
-          `[Home] Setting ${(workspace as any).bpmnProcesses.length} BPMN process(es) in model store`
-        );
         modelStore.setBPMNProcesses((workspace as any).bpmnProcesses);
       }
 
       // Set DMN decisions
       if ((workspace as any).dmnDecisions) {
-        console.log(
-          `[Home] Setting ${(workspace as any).dmnDecisions.length} DMN decision(s) in model store`
-        );
         modelStore.setDMNDecisions((workspace as any).dmnDecisions);
       }
 
       // Set knowledge articles
       if ((workspace as any).knowledgeArticles) {
-        console.log(
-          `[Home] Setting ${(workspace as any).knowledgeArticles.length} knowledge article(s) in knowledge store`
-        );
         const { useKnowledgeStore } = await import('@/stores/knowledgeStore');
         useKnowledgeStore.getState().setArticles((workspace as any).knowledgeArticles);
       }
 
       // Set decision records (ADRs)
       if ((workspace as any).decisionRecords) {
-        console.log(
-          `[Home] Setting ${(workspace as any).decisionRecords.length} decision record(s) in decision store`
-        );
         const { useDecisionStore } = await import('@/stores/decisionStore');
         useDecisionStore.getState().setDecisions((workspace as any).decisionRecords);
       }
 
-      console.log(`[Home] Final model store state:`, {
-        domains: modelStore.domains.length,
-        tables: modelStore.tables.length,
-        relationships: modelStore.relationships.length,
-        systems: modelStore.systems.length,
-        products: modelStore.products.length,
-        assets: modelStore.computeAssets.length,
-        bpmnProcesses: modelStore.bpmnProcesses.length,
-        dmnDecisions: modelStore.dmnDecisions.length,
-      });
-
       // Select first domain if available
       if ((workspace as any).domains && (workspace as any).domains.length > 0) {
         const firstDomainId = (workspace as any).domains[0].id;
-        console.log(`[Home] Setting selected domain to: ${firstDomainId}`);
         modelStore.setSelectedDomain(firstDomainId);
       }
 
@@ -399,6 +398,67 @@ const Home: React.FC = () => {
             <WorkspaceList
               onWorkspaceSelect={(workspaceId) => navigate(`/workspace/${workspaceId}`)}
             />
+
+            {/* Example Workspaces */}
+            {exampleWorkspaces.length > 0 && (
+              <div className="mt-8">
+                <h2 className="text-xl font-semibold text-gray-900 mb-4">Example Workspaces</h2>
+                <p className="text-sm text-gray-600 mb-4">
+                  Get started quickly with these pre-built example workspaces. Examples are
+                  refreshed with each new release.
+                </p>
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  {exampleWorkspaces.map((example) => (
+                    <div
+                      key={example.id}
+                      className="bg-white rounded-lg border border-gray-200 p-4 hover:border-blue-500 hover:shadow-md transition-all"
+                    >
+                      <h3 className="text-lg font-medium text-gray-900 mb-2">{example.name}</h3>
+                      <p className="text-sm text-gray-600 mb-3">{example.description}</p>
+                      <div className="flex flex-wrap gap-1 mb-3">
+                        {example.features.slice(0, 4).map((feature, idx) => (
+                          <span
+                            key={idx}
+                            className="inline-block px-2 py-0.5 text-xs bg-gray-100 text-gray-700 rounded"
+                          >
+                            {feature}
+                          </span>
+                        ))}
+                      </div>
+                      <button
+                        onClick={() => handleOpenExample(example)}
+                        disabled={loadingExample === example.id}
+                        className="w-full bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {loadingExample === example.id ? (
+                          <span className="flex items-center justify-center gap-2">
+                            <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                              <circle
+                                className="opacity-25"
+                                cx="12"
+                                cy="12"
+                                r="10"
+                                stroke="currentColor"
+                                strokeWidth="4"
+                                fill="none"
+                              />
+                              <path
+                                className="opacity-75"
+                                fill="currentColor"
+                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                              />
+                            </svg>
+                            Loading...
+                          </span>
+                        ) : (
+                          'Open Example'
+                        )}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Create Workspace Dialog for offline mode */}
             {showCreateDialog && (

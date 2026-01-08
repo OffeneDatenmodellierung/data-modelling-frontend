@@ -503,22 +503,44 @@ export const DomainCanvas: React.FC<DomainCanvasProps> = ({ workspaceId, domainI
   // Get systems for current domain
   const domainSystems = useMemo(() => {
     const filtered = systems.filter((s) => s.domain_id === domainId);
-    console.log(`[DomainCanvas] Filtering systems for domain ${domainId}:`, {
-      totalSystems: systems.length,
-      filteredCount: filtered.length,
-      systems: systems.map((s) => ({ id: s.id, name: s.name, domain_id: s.domain_id })),
-      filtered: filtered.map((s) => ({ id: s.id, name: s.name, domain_id: s.domain_id })),
-    });
+    // Debug: Log detailed info if no systems match
+    if (systems.length > 0 && filtered.length === 0) {
+      console.warn(`[DomainCanvas] No systems match domain ${domainId}!`, {
+        totalSystems: systems.length,
+        systemDomainIds: systems.map((s) => ({
+          name: s.name,
+          domain_id: s.domain_id,
+          table_ids_count: (s.table_ids || []).length,
+        })),
+        expectedDomainId: domainId,
+      });
+    }
     return filtered;
   }, [systems, domainId]);
 
   // Find unlinked tables (tables that don't appear in any system's table_ids)
   const unlinkedTables = useMemo(() => {
     const allTableIdsInSystems = new Set(domainSystems.flatMap((s) => s.table_ids || []));
+    const domainTables = tables.filter((t) => t.primary_domain_id === domainId);
+    const unlinked = domainTables.filter((t) => !allTableIdsInSystems.has(t.id));
 
-    return tables.filter(
-      (t) => t.primary_domain_id === domainId && !allTableIdsInSystems.has(t.id)
-    );
+    // Debug: Log unlinked tables computation
+    if (unlinked.length > 0 && domainSystems.length > 0) {
+      console.log(`[DomainCanvas] Unlinked tables debug:`, {
+        domainSystemsCount: domainSystems.length,
+        systemTableIds: domainSystems.map((s) => ({
+          name: s.name,
+          table_ids: s.table_ids,
+        })),
+        allTableIdsInSystems: Array.from(allTableIdsInSystems),
+        domainTablesCount: domainTables.length,
+        domainTableIds: domainTables.slice(0, 5).map((t) => ({ id: t.id, name: t.name })),
+        unlinkedCount: unlinked.length,
+        unlinkedSample: unlinked.slice(0, 3).map((t) => ({ id: t.id, name: t.name })),
+      });
+    }
+
+    return unlinked;
   }, [tables, domainSystems, domainId]);
 
   // Get compute assets for current domain
@@ -586,7 +608,10 @@ export const DomainCanvas: React.FC<DomainCanvasProps> = ({ workspaceId, domainI
           // 1. Tables from current domain that belong to this system
           // 2. Foreign tables (explicitly shared with target_system_id)
           // DO NOT include tables from shared systems
-          systemTables = visibleTables.filter((table) => system.table_ids?.includes(table.id));
+          // In Systems View, show ALL tables from the system (not filtered by data level)
+          systemTables = tables.filter(
+            (table) => table.primary_domain_id === domainId && system.table_ids?.includes(table.id)
+          );
 
           // Add foreign tables (from other domains) that explicitly target this system
           const foreignTables =
@@ -707,6 +732,8 @@ export const DomainCanvas: React.FC<DomainCanvasProps> = ({ workspaceId, domainI
           isShared, // Mark if this is a shared resource from another domain
           // Determine model type based on current view
           modelType: currentView === 'process' ? 'logical' : 'physical',
+          // Expand columns (no max-height) for analytical and operational views
+          expandColumns: currentView === 'analytical' || currentView === 'operational',
         },
         selected: selectedTableId === table.id,
       };
@@ -785,6 +812,16 @@ export const DomainCanvas: React.FC<DomainCanvasProps> = ({ workspaceId, domainI
       .flatMap((p) => p.transformation_links || []);
   }, [bpmnProcesses, domainId]);
 
+  // Create a hash of relationship data to detect property changes (color, type, cardinality, etc.)
+  const relationshipDataHash = useMemo(() => {
+    return domainRelationships
+      .map(
+        (r) =>
+          `${r.id}:${r.type}:${r.color || ''}:${r.source_cardinality}:${r.target_cardinality}:${r.label || ''}`
+      )
+      .join('|');
+  }, [domainRelationships]);
+
   // Convert relationships to ReactFlow edges
   const initialEdges: Edge[] = useMemo(() => {
     console.log('[DomainCanvas] Computing initialEdges from relationships:', {
@@ -851,11 +888,20 @@ export const DomainCanvas: React.FC<DomainCanvasProps> = ({ workspaceId, domainI
         const useCardinalityEdge =
           isTableToTable && (currentView === 'operational' || currentView === 'analytical');
 
+        // Source handles have 'src-' prefix in the node definition
+        const sourceHandle = relationship.source_handle
+          ? `src-${relationship.source_handle}`
+          : undefined;
+        // Target handles don't have a prefix
+        const targetHandle = relationship.target_handle || undefined;
+
         return {
           id: relationship.id,
           type: useCardinalityEdge ? 'cardinality' : 'default', // Use default edge for non-table relationships
           source: sourceId,
           target: targetId,
+          sourceHandle, // Use stored handle or let ReactFlow choose
+          targetHandle, // Use stored handle or let ReactFlow choose
           data: { relationship, isCrossDomain },
           selected: selectedRelationshipId === relationship.id,
           animated: false,
@@ -885,12 +931,14 @@ export const DomainCanvas: React.FC<DomainCanvasProps> = ({ workspaceId, domainI
     return [...relationshipEdges, ...transformationEdges];
   }, [
     domainRelationships,
+    relationshipDataHash,
     visibleTables,
     domainSystems,
     domainComputeAssets,
     selectedRelationshipId,
     transformationLinks,
     currentView,
+    sharedResources,
   ]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
@@ -919,11 +967,11 @@ export const DomainCanvas: React.FC<DomainCanvasProps> = ({ workspaceId, domainI
     const currentSystemIds = domainSystems.map((s) => s.id).sort();
 
     // Create a hash of table data to detect changes (not just IDs)
-    // Include compoundKeys and metadata.indexes in the hash to detect changes
+    // Include compoundKeys, metadata.indexes, and tags in the hash to detect changes
     const currentTableDataHash = visibleTables
       .map(
         (t) =>
-          `${t.id}:${t.name}:${t.columns?.length || 0}:${JSON.stringify(t.columns?.map((c) => `${c.id}:${c.name}:${c.is_primary_key}:${c.compound_key_id || ''}`))}:${JSON.stringify(t.compoundKeys || [])}:${JSON.stringify(t.metadata?.indexes || [])}`
+          `${t.id}:${t.name}:${t.columns?.length || 0}:${JSON.stringify(t.columns?.map((c) => `${c.id}:${c.name}:${c.is_primary_key}:${c.compound_key_id || ''}`))}:${JSON.stringify(t.compoundKeys || [])}:${JSON.stringify(t.metadata?.indexes || [])}:${JSON.stringify(t.tags || [])}`
       )
       .join('|');
 
@@ -1018,6 +1066,8 @@ export const DomainCanvas: React.FC<DomainCanvasProps> = ({ workspaceId, domainI
         attributionPosition="bottom-left"
         edgesUpdatable={false}
         edgesFocusable={true}
+        minZoom={0.1}
+        maxZoom={4}
       >
         <Background />
         <Controls />

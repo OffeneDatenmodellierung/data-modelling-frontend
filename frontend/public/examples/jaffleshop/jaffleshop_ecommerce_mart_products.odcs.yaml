@@ -1,29 +1,29 @@
-version: "1.0.0"
+version: '1.0.0'
 apiVersion: v3.1.0
 kind: DataContract
-id: 0072c7c7-38ad-48f4-81a8-eff0b2ac403e
+id: bfe4654e-ede1-4750-827e-54b5fbb3ecd1
 status: active
-name: stg_products
+name: products
 domain: ecommerce
 tenant: jaffleshop
 
 description:
-  purpose: Staged product catalog with standardized attributes
+  purpose: Product dimension table with pricing and categorization
 
 schema:
-  - name: stg_products
-    description: Cleaned and standardized product catalog from raw layer
-    physicalName: staging.stg_products
+  - name: products
+    description: Product dimension for analytics with pricing and category info
+    physicalName: marts.products
     logicalType: object
     properties:
       - name: product_id
-        description: Standardized product identifier (derived from SKU)
+        description: Unique product identifier
         logicalType: string
         physicalType: VARCHAR
         required: true
         primaryKey: true
       - name: product_name
-        description: Product display name (cleaned)
+        description: Product display name
         logicalType: string
         physicalType: VARCHAR
         required: true
@@ -33,7 +33,7 @@ schema:
         physicalType: VARCHAR
         required: false
       - name: product_price
-        description: Product price in dollars
+        description: Current product price in dollars
         logicalType: number
         physicalType: DOUBLE
         required: false
@@ -43,12 +43,12 @@ schema:
         physicalType: VARCHAR
         required: false
       - name: is_food_item
-        description: Whether product is a food item
+        description: Whether product is food
         logicalType: boolean
         physicalType: BOOLEAN
         required: false
       - name: is_drink_item
-        description: Whether product is a drink item
+        description: Whether product is drink
         logicalType: boolean
         physicalType: BOOLEAN
         required: false
@@ -56,10 +56,9 @@ schema:
 customProperties:
   - property: system_id
     value: ad789620-a825-4bc4-afd7-429db96a6359
-  - property: data_level
-    value: silver
 
 tags:
-  - staging
+  - mart
   - products
-  - silver
+  - dimension
+  - dm_level:Gold

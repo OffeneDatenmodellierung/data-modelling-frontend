@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.1.3] - 2026-01-08
+
+### Added
+- **Bundled Example Workspaces**: Jaffleshop example workspace now appears in the Home page workspace list
+  - Complete e-commerce data platform with medallion architecture (bronze/silver/gold)
+  - 19 ODCS data contracts, 2 ODPS data products, 3 BPMN processes
+  - 3 Knowledge articles, 3 Architecture decision records
+  - Examples automatically refresh when a new app version is deployed
+- **App Version Injection**: Added `__APP_VERSION__` build-time constant via Vite define
+
+### Changed
+- **Workspace Loader**: Added `loadFromStringFiles` method to WorkspaceV2Loader for loading workspaces from pre-loaded string content (used by bundled examples)
+- **Project Structure**: Moved Jaffleshop example from `/examples/` to `/frontend/public/examples/` for bundling with the app
+
+## [2.1.2] - 2026-01-08
+
+### Fixed
+- **Tags Persistence**: Fixed tags disappearing when canvas redraws by including tags in table data change detection hash
+- **V2 Save Format**: Save button now uses V2 flat file format instead of V1 folder-based format
+- **SDK Field Naming**: Fixed SDK export_to_odcs_yaml deserialization error by converting snake_case fields to camelCase for SDK compatibility
+- **File Deletion on Save**: Deleted resources now properly remove orphaned files from disk during autosave and manual save
+- **Security Vulnerabilities**: Updated react-router packages to fix CSRF, XSS, and open redirect vulnerabilities
+
+### Changed
+- **SDK Version**: Upgraded to data-modelling-sdk 1.13.5
+  - Fixed ODCS `id` field preservation issue where contract UUIDs were lost during `TableData` construction
+  - Added ODCS v3.1.0 contract-level field preservation: `id`, `apiVersion`, `version`, `status`, `kind`, `domain`, `dataProduct`, `tenant`, `description`, `servers`, `team`, `support`, `roles`, `slaProperties`, `quality`, `price`, `tags`, `customProperties`, `authoritativeDefinitions`, `contractCreatedTs`, `odcsMetadata`
+  - SystemReference now includes optional `table_ids` and `asset_ids` UUID arrays for explicit system mapping
+- **Canvas Zoom**: Increased zoom out limit from default to 0.1 (10%) and zoom in limit to 4x on Analytical and Operational Canvas views
+- **Relationship Editor**: Relationship Type and Cardinality dropdowns now sync bidirectionally; changing one updates the other automatically
+- **Connection Handles**: Added 14 connection points per node (tables, systems, compute assets):
+  - 4 corner handles (top-left, top-right, bottom-left, bottom-right)
+  - 2 center handles (top-center, bottom-center)
+  - 6 side handles (3 on left, 3 on right at 25%, 50%, 75% positions)
+
 ## [2.1.1] - 2026-01-08
 
 ### Fixed

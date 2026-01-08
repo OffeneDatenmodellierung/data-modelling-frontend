@@ -81,6 +81,7 @@ const ModelEditor: React.FC = () => {
   const [tagFilter, setTagFilter] = useState<string[]>([]);
   const [isFiltering, setIsFiltering] = useState(false);
   const [showSharedResourcePicker, setShowSharedResourcePicker] = useState(false);
+  const [canvasRefreshKey, setCanvasRefreshKey] = useState(0);
 
   // Handle shared resource selection
   const handleSharedResourcesSelected = (sharedResources: SharedResourceReference[]) => {
@@ -256,7 +257,46 @@ const ModelEditor: React.FC = () => {
         // Check if we're in offline mode - skip API calls
         const currentMode = useSDKModeStore.getState().mode;
         if (currentMode === 'offline') {
-          // In offline mode, load from workspace store (loaded from file)
+          // In offline mode, check if model store already has data (set by Home.tsx)
+          // If so, don't overwrite it - just set the workspace and domain selection
+          const modelStore = useModelStore.getState();
+          const hasExistingData =
+            modelStore.tables.length > 0 ||
+            modelStore.systems.length > 0 ||
+            modelStore.domains.length > 0;
+
+          if (hasExistingData) {
+            console.log(
+              `[ModelEditor] Model store already has data (tables: ${modelStore.tables.length}, systems: ${modelStore.systems.length}, domains: ${modelStore.domains.length}) - not reloading from workspace object`
+            );
+
+            // Just set current workspace and select first domain if needed
+            const workspace = workspaces.find((w) => w.id === workspaceId);
+            if (workspace) {
+              setCurrentWorkspace(workspace.id);
+            }
+
+            // Select first domain if none selected
+            if (!selectedDomainId && modelStore.domains.length > 0) {
+              const firstDomain = modelStore.domains[0];
+              if (firstDomain) {
+                console.log(
+                  `[ModelEditor] Setting selected domain to: ${firstDomain.id} (${firstDomain.name})`
+                );
+                setSelectedDomain(firstDomain.id);
+              }
+            }
+
+            addToast({
+              type: 'success',
+              message: `Loaded workspace: ${workspace?.name || workspaceId}`,
+            });
+
+            setIsLoading(false);
+            return;
+          }
+
+          // Model store is empty - load from workspace store (loaded from file)
           const workspace = workspaces.find((w) => w.id === workspaceId);
           if (workspace) {
             // Set current workspace
@@ -496,9 +536,9 @@ const ModelEditor: React.FC = () => {
             <>
               <button
                 onClick={() => {
-                  // Force a re-render by toggling the current view
-                  const currentView = useModelStore.getState().currentView;
-                  useModelStore.getState().setCurrentView(currentView);
+                  // Force a re-render by incrementing the refresh key
+                  setCanvasRefreshKey((prev) => prev + 1);
+                  console.log('[ModelEditor] Refresh button clicked - forcing canvas re-render');
                 }}
                 className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 whitespace-nowrap"
                 title="Refresh canvas and reload all resources"
@@ -567,7 +607,11 @@ const ModelEditor: React.FC = () => {
             workspaceId &&
             currentView !== 'decisions' &&
             currentView !== 'knowledge' && (
-              <DomainCanvas workspaceId={workspaceId} domainId={selectedDomainId} />
+              <DomainCanvas
+                key={canvasRefreshKey}
+                workspaceId={workspaceId}
+                domainId={selectedDomainId}
+              />
             )}
         </div>
       </div>

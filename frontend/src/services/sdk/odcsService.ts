@@ -94,6 +94,7 @@ class ODCSService {
           // Log table structure to verify quality rules are included
           if (result.tables && result.tables.length > 0) {
             console.log('[ODCSService] First table structure:', {
+              id: result.tables[0].id,
               name: result.tables[0].name,
               columnsCount: result.tables[0].columns?.length,
               hasQualityRules: !!result.tables[0].quality_rules,
@@ -101,6 +102,8 @@ class ODCSService {
               firstColumnSample: result.tables[0].columns?.[0],
             });
           }
+          // Also log the root-level id from ODCS file
+          console.log('[ODCSService] Result root-level id:', result.id);
 
           // SDK 1.8.4+: Normalize tables to ensure quality rules are in expected format
           // The SDK returns 'quality' array on columns, but UI expects 'quality_rules'
@@ -290,42 +293,42 @@ class ODCSService {
               const workspaceId = normalized.workspace_id || generateUUID();
 
               // Clean tables (remove complex nested objects, but preserve metadata including system_id)
+              // SDK export_to_odcs_yaml expects camelCase field names
               const cleanedTables = Array.isArray(normalized.tables)
                 ? normalized.tables.map((table: any) => {
                     const cleaned: any = {
                       id: table.id,
-                      workspace_id: table.workspace_id,
+                      workspaceId: table.workspace_id,
                       name: table.name,
-                      model_type: table.model_type || 'conceptual',
+                      modelType: table.model_type || 'conceptual',
                       // Ensure status is present (required by ODCS schema)
                       status: table.status || table.metadata?.status || 'draft',
                       columns: Array.isArray(table.columns)
                         ? table.columns.map((col: any) => ({
                             id: col.id,
-                            table_id: col.table_id,
+                            tableId: col.table_id,
                             name: col.name,
-                            data_type: col.data_type,
+                            dataType: col.data_type,
                             nullable: col.nullable ?? false,
-                            is_primary_key: col.is_primary_key ?? false,
-                            is_foreign_key: col.is_foreign_key ?? false,
+                            isPrimaryKey: col.is_primary_key ?? false,
+                            isForeignKey: col.is_foreign_key ?? false,
                             order: col.order ?? 0,
-                            created_at: col.created_at || now,
+                            createdAt: col.created_at || now,
                             ...(col.description && { description: col.description }),
                             ...(col.foreign_key_reference && {
-                              foreign_key_reference: col.foreign_key_reference,
+                              foreignKeyReference: col.foreign_key_reference,
                             }),
-                            ...(col.default_value && { default_value: col.default_value }),
+                            ...(col.default_value && { defaultValue: col.default_value }),
                           }))
                         : [],
-                      created_at: table.created_at || now,
-                      updated_at: table.last_modified_at || table.updated_at || now,
+                      createdAt: table.created_at || now,
+                      updatedAt: table.last_modified_at || table.updated_at || now,
                     };
-                    if (table.primary_domain_id)
-                      cleaned.primary_domain_id = table.primary_domain_id;
+                    if (table.primary_domain_id) cleaned.primaryDomainId = table.primary_domain_id;
                     if (table.alias) cleaned.alias = table.alias;
                     if (table.description) cleaned.description = table.description;
                     if (Array.isArray(table.tags)) cleaned.tags = table.tags;
-                    if (table.data_level) cleaned.data_level = table.data_level;
+                    if (table.data_level) cleaned.dataLevel = table.data_level;
                     // IMPORTANT: Preserve metadata (including system_id) when saving
                     if (table.metadata && typeof table.metadata === 'object') {
                       cleaned.metadata = { ...table.metadata };
@@ -339,16 +342,16 @@ class ODCSService {
                   })
                 : [];
 
-              // Clean relationships
+              // Clean relationships (SDK expects camelCase)
               const cleanedRelationships = Array.isArray(normalized.relationships)
                 ? normalized.relationships.map((rel: any) => ({
                     id: rel.id,
-                    workspace_id: rel.workspace_id,
-                    source_table_id: rel.source_table_id || rel.source_id,
-                    target_table_id: rel.target_table_id || rel.target_id,
-                    created_at: rel.created_at || now,
-                    updated_at: rel.last_modified_at || rel.updated_at || now,
-                    ...(rel.domain_id && { domain_id: rel.domain_id }),
+                    workspaceId: rel.workspace_id,
+                    sourceTableId: rel.source_table_id || rel.source_id,
+                    targetTableId: rel.target_table_id || rel.target_id,
+                    createdAt: rel.created_at || now,
+                    updatedAt: rel.last_modified_at || rel.updated_at || now,
+                    ...(rel.domain_id && { domainId: rel.domain_id }),
                     ...(rel.cardinality && { cardinality: rel.cardinality }),
                     ...(rel.type && { type: rel.type }),
                     ...(rel.name && { name: rel.name }),
@@ -356,19 +359,19 @@ class ODCSService {
                   }))
                 : [];
 
-              // Create DataModel structure with all required fields
+              // Create DataModel structure with all required fields (SDK expects camelCase)
               const dataModel = {
                 id: workspaceId,
                 name: (normalized as any).name || 'Workspace',
-                git_directory_path: (normalized as any).git_directory_path || '',
-                control_file_path: (normalized as any).control_file_path || '',
+                gitDirectoryPath: (normalized as any).git_directory_path || '',
+                controlFilePath: (normalized as any).control_file_path || '',
                 tables: cleanedTables,
                 relationships: cleanedRelationships,
                 domains: [],
-                created_at: (normalized as any).created_at || now,
-                updated_at:
+                createdAt: (normalized as any).created_at || now,
+                updatedAt:
                   (normalized as any).updated_at || (normalized as any).last_modified_at || now,
-                is_subfolder: (normalized as any).is_subfolder ?? false,
+                isSubfolder: (normalized as any).is_subfolder ?? false,
               };
 
               // Convert DataModel to JSON string
@@ -1331,7 +1334,20 @@ class ODCSService {
     }
 
     // Apply ODCL table-level metadata if provided
-    let finalDescription = item.description || item.info?.description;
+    // IMPORTANT: In ODCS format, description can be an object like { purpose: "..." }
+    // We need to extract the string value to avoid React error #31
+    let finalDescription: string | undefined;
+    if (typeof item.description === 'string') {
+      finalDescription = item.description;
+    } else if (item.description && typeof item.description === 'object') {
+      // Extract purpose field from ODCS description object
+      finalDescription = item.description.purpose || JSON.stringify(item.description);
+    } else if (item.info?.description) {
+      finalDescription =
+        typeof item.info.description === 'string'
+          ? item.info.description
+          : item.info.description?.purpose || JSON.stringify(item.info.description);
+    }
     if (odclTableMetadata) {
       // Map ODCL info fields
       if (odclTableMetadata.odcl_title && !item.alias) {
@@ -1339,7 +1355,9 @@ class ODCSService {
       }
       // Use ODCL info.description if table doesn't have its own description
       if (!finalDescription && odclInfo?.odcl_info?.description) {
-        finalDescription = odclInfo.odcl_info.description as string;
+        const odclDesc = odclInfo.odcl_info.description;
+        finalDescription =
+          typeof odclDesc === 'string' ? odclDesc : odclDesc?.purpose || JSON.stringify(odclDesc);
       }
       if (odclTableMetadata.version) {
         metadata.version = odclTableMetadata.version;
@@ -1406,6 +1424,40 @@ class ODCSService {
     }
     if (!tableTags && item.metadata && item.metadata.tags) {
       tableTags = item.metadata.tags;
+    }
+
+    // Extract data_level from dm_level tag (e.g., "dm_level:Gold" -> "gold")
+    let dataLevel: 'operational' | 'bronze' | 'silver' | 'gold' | undefined;
+    if (tableTags && Array.isArray(tableTags)) {
+      for (const tag of tableTags) {
+        if (typeof tag === 'string' && tag.toLowerCase().startsWith('dm_level:')) {
+          const levelValue = tag.substring('dm_level:'.length).toLowerCase();
+          if (['operational', 'bronze', 'silver', 'gold'].includes(levelValue)) {
+            dataLevel = levelValue as 'operational' | 'bronze' | 'silver' | 'gold';
+          }
+          break;
+        }
+        // Also handle object tag format { key: 'dm_level', value: 'Gold' }
+        if (typeof tag === 'object' && tag !== null && 'key' in tag && tag.key === 'dm_level') {
+          const levelValue = String(tag.value || '').toLowerCase();
+          if (['operational', 'bronze', 'silver', 'gold'].includes(levelValue)) {
+            dataLevel = levelValue as 'operational' | 'bronze' | 'silver' | 'gold';
+          }
+          break;
+        }
+      }
+    }
+    // Fallback: check customProperties for data_level (legacy support)
+    if (!dataLevel && item.customProperties && Array.isArray(item.customProperties)) {
+      const dataLevelProp = item.customProperties.find(
+        (p: any) => p.property === 'data_level' || p.property === 'dataLevel'
+      );
+      if (dataLevelProp) {
+        const levelValue = String(dataLevelProp.value || '').toLowerCase();
+        if (['operational', 'bronze', 'silver', 'gold'].includes(levelValue)) {
+          dataLevel = levelValue as 'operational' | 'bronze' | 'silver' | 'gold';
+        }
+      }
     }
 
     // Normalize columns with ALL quality rules
@@ -1600,6 +1652,7 @@ class ODCSService {
       width: item.width ?? 200,
       height: item.height ?? 150,
       visible_domains: item.visible_domains || [item.primary_domain_id || item.domain_id || ''],
+      data_level: dataLevel, // Extracted from dm_level tag
       owner,
       roles: Array.isArray(item.roles) ? item.roles : undefined,
       support,
@@ -1750,13 +1803,23 @@ class ODCSService {
           },
         ],
 
-        // Custom properties for metadata
-        ...((table as any).metadata && {
-          customProperties: Object.entries((table as any).metadata).map(([property, value]) => ({
-            property,
-            value: String(value),
-          })),
-        }),
+        // Custom properties for metadata (includes system_id, but NOT data_level - that's in tags as dm_level)
+        ...(() => {
+          const props: { property: string; value: string }[] = [];
+
+          // Add metadata properties (includes system_id)
+          if ((table as any).metadata) {
+            for (const [property, value] of Object.entries((table as any).metadata)) {
+              // Skip data_level - it's stored as dm_level tag instead
+              if (property === 'data_level') continue;
+              if (value !== undefined && value !== null) {
+                props.push({ property, value: String(value) });
+              }
+            }
+          }
+
+          return props.length > 0 ? { customProperties: props } : {};
+        })(),
 
         // Tags
         ...(table.tags &&
