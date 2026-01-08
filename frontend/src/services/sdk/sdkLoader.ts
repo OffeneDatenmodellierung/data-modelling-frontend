@@ -150,31 +150,32 @@ class SDKLoader {
 
   /**
    * Internal method to load the WASM module
+   *
+   * IMPORTANT: In production (Cloudflare Pages), SDK WASM is downloaded from GitHub Releases
+   * during the build process and placed in /wasm/. We should ONLY load from that location.
+   * Local development paths are only used in Electron or dev mode.
    */
   private async _loadModule(): Promise<SDKModule> {
+    const isElectron = typeof window !== 'undefined' && window.location.protocol === 'file:';
+    const isDev = import.meta.env.DEV;
+
     try {
-      // Load WASM module from SDK pkg directory
-      // In dev mode (Vite), files in /public are served at root but cannot be imported
-      // In production, Vite copies public/wasm/ to dist/wasm/
-      // In Electron, use relative paths for file:// protocol
-
-      const isElectron = typeof window !== 'undefined' && window.location.protocol === 'file:';
-      const isDev = import.meta.env.DEV;
-
-      // In dev mode, load via script tag since we can't import from /public
+      // In dev mode (Vite), load via script tag since we can't import from /public
       if (isDev && !isElectron) {
+        console.log('[SDKLoader] Dev mode: Loading WASM via script tag');
         return await this._loadViaScriptTag('/wasm/data_modelling_sdk.js');
       }
 
-      // In production or Electron, use dynamic import
+      // Define possible paths based on environment
+      // - Electron: Try multiple relative paths for file:// protocol
+      // - Production web: ONLY load from /wasm/ (GitHub release files)
       const possiblePaths = isElectron
         ? [
             './wasm/data_modelling_sdk.js',
             './assets/wasm/data_modelling_sdk.js',
             '../wasm/data_modelling_sdk.js',
-            '../public/wasm/data_modelling_sdk.js',
           ]
-        : ['/wasm/data_modelling_sdk.js'];
+        : ['/wasm/data_modelling_sdk.js']; // Production: ONLY from /wasm/
 
       let wasmModule: any = null;
       let lastError: Error | null = null;
@@ -211,28 +212,30 @@ class SDKLoader {
       this.verifySDKBindings(module);
 
       return module;
-    } catch {
-      // Fallback: Try relative path (for development)
-      try {
-        const wasmPath = '../../../../data-modelling-sdk/pkg/data_modelling_sdk.js';
-        const wasmModule = await import(/* @vite-ignore */ wasmPath);
-        if (wasmModule.default) {
-          await wasmModule.default();
-        }
-        return wasmModule as SDKModule;
-      } catch {
-        console.warn('SDK WASM module not available - offline mode will use placeholders');
+    } catch (error) {
+      // Log the actual error
+      console.error('[SDKLoader] Failed to load SDK WASM module:', error);
+      console.warn(
+        '[SDKLoader] SDK WASM module not available - offline mode will use placeholders'
+      );
+
+      if (isElectron) {
+        console.warn('[SDKLoader] For Electron: Ensure WASM files are in the app bundle');
+      } else {
         console.warn(
-          'Build the SDK with: cd ../data-modelling-sdk && wasm-pack build --target web --out-dir pkg --features wasm'
+          '[SDKLoader] For web deployment: SDK WASM should be downloaded from GitHub Releases during build'
         );
-        console.warn('Then copy pkg/ to frontend/public/wasm/');
-        // Return placeholder for now - actual SDK methods will be called when available
-        return {
-          init: async () => {
-            console.log('SDK placeholder initialized - WASM module not loaded');
-          },
-        } as SDKModule;
+        console.warn(
+          '[SDKLoader] Check that cloudflare-build.sh successfully downloaded the WASM SDK'
+        );
       }
+
+      // Return placeholder - actual SDK methods will fail gracefully when called
+      return {
+        init: async () => {
+          console.log('[SDKLoader] SDK placeholder initialized - WASM module not loaded');
+        },
+      } as SDKModule;
     }
   }
 
