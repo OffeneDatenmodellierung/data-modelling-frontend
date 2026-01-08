@@ -62,24 +62,34 @@ class ODCSService {
       if (sdk && 'parse_odcs_yaml' in sdk && typeof (sdk as any).parse_odcs_yaml === 'function') {
         console.log('[ODCSService] Using SDK parse_odcs_yaml method (SDK 1.8.4+)');
         try {
+          // IMPORTANT: SDK parse_odcs_yaml does NOT return customProperties from the YAML
+          // We need to extract it from the raw YAML before SDK processing
+          let rawCustomProperties: any[] = [];
+          try {
+            const yaml = await import('js-yaml');
+            const rawParsed = yaml.load(yamlContent) as any;
+            if (
+              rawParsed &&
+              rawParsed.customProperties &&
+              Array.isArray(rawParsed.customProperties)
+            ) {
+              rawCustomProperties = rawParsed.customProperties;
+              console.log(
+                '[ODCSService] Extracted customProperties from raw YAML:',
+                rawCustomProperties
+              );
+            }
+          } catch (yamlErr) {
+            console.warn(
+              '[ODCSService] Failed to extract customProperties from raw YAML:',
+              yamlErr
+            );
+          }
+
           // SDK 1.8.4+: No preprocessing needed, SDK handles validation
           const resultJson = (sdk as any).parse_odcs_yaml(yamlContent);
           const result = JSON.parse(resultJson);
           console.log('[ODCSService] SDK parse_odcs_yaml result:', result);
-
-          // Debug: Log customProperties at root and table level
-          console.log('[ODCSService] Root customProperties:', result.customProperties);
-          console.log('[ODCSService] Root custom_properties:', result.custom_properties);
-          if (result.tables && result.tables.length > 0) {
-            console.log(
-              '[ODCSService] Table[0] customProperties:',
-              result.tables[0].customProperties
-            );
-            console.log(
-              '[ODCSService] Table[0] custom_properties:',
-              result.tables[0].custom_properties
-            );
-          }
 
           // Log table structure to verify quality rules are included
           if (result.tables && result.tables.length > 0) {
@@ -95,8 +105,8 @@ class ODCSService {
           // SDK 1.8.4+: Normalize tables to ensure quality rules are in expected format
           // The SDK returns 'quality' array on columns, but UI expects 'quality_rules'
           // IMPORTANT: customProperties is at the root level of ODCS, not on each table
-          // We need to inject root-level customProperties into each table for system linking
-          const rootCustomProperties = result.customProperties || result.custom_properties || [];
+          // SDK does NOT pass through customProperties, so we use the raw YAML extraction
+          const rootCustomProperties = rawCustomProperties;
           console.log(
             '[ODCSService] Injecting root customProperties into tables:',
             rootCustomProperties
