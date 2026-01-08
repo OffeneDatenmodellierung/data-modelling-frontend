@@ -267,6 +267,9 @@ export class WorkspaceV2Saver {
             id: s.id,
             name: s.name,
             description: s.description,
+            // Include table and asset IDs for system-resource linkage
+            ...(s.table_ids && s.table_ids.length > 0 && { table_ids: s.table_ids }),
+            ...(s.asset_ids && s.asset_ids.length > 0 && { asset_ids: s.asset_ids }),
           })),
         };
       }),

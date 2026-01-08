@@ -41,11 +41,9 @@ schema:
 customProperties:
   - property: system_id
     value: ad789620-a825-4bc4-afd7-429db96a6359
-  - property: data_level
-    value: gold
 
 tags:
   - mart
   - locations
   - dimension
-  - gold
+  - dm_level:Gold

@@ -81,6 +81,7 @@ const ModelEditor: React.FC = () => {
   const [tagFilter, setTagFilter] = useState<string[]>([]);
   const [isFiltering, setIsFiltering] = useState(false);
   const [showSharedResourcePicker, setShowSharedResourcePicker] = useState(false);
+  const [canvasRefreshKey, setCanvasRefreshKey] = useState(0);
 
   // Handle shared resource selection
   const handleSharedResourcesSelected = (sharedResources: SharedResourceReference[]) => {
@@ -496,9 +497,9 @@ const ModelEditor: React.FC = () => {
             <>
               <button
                 onClick={() => {
-                  // Force a re-render by toggling the current view
-                  const currentView = useModelStore.getState().currentView;
-                  useModelStore.getState().setCurrentView(currentView);
+                  // Force a re-render by incrementing the refresh key
+                  setCanvasRefreshKey((prev) => prev + 1);
+                  console.log('[ModelEditor] Refresh button clicked - forcing canvas re-render');
                 }}
                 className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 whitespace-nowrap"
                 title="Refresh canvas and reload all resources"
@@ -567,7 +568,11 @@ const ModelEditor: React.FC = () => {
             workspaceId &&
             currentView !== 'decisions' &&
             currentView !== 'knowledge' && (
-              <DomainCanvas workspaceId={workspaceId} domainId={selectedDomainId} />
+              <DomainCanvas
+                key={canvasRefreshKey}
+                workspaceId={workspaceId}
+                domainId={selectedDomainId}
+              />
             )}
         </div>
       </div>

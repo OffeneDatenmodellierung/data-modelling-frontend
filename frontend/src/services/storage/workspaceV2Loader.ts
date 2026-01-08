@@ -128,6 +128,39 @@ export class WorkspaceV2Loader {
       workspaceId
     );
 
+    // 5.5 Set domain_id on relationships based on source table's domain
+    // Create a map of table ID to domain ID for quick lookup
+    const tableIdToDomainId = new Map<string, string>();
+    for (const table of allTables) {
+      if (table.id && table.primary_domain_id) {
+        tableIdToDomainId.set(table.id, table.primary_domain_id);
+      }
+    }
+
+    // Update each relationship's domain_id based on its source table
+    for (const rel of allRelationships) {
+      const sourceTableId = rel.source_table_id || rel.source_id;
+      if (sourceTableId) {
+        const domainId = tableIdToDomainId.get(sourceTableId);
+        if (domainId) {
+          rel.domain_id = domainId;
+        } else {
+          // Fallback: try target table
+          const targetTableId = rel.target_table_id || rel.target_id;
+          if (targetTableId) {
+            const targetDomainId = tableIdToDomainId.get(targetTableId);
+            if (targetDomainId) {
+              rel.domain_id = targetDomainId;
+            }
+          }
+        }
+      }
+    }
+
+    console.log(
+      `[WorkspaceV2Loader] Set domain_id on ${allRelationships.filter((r) => r.domain_id).length}/${allRelationships.length} relationship(s)`
+    );
+
     // 6. Build workspace object with all resources attached (like V1 loader does)
     const workspace: Workspace & {
       tables?: Table[];
@@ -302,23 +335,37 @@ export class WorkspaceV2Loader {
     const systems: System[] = [];
 
     for (const spec of systemSpecs) {
-      // Find tables that belong to this system (by metadata.system_id or naming convention)
-      const systemTables = tables.filter((t) => {
-        // Check if table has system_id in metadata
-        const tableSystemId = (t as any).metadata?.system_id;
-        if (tableSystemId) {
+      let tableIds: string[] = [];
+
+      // PRIORITY 1: Use table_ids from workspace.yaml if present
+      if (spec.table_ids && spec.table_ids.length > 0) {
+        tableIds = spec.table_ids;
+        console.log(
+          `[WorkspaceV2Loader] System "${spec.name}" has explicit table_ids in workspace.yaml: ${tableIds.length} table(s)`
+        );
+      } else {
+        // FALLBACK: Find tables by metadata.system_id or naming convention (legacy support)
+        const systemTables = tables.filter((t) => {
+          // Check if table has system_id in metadata
+          const tableSystemId = (t as any).metadata?.system_id;
+          if (tableSystemId === spec.id) {
+            return true;
+          }
+          // Fallback: check if table name contains system name
+          const tableName = t.name?.toLowerCase() || '';
+          const systemName = spec.name?.toLowerCase() || '';
+          return tableName.includes(systemName) || systemName.includes(tableName);
+        });
+        tableIds = systemTables.map((t) => t.id);
+        if (tableIds.length > 0) {
           console.log(
-            `[WorkspaceV2Loader] Table "${t.name}" has metadata.system_id="${tableSystemId}", comparing with spec.id="${spec.id}"`
+            `[WorkspaceV2Loader] System "${spec.name}" matched ${tableIds.length} table(s) via fallback (metadata/naming)`
           );
         }
-        if (tableSystemId === spec.id) {
-          return true;
-        }
-        // Fallback: check if table name contains system name
-        const tableName = t.name?.toLowerCase() || '';
-        const systemName = spec.name?.toLowerCase() || '';
-        return tableName.includes(systemName) || systemName.includes(tableName);
-      });
+      }
+
+      // Get asset_ids from workspace.yaml if present
+      const assetIds = spec.asset_ids || [];
 
       const system: System = {
         id: spec.id,
@@ -326,19 +373,23 @@ export class WorkspaceV2Loader {
         description: spec.description,
         domain_id: domainId,
         system_type: 'database', // Default system type
-        table_ids: systemTables.map((t) => t.id),
+        table_ids: tableIds,
+        asset_ids: assetIds,
         created_at: new Date().toISOString(),
         last_modified_at: new Date().toISOString(),
       };
 
-      // Update tables with system linkage
-      for (const table of systemTables) {
-        (table as any).primary_system_id = spec.id;
+      // Update tables with system linkage (set primary_system_id on matched tables)
+      for (const tableId of tableIds) {
+        const table = tables.find((t) => t.id === tableId);
+        if (table) {
+          (table as any).primary_system_id = spec.id;
+        }
       }
 
       systems.push(system);
       console.log(
-        `[WorkspaceV2Loader] Loaded system "${spec.name}" with ${systemTables.length} table(s)`
+        `[WorkspaceV2Loader] Loaded system "${spec.name}" with ${tableIds.length} table(s), ${assetIds.length} asset(s)`
       );
     }
 

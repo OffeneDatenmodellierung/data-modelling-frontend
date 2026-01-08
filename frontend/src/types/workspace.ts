@@ -101,6 +101,8 @@ export interface SystemV2 {
 
   // Optional fields
   description?: string;
+  table_ids?: string[]; // UUIDs of tables belonging to this system
+  asset_ids?: string[]; // UUIDs of compute assets belonging to this system
 }
 
 /**

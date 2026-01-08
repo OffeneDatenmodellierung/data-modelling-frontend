@@ -27,7 +27,10 @@ export type ViewMode =
   | 'products'
   | 'decisions'
   | 'knowledge';
+// Valid selectable data levels for tables
 export type DataLevel = 'operational' | 'bronze' | 'silver' | 'gold';
+// Display-only level when dm_level tag is not set
+export type DataLevelDisplay = DataLevel | 'unknown';
 
 interface ModelState {
   tables: Table[];
@@ -221,9 +224,14 @@ export const useModelStore = create<ModelState>((set, get) => ({
     useWorkspaceStore.getState().setPendingChanges(true);
   },
   updateSystem: (systemId, updates) => {
-    set((state) => ({
-      systems: state.systems.map((s) => (s.id === systemId ? { ...s, ...updates } : s)),
-    }));
+    set((state) => {
+      const applyUpdate = (s: System) => (s.id === systemId ? { ...s, ...updates } : s);
+      return {
+        systems: state.systems.map(applyUpdate),
+        // Also update backup if filtering is active
+        originalSystems: state.originalSystems ? state.originalSystems.map(applyUpdate) : undefined,
+      };
+    });
     useWorkspaceStore.getState().setPendingChanges(true);
   },
   removeSystem: (systemId) => {
@@ -242,7 +250,7 @@ export const useModelStore = create<ModelState>((set, get) => ({
   },
   updateTable: (tableId: string, updates: Partial<Table>) => {
     set((state) => {
-      const updatedTables = state.tables.map((t) => {
+      const applyTableUpdate = (t: Table): Table => {
         if (t.id === tableId) {
           // Deep merge to ensure compoundKeys and metadata are properly updated
           const merged = { ...t, ...updates };
@@ -257,8 +265,19 @@ export const useModelStore = create<ModelState>((set, get) => ({
           return merged;
         }
         return t;
-      });
-      return { tables: updatedTables };
+      };
+
+      const updatedTables = state.tables.map(applyTableUpdate);
+
+      // Also update backup if filtering is active
+      const updatedOriginalTables = state.originalTables
+        ? state.originalTables.map(applyTableUpdate)
+        : undefined;
+
+      return {
+        tables: updatedTables,
+        originalTables: updatedOriginalTables,
+      };
     });
     useWorkspaceStore.getState().setPendingChanges(true);
   },
@@ -296,9 +315,9 @@ export const useModelStore = create<ModelState>((set, get) => ({
     });
 
     set((state) => {
-      const updatedRelationships = state.relationships.map((r) =>
-        r.id === relationshipId ? { ...r, ...updates } : r
-      );
+      const applyUpdate = (r: Relationship) => (r.id === relationshipId ? { ...r, ...updates } : r);
+
+      const updatedRelationships = state.relationships.map(applyUpdate);
 
       console.log('[ModelStore] After local update:', {
         afterCount: updatedRelationships.length,
@@ -307,7 +326,13 @@ export const useModelStore = create<ModelState>((set, get) => ({
           .map((r) => r.id),
       });
 
-      return { relationships: updatedRelationships };
+      return {
+        relationships: updatedRelationships,
+        // Also update backup if filtering is active
+        originalRelationships: state.originalRelationships
+          ? state.originalRelationships.map(applyUpdate)
+          : undefined,
+      };
     });
 
     // Mark workspace as having pending changes
@@ -345,9 +370,16 @@ export const useModelStore = create<ModelState>((set, get) => ({
     useWorkspaceStore.getState().setPendingChanges(true);
   },
   updateComputeAsset: (assetId, updates) => {
-    set((state) => ({
-      computeAssets: state.computeAssets.map((a) => (a.id === assetId ? { ...a, ...updates } : a)),
-    }));
+    set((state) => {
+      const applyUpdate = (a: ComputeAsset) => (a.id === assetId ? { ...a, ...updates } : a);
+      return {
+        computeAssets: state.computeAssets.map(applyUpdate),
+        // Also update backup if filtering is active
+        originalComputeAssets: state.originalComputeAssets
+          ? state.originalComputeAssets.map(applyUpdate)
+          : undefined,
+      };
+    });
     useWorkspaceStore.getState().setPendingChanges(true);
   },
   removeComputeAsset: (assetId) => {

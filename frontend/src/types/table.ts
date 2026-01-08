@@ -74,7 +74,7 @@ export interface Table {
   width: number; // canvas size, default 200
   height: number; // canvas size, default 150
   visible_domains: string[]; // array of domain UUIDs
-  data_level?: 'operational' | 'bronze' | 'silver' | 'gold'; // Data quality tier
+  data_level?: 'operational' | 'bronze' | 'silver' | 'gold'; // Data quality tier (derived from dm_level tag)
   is_owned_by_domain: boolean; // True if owned by current domain (for cross-domain viewing)
   created_at: string; // ISO timestamp
   last_modified_at: string; // ISO timestamp

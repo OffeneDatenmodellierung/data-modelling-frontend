@@ -1408,6 +1408,40 @@ class ODCSService {
       tableTags = item.metadata.tags;
     }
 
+    // Extract data_level from dm_level tag (e.g., "dm_level:Gold" -> "gold")
+    let dataLevel: 'operational' | 'bronze' | 'silver' | 'gold' | undefined;
+    if (tableTags && Array.isArray(tableTags)) {
+      for (const tag of tableTags) {
+        if (typeof tag === 'string' && tag.toLowerCase().startsWith('dm_level:')) {
+          const levelValue = tag.substring('dm_level:'.length).toLowerCase();
+          if (['operational', 'bronze', 'silver', 'gold'].includes(levelValue)) {
+            dataLevel = levelValue as 'operational' | 'bronze' | 'silver' | 'gold';
+          }
+          break;
+        }
+        // Also handle object tag format { key: 'dm_level', value: 'Gold' }
+        if (typeof tag === 'object' && tag !== null && 'key' in tag && tag.key === 'dm_level') {
+          const levelValue = String(tag.value || '').toLowerCase();
+          if (['operational', 'bronze', 'silver', 'gold'].includes(levelValue)) {
+            dataLevel = levelValue as 'operational' | 'bronze' | 'silver' | 'gold';
+          }
+          break;
+        }
+      }
+    }
+    // Fallback: check customProperties for data_level (legacy support)
+    if (!dataLevel && item.customProperties && Array.isArray(item.customProperties)) {
+      const dataLevelProp = item.customProperties.find(
+        (p: any) => p.property === 'data_level' || p.property === 'dataLevel'
+      );
+      if (dataLevelProp) {
+        const levelValue = String(dataLevelProp.value || '').toLowerCase();
+        if (['operational', 'bronze', 'silver', 'gold'].includes(levelValue)) {
+          dataLevel = levelValue as 'operational' | 'bronze' | 'silver' | 'gold';
+        }
+      }
+    }
+
     // Normalize columns with ALL quality rules
     const normalizedColumns = columns.map((col: any, colIndex: number) => {
       const colConstraints: Record<string, unknown> = {};
@@ -1600,6 +1634,7 @@ class ODCSService {
       width: item.width ?? 200,
       height: item.height ?? 150,
       visible_domains: item.visible_domains || [item.primary_domain_id || item.domain_id || ''],
+      data_level: dataLevel, // Extracted from dm_level tag
       owner,
       roles: Array.isArray(item.roles) ? item.roles : undefined,
       support,
@@ -1750,13 +1785,23 @@ class ODCSService {
           },
         ],
 
-        // Custom properties for metadata
-        ...((table as any).metadata && {
-          customProperties: Object.entries((table as any).metadata).map(([property, value]) => ({
-            property,
-            value: String(value),
-          })),
-        }),
+        // Custom properties for metadata (includes system_id, but NOT data_level - that's in tags as dm_level)
+        ...(() => {
+          const props: { property: string; value: string }[] = [];
+
+          // Add metadata properties (includes system_id)
+          if ((table as any).metadata) {
+            for (const [property, value] of Object.entries((table as any).metadata)) {
+              // Skip data_level - it's stored as dm_level tag instead
+              if (property === 'data_level') continue;
+              if (value !== undefined && value !== null) {
+                props.push({ property, value: String(value) });
+              }
+            }
+          }
+
+          return props.length > 0 ? { customProperties: props } : {};
+        })(),
 
         // Tags
         ...(table.tags &&
