@@ -49,28 +49,67 @@ class KnowledgeService {
    * Parse a knowledge article from YAML string
    */
   async parseKnowledgeYaml(yaml: string): Promise<KnowledgeArticle | null> {
-    if (!this.isSupported()) {
-      console.warn('[KnowledgeService] Knowledge features require SDK 1.13.3+');
-      return null;
+    // Try SDK first if supported
+    if (this.isSupported()) {
+      const sdk = await sdkLoader.load();
+      if (sdk.parse_knowledge_yaml) {
+        try {
+          const resultJson = sdk.parse_knowledge_yaml(yaml);
+          const result = JSON.parse(resultJson);
+
+          if (result.error) {
+            throw new Error(result.error);
+          }
+
+          return result as KnowledgeArticle;
+        } catch (error) {
+          console.warn('[KnowledgeService] SDK parse failed, trying fallback:', error);
+        }
+      }
     }
 
-    const sdk = await sdkLoader.load();
-    if (!sdk.parse_knowledge_yaml) {
-      console.warn('[KnowledgeService] parse_knowledge_yaml method not available');
-      return null;
-    }
+    // Fallback: Parse YAML directly using js-yaml
+    return this.parseKnowledgeYamlFallback(yaml);
+  }
 
+  /**
+   * Fallback parser for knowledge articles when SDK is not available
+   */
+  private async parseKnowledgeYamlFallback(yamlContent: string): Promise<KnowledgeArticle | null> {
     try {
-      const resultJson = sdk.parse_knowledge_yaml(yaml);
-      const result = JSON.parse(resultJson);
+      const jsYaml = await import('js-yaml');
+      const parsed = jsYaml.load(yamlContent) as any;
 
-      if (result.error) {
-        throw new Error(result.error);
+      if (!parsed || typeof parsed !== 'object') {
+        console.error('[KnowledgeService] Invalid YAML content');
+        return null;
       }
 
-      return result as KnowledgeArticle;
+      // Map YAML fields to KnowledgeArticle structure
+      const article: KnowledgeArticle = {
+        id: parsed.id || crypto.randomUUID(),
+        number: parsed.number || 0,
+        title: parsed.title || 'Untitled Article',
+        type: parsed.type || 'guide',
+        status: parsed.status || 'draft',
+        summary: parsed.summary || '',
+        content: parsed.content || '',
+        domain_id: parsed.domain_id,
+        workspace_id: parsed.workspace_id,
+        authors: Array.isArray(parsed.authors) ? parsed.authors : [],
+        reviewers: Array.isArray(parsed.reviewers) ? parsed.reviewers : [],
+        tags: parsed.tags,
+        created_at: parsed.created_at || new Date().toISOString(),
+        updated_at: parsed.updated_at || new Date().toISOString(),
+        published_at: parsed.published_at,
+        reviewed_at: parsed.reviewed_at,
+        archived_at: parsed.archived_at,
+      };
+
+      console.log(`[KnowledgeService] Parsed article via fallback: ${article.title}`);
+      return article;
     } catch (error) {
-      console.error('[KnowledgeService] Failed to parse knowledge YAML:', error);
+      console.error('[KnowledgeService] Fallback parse failed:', error);
       return null;
     }
   }

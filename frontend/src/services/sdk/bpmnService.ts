@@ -39,17 +39,105 @@ class BPMNService {
       const parser = new DOMParser();
       const doc = parser.parseFromString(xmlContent, 'text/xml');
 
-      // Look for bpmn:process element with name attribute
-      const processEl = doc.querySelector('process, bpmn\\:process, [*|localName="process"]');
-      const name = processEl?.getAttribute('name') || '';
-      const id = processEl?.getAttribute('id') || '';
+      // Check for parse errors
+      const parseError = doc.querySelector('parsererror');
+      if (parseError) {
+        console.warn('[BPMNService] XML parse error:', parseError.textContent);
+        // Fall back to regex extraction
+        return this.extractFromXMLRegex(xmlContent);
+      }
 
-      console.log(`[BPMNService] Extracted from XML - name: "${name}", id: "${id}"`);
+      // Try multiple ways to find the process element
+      let processEl: Element | null = null;
+      let name = '';
+      let id = '';
+
+      // Method 1: getElementsByTagNameNS (most reliable for namespaced XML)
+      const bpmnNS = 'http://www.omg.org/spec/BPMN/20100524/MODEL';
+      const processElements = doc.getElementsByTagNameNS(bpmnNS, 'process');
+      if (processElements.length > 0) {
+        processEl = processElements[0] ?? null;
+        console.log('[BPMNService] Found process via getElementsByTagNameNS');
+      }
+
+      // Method 2: Try getElementsByTagName with local name
+      if (!processEl) {
+        const allProcesses = doc.getElementsByTagName('process');
+        if (allProcesses.length > 0) {
+          processEl = allProcesses[0] ?? null;
+          console.log('[BPMNService] Found process via getElementsByTagName("process")');
+        }
+      }
+
+      // Method 3: Try getElementsByTagName with prefixed name
+      if (!processEl) {
+        const bpmnProcesses = doc.getElementsByTagName('bpmn:process');
+        if (bpmnProcesses.length > 0) {
+          processEl = bpmnProcesses[0] ?? null;
+          console.log('[BPMNService] Found process via getElementsByTagName("bpmn:process")');
+        }
+      }
+
+      if (processEl) {
+        name = processEl.getAttribute('name') || '';
+        id = processEl.getAttribute('id') || '';
+        console.log(`[BPMNService] Extracted from XML DOM - name: "${name}", id: "${id}"`);
+      } else {
+        console.warn('[BPMNService] No process element found in DOM, trying regex fallback');
+        return this.extractFromXMLRegex(xmlContent);
+      }
+
+      // If DOM parsing didn't find the name, try regex as final fallback
+      if (!name) {
+        const regexResult = this.extractFromXMLRegex(xmlContent);
+        if (regexResult.name) {
+          name = regexResult.name;
+          console.log(`[BPMNService] Got name from regex fallback: "${name}"`);
+        }
+      }
+
       return { name, id };
     } catch (error) {
-      console.warn('[BPMNService] Failed to extract from XML:', error);
-      return { name: '', id: '' };
+      console.warn('[BPMNService] Failed to extract from XML via DOM:', error);
+      return this.extractFromXMLRegex(xmlContent);
     }
+  }
+
+  /**
+   * Extract process name and ID from BPMN XML using regex (fallback)
+   */
+  private extractFromXMLRegex(xmlContent: string): { name: string; id: string } {
+    let name = '';
+    let id = '';
+
+    try {
+      // Match <bpmn:process or <process element with name and id attributes
+      // Handle both orders: name before id, and id before name
+      const processRegex = /<(?:bpmn:)?process[^>]*>/i;
+      const processMatch = xmlContent.match(processRegex);
+
+      if (processMatch) {
+        const processTag = processMatch[0];
+
+        // Extract name attribute
+        const nameMatch = processTag.match(/name\s*=\s*["']([^"']+)["']/);
+        if (nameMatch && nameMatch[1]) {
+          name = nameMatch[1];
+        }
+
+        // Extract id attribute
+        const idMatch = processTag.match(/id\s*=\s*["']([^"']+)["']/);
+        if (idMatch && idMatch[1]) {
+          id = idMatch[1];
+        }
+
+        console.log(`[BPMNService] Extracted from XML regex - name: "${name}", id: "${id}"`);
+      }
+    } catch (error) {
+      console.warn('[BPMNService] Regex extraction failed:', error);
+    }
+
+    return { name, id };
   }
 
   /**

@@ -48,28 +48,68 @@ class DecisionService {
    * Parse a decision from YAML string
    */
   async parseDecisionYaml(yaml: string): Promise<Decision | null> {
-    if (!this.isSupported()) {
-      console.warn('[DecisionService] Decision features require SDK 1.13.3+');
-      return null;
+    // Try SDK first if supported
+    if (this.isSupported()) {
+      const sdk = await sdkLoader.load();
+      if (sdk.parse_decision_yaml) {
+        try {
+          const resultJson = sdk.parse_decision_yaml(yaml);
+          const result = JSON.parse(resultJson);
+
+          if (result.error) {
+            throw new Error(result.error);
+          }
+
+          return result as Decision;
+        } catch (error) {
+          console.warn('[DecisionService] SDK parse failed, trying fallback:', error);
+        }
+      }
     }
 
-    const sdk = await sdkLoader.load();
-    if (!sdk.parse_decision_yaml) {
-      console.warn('[DecisionService] parse_decision_yaml method not available');
-      return null;
-    }
+    // Fallback: Parse YAML directly using js-yaml
+    return this.parseDecisionYamlFallback(yaml);
+  }
 
+  /**
+   * Fallback parser for decisions when SDK is not available
+   */
+  private async parseDecisionYamlFallback(yamlContent: string): Promise<Decision | null> {
     try {
-      const resultJson = sdk.parse_decision_yaml(yaml);
-      const result = JSON.parse(resultJson);
+      const jsYaml = await import('js-yaml');
+      const parsed = jsYaml.load(yamlContent) as any;
 
-      if (result.error) {
-        throw new Error(result.error);
+      if (!parsed || typeof parsed !== 'object') {
+        console.error('[DecisionService] Invalid YAML content');
+        return null;
       }
 
-      return result as Decision;
+      // Map YAML fields to Decision structure (MADR format)
+      const decision: Decision = {
+        id: parsed.id || crypto.randomUUID(),
+        number: parsed.number || 0,
+        title: parsed.title || 'Untitled Decision',
+        status: parsed.status || 'draft',
+        category: parsed.category || 'architecture',
+        context: parsed.context || '',
+        decision: parsed.decision || '',
+        consequences: parsed.consequences || '',
+        options: Array.isArray(parsed.options) ? parsed.options : [],
+        domain_id: parsed.domain_id,
+        workspace_id: parsed.workspace_id,
+        authors: Array.isArray(parsed.authors) ? parsed.authors : [],
+        deciders: Array.isArray(parsed.deciders) ? parsed.deciders : [],
+        tags: parsed.tags,
+        created_at: parsed.created_at || new Date().toISOString(),
+        updated_at: parsed.updated_at || new Date().toISOString(),
+        decided_at: parsed.decided_at,
+        superseded_by: parsed.superseded_by,
+      };
+
+      console.log(`[DecisionService] Parsed decision via fallback: ${decision.title}`);
+      return decision;
     } catch (error) {
-      console.error('[DecisionService] Failed to parse decision YAML:', error);
+      console.error('[DecisionService] Fallback parse failed:', error);
       return null;
     }
   }
