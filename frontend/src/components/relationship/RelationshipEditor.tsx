@@ -434,50 +434,40 @@ export const RelationshipEditor: React.FC<RelationshipEditorProps> = ({
                 <label
                   htmlFor="source-cardinality"
                   className="block text-sm font-medium text-gray-700 mb-2"
+                  title="Crow's Foot notation: 0 = zero/optional, 1 = one/required, N = many"
                 >
-                  Source Participation ({sourceName})
+                  Source Cardinality ({sourceName})
                 </label>
                 <select
                   id="source-cardinality"
-                  value={sourceCardinality === '0' ? '0' : '1'}
-                  onChange={(e) => {
-                    const isOptional = e.target.value === '0';
-                    // Preserve 'N' if relationship type is many-to-many or many-to-one
-                    if (relationshipType === 'many-to-many') {
-                      setSourceCardinality(isOptional ? '0' : 'N');
-                    } else {
-                      setSourceCardinality(isOptional ? '0' : '1');
-                    }
-                  }}
+                  value={sourceCardinality}
+                  onChange={(e) => setSourceCardinality(e.target.value as Cardinality)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  title="0 = zero/optional, 1 = one/required, N = many"
                 >
-                  <option value="0">Optional</option>
-                  <option value="1">Required</option>
+                  <option value="0">0 (Zero/Optional)</option>
+                  <option value="1">1 (One/Required)</option>
+                  <option value="N">N (Many)</option>
                 </select>
               </div>
               <div>
                 <label
                   htmlFor="target-cardinality"
                   className="block text-sm font-medium text-gray-700 mb-2"
+                  title="Crow's Foot notation: 0 = zero/optional, 1 = one/required, N = many"
                 >
-                  Target Participation ({targetName})
+                  Target Cardinality ({targetName})
                 </label>
                 <select
                   id="target-cardinality"
-                  value={targetCardinality === '0' ? '0' : '1'}
-                  onChange={(e) => {
-                    const isOptional = e.target.value === '0';
-                    // Preserve 'N' if relationship type is one-to-many or many-to-many
-                    if (relationshipType === 'one-to-many' || relationshipType === 'many-to-many') {
-                      setTargetCardinality(isOptional ? '0' : 'N');
-                    } else {
-                      setTargetCardinality(isOptional ? '0' : '1');
-                    }
-                  }}
+                  value={targetCardinality}
+                  onChange={(e) => setTargetCardinality(e.target.value as Cardinality)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  title="0 = zero/optional, 1 = one/required, N = many"
                 >
-                  <option value="0">Optional</option>
-                  <option value="1">Required</option>
+                  <option value="0">0 (Zero/Optional)</option>
+                  <option value="1">1 (One/Required)</option>
+                  <option value="N">N (Many)</option>
                 </select>
               </div>
             </div>
