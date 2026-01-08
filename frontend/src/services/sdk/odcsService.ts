@@ -67,6 +67,20 @@ class ODCSService {
           const result = JSON.parse(resultJson);
           console.log('[ODCSService] SDK parse_odcs_yaml result:', result);
 
+          // Debug: Log customProperties at root and table level
+          console.log('[ODCSService] Root customProperties:', result.customProperties);
+          console.log('[ODCSService] Root custom_properties:', result.custom_properties);
+          if (result.tables && result.tables.length > 0) {
+            console.log(
+              '[ODCSService] Table[0] customProperties:',
+              result.tables[0].customProperties
+            );
+            console.log(
+              '[ODCSService] Table[0] custom_properties:',
+              result.tables[0].custom_properties
+            );
+          }
+
           // Log table structure to verify quality rules are included
           if (result.tables && result.tables.length > 0) {
             console.log('[ODCSService] First table structure:', {
@@ -80,9 +94,23 @@ class ODCSService {
 
           // SDK 1.8.4+: Normalize tables to ensure quality rules are in expected format
           // The SDK returns 'quality' array on columns, but UI expects 'quality_rules'
-          const normalizedTables = (result.tables || []).map((table: any, index: number) =>
-            this.normalizeTable(table, index, {}, {})
+          // IMPORTANT: customProperties is at the root level of ODCS, not on each table
+          // We need to inject root-level customProperties into each table for system linking
+          const rootCustomProperties = result.customProperties || result.custom_properties || [];
+          console.log(
+            '[ODCSService] Injecting root customProperties into tables:',
+            rootCustomProperties
           );
+
+          const normalizedTables = (result.tables || []).map((table: any, index: number) => {
+            // Inject root-level customProperties into table if table doesn't have its own
+            const tableWithCustomProps = {
+              ...table,
+              customProperties:
+                table.customProperties || table.custom_properties || rootCustomProperties,
+            };
+            return this.normalizeTable(tableWithCustomProps, index, {}, {});
+          });
 
           // SDK 1.8.4+: Returns complete, validated data - preserve all fields
           // Spread result first, then override tables with normalized version
