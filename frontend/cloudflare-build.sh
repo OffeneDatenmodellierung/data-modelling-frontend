@@ -100,44 +100,35 @@ download_wasm_sdk() {
   fi
 }
 
-# Function to copy DuckDB-WASM files from node_modules
-# REQUIRED: Build will fail if DuckDB-WASM files cannot be copied
-copy_duckdb_wasm() {
-  echo "📥 Setting up DuckDB-WASM files..."
+# Function to setup DuckDB-WASM
+# For Cloudflare Pages, we use CDN instead of local files due to 25MB limit
+# DuckDB WASM files are ~35MB which exceeds Cloudflare's limit
+setup_duckdb_wasm() {
+  echo "📥 Setting up DuckDB-WASM..."
 
-  local duckdb_pkg="node_modules/@duckdb/duckdb-wasm/dist"
+  # For Cloudflare Pages, we DON'T copy WASM files - they're loaded from CDN
+  # This is because Cloudflare Pages has a 25MB file size limit
+  # and duckdb-eh.wasm is ~35MB
 
-  if [ ! -d "$duckdb_pkg" ]; then
-    echo "❌ ERROR: DuckDB-WASM package not found at ${duckdb_pkg}"
-    echo "   Please ensure @duckdb/duckdb-wasm is installed"
-    exit 1
-  fi
-
-  # Create output directory
+  # Create a placeholder README to document this
   mkdir -p "$DUCKDB_OUT_DIR"
+  cat > "$DUCKDB_OUT_DIR/README.md" << 'EOF'
+# DuckDB-WASM Files
 
-  # Copy WASM files (using eh bundle for better error handling)
-  echo "   Copying DuckDB-WASM files..."
-  cp "$duckdb_pkg/duckdb-mvp.wasm" "$DUCKDB_OUT_DIR/" 2>/dev/null || true
-  cp "$duckdb_pkg/duckdb-eh.wasm" "$DUCKDB_OUT_DIR/"
-  cp "$duckdb_pkg/duckdb-browser-mvp.worker.js" "$DUCKDB_OUT_DIR/" 2>/dev/null || true
-  cp "$duckdb_pkg/duckdb-browser-eh.worker.js" "$DUCKDB_OUT_DIR/"
+For Cloudflare Pages deployments, DuckDB-WASM files are loaded from jsDelivr CDN
+instead of being bundled locally. This is because Cloudflare Pages has a 25MB
+file size limit and DuckDB WASM files exceed this limit (~35MB).
 
-  # Verify required files were copied
-  if [ ! -f "$DUCKDB_OUT_DIR/duckdb-eh.wasm" ]; then
-    echo "❌ ERROR: Failed to copy DuckDB-WASM files"
-    exit 1
-  fi
+The application automatically detects the environment and loads from:
+- **Web (Cloudflare Pages)**: https://cdn.jsdelivr.net/npm/@duckdb/duckdb-wasm@1.29.0/dist/
+- **Electron**: Local files in /duckdb/
 
-  # Verify version
-  local installed_version=$(node -p "require('@duckdb/duckdb-wasm/package.json').version" 2>/dev/null || echo "unknown")
-  if [ "$installed_version" != "$DUCKDB_WASM_VERSION" ]; then
-    echo "⚠️  WARNING: DuckDB-WASM version mismatch"
-    echo "   Expected: ${DUCKDB_WASM_VERSION}"
-    echo "   Installed: ${installed_version}"
-  fi
+See `src/types/duckdb.ts` for the CDN configuration.
+EOF
 
-  echo "✅ DuckDB-WASM ${installed_version} installed to ${DUCKDB_OUT_DIR}"
+  echo "✅ DuckDB-WASM will be loaded from CDN (jsDelivr)"
+  echo "   CDN URL: https://cdn.jsdelivr.net/npm/@duckdb/duckdb-wasm@${DUCKDB_WASM_VERSION}/dist/"
+  echo "   Reason: Cloudflare Pages 25MB file limit (DuckDB WASM is ~35MB)"
 }
 
 # =============================================================================
@@ -154,8 +145,8 @@ else
   echo "   Build will continue but the application may not function correctly"
 fi
 
-# Copy DuckDB-WASM files (REQUIRED)
-copy_duckdb_wasm
+# Setup DuckDB-WASM (uses CDN for Cloudflare Pages due to 25MB limit)
+setup_duckdb_wasm
 
 # =============================================================================
 # Build Application
@@ -176,10 +167,8 @@ if [ ! -f "dist/wasm/data_modelling_sdk.js" ]; then
   echo "⚠️  WARNING: SDK WASM files may not be in build output"
 fi
 
-# Check DuckDB WASM files in dist
-if [ ! -f "dist/duckdb/duckdb-eh.wasm" ]; then
-  echo "⚠️  WARNING: DuckDB WASM files may not be in build output"
-fi
+# Note: DuckDB WASM files are loaded from CDN, not bundled
+echo "   - DuckDB-WASM: Loaded from CDN (jsDelivr)"
 
 echo "✅ Build complete! Output directory: dist"
 echo ""

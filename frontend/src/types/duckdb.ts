@@ -6,10 +6,20 @@
 import type { AsyncDuckDB, AsyncDuckDBConnection } from '@duckdb/duckdb-wasm';
 
 /**
+ * DuckDB-WASM version (must match package.json)
+ */
+export const DUCKDB_WASM_VERSION = '1.29.0';
+
+/**
+ * CDN URL for DuckDB-WASM files (used when local files exceed size limits)
+ */
+export const DUCKDB_CDN_URL = `https://cdn.jsdelivr.net/npm/@duckdb/duckdb-wasm@${DUCKDB_WASM_VERSION}/dist/`;
+
+/**
  * DuckDB-WASM configuration options
  */
 export interface DuckDBConfig {
-  /** Path to WASM files (default: '/duckdb/') */
+  /** Path to WASM files (default: CDN URL for web, '/duckdb/' for Electron) */
   wasmPath?: string;
   /** Use EH (Exception Handling) or MVP bundle */
   bundle?: 'eh' | 'mvp';
@@ -19,17 +29,29 @@ export interface DuckDBConfig {
   debug?: boolean;
   /** Custom logger function */
   logger?: (message: string) => void;
+  /** Force use of CDN even if local files exist */
+  useCDN?: boolean;
+}
+
+/**
+ * Check if running in Electron
+ */
+function isElectron(): boolean {
+  return typeof window !== 'undefined' && 'electronAPI' in window;
 }
 
 /**
  * Default DuckDB-WASM configuration
+ * Uses CDN for web deployments (Cloudflare Pages has 25MB file limit)
+ * Uses local files for Electron (no size limit)
  */
 export const DEFAULT_DUCKDB_CONFIG: Required<DuckDBConfig> = {
-  wasmPath: '/duckdb/',
+  wasmPath: isElectron() ? '/duckdb/' : DUCKDB_CDN_URL,
   bundle: 'eh',
   databaseName: 'data-modelling.duckdb',
   debug: false,
   logger: console.log,
+  useCDN: !isElectron(),
 };
 
 /**
