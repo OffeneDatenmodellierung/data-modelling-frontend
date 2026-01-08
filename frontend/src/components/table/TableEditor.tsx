@@ -12,7 +12,7 @@ import { ColumnEditor } from './ColumnEditor';
 import { ColumnDetailsModal } from './ColumnDetailsModal';
 import { TableMetadataModal } from './TableMetadataModal';
 import { CompoundKeyEditor } from './CompoundKeyEditor';
-import { isValidTableName, normalizeUUID, isValidUUID } from '@/utils/validation';
+import { isValidTableName } from '@/utils/validation';
 import { odcsService } from '@/services/sdk/odcsService';
 import { browserFileService } from '@/services/platform/browser';
 import { importExportService } from '@/services/sdk/importExportService';
@@ -75,34 +75,20 @@ export const TableEditor: React.FC<TableEditorProps> = ({ tableId, workspaceId, 
   const [expandedColumns, setExpandedColumns] = useState<Set<string>>(new Set());
 
   // Check if table is editable (must be primary domain)
-  // Normalize both IDs for comparison in case one is invalid
-  // This handles cases where domains were created with invalid UUIDs (e.g., "domain-123456")
-  const normalizedTableDomainId = table?.primary_domain_id
-    ? isValidUUID(table.primary_domain_id)
-      ? table.primary_domain_id
-      : normalizeUUID(table.primary_domain_id)
-    : null;
-  const normalizedSelectedDomainId = selectedDomainId
-    ? isValidUUID(selectedDomainId)
-      ? selectedDomainId
-      : normalizeUUID(selectedDomainId)
-    : null;
+  // Compare domain IDs directly - they should match exactly as strings
+  // Note: normalizeUUID generates random UUIDs for non-UUID strings, so we can't use it for comparison
+  const tableDomainId = table?.primary_domain_id || null;
   const isEditable =
-    normalizedTableDomainId !== null &&
-    normalizedSelectedDomainId !== null &&
-    normalizedTableDomainId === normalizedSelectedDomainId;
+    tableDomainId !== null && selectedDomainId !== null && tableDomainId === selectedDomainId;
 
   // Debug logging
   if (table && !isEditable) {
     console.log('[TableEditor] Table is read-only:', {
       tableId: table.id,
       tableName: table.name,
-      tablePrimaryDomainId: table.primary_domain_id,
-      normalizedTableDomainId,
+      tableDomainId,
       selectedDomainId,
-      normalizedSelectedDomainId,
-      match: normalizedTableDomainId === normalizedSelectedDomainId,
-      bothNotNull: normalizedTableDomainId !== null && normalizedSelectedDomainId !== null,
+      match: tableDomainId === selectedDomainId,
     });
   }
 
