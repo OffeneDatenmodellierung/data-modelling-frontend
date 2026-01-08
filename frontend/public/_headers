@@ -1,0 +1,22 @@
+# Cross-Origin Isolation headers for SharedArrayBuffer (required by DuckDB-WASM)
+/*
+  Cross-Origin-Embedder-Policy: require-corp
+  Cross-Origin-Opener-Policy: same-origin
+
+# WASM files
+/wasm/*
+  Content-Type: application/wasm
+  Cross-Origin-Embedder-Policy: require-corp
+  Cross-Origin-Opener-Policy: same-origin
+
+# DuckDB WASM files
+/duckdb/*
+  Content-Type: application/wasm
+  Cross-Origin-Embedder-Policy: require-corp
+  Cross-Origin-Opener-Policy: same-origin
+
+/*.wasm
+  Content-Type: application/wasm
+
+/*.worker.js
+  Content-Type: application/javascript
