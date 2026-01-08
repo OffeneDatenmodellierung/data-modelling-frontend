@@ -919,11 +919,11 @@ export const DomainCanvas: React.FC<DomainCanvasProps> = ({ workspaceId, domainI
     const currentSystemIds = domainSystems.map((s) => s.id).sort();
 
     // Create a hash of table data to detect changes (not just IDs)
-    // Include compoundKeys and metadata.indexes in the hash to detect changes
+    // Include compoundKeys, metadata.indexes, and tags in the hash to detect changes
     const currentTableDataHash = visibleTables
       .map(
         (t) =>
-          `${t.id}:${t.name}:${t.columns?.length || 0}:${JSON.stringify(t.columns?.map((c) => `${c.id}:${c.name}:${c.is_primary_key}:${c.compound_key_id || ''}`))}:${JSON.stringify(t.compoundKeys || [])}:${JSON.stringify(t.metadata?.indexes || [])}`
+          `${t.id}:${t.name}:${t.columns?.length || 0}:${JSON.stringify(t.columns?.map((c) => `${c.id}:${c.name}:${c.is_primary_key}:${c.compound_key_id || ''}`))}:${JSON.stringify(t.compoundKeys || [])}:${JSON.stringify(t.metadata?.indexes || [])}:${JSON.stringify(t.tags || [])}`
       )
       .join('|');
 

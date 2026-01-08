@@ -1,8 +1,8 @@
 # Data Modelling SDK WASM Bindings Reference
 
 **Package**: `data-modelling-sdk`  
-**Version**: 1.13.2  
-**Audit Date**: 2025-01-08
+**Version**: 1.13.4  
+**Audit Date**: 2026-01-08
 
 This document lists all exported bindings from the Data Modelling SDK WASM module.
 
@@ -16,7 +16,7 @@ The SDK is downloaded from GitHub releases during build:
 npm run build:wasm
 ```
 
-This downloads from: `https://github.com/pixie79/data-modelling-sdk/releases/download/v1.13.2/data-modelling-sdk-wasm-v1.13.2.tar.gz`
+This downloads from: `https://github.com/pixie79/data-modelling-sdk/releases/download/v1.13.4/data-modelling-sdk-wasm-v1.13.4.tar.gz`
 
 ## WASM Files
 
@@ -348,9 +348,9 @@ console.log('Has cycle:', cycle.has_cycle);
 
 ---
 
-## New in Version 1.13.2
+## New in Version 1.13.4
 
-The following functions are available in SDK 1.13.2:
+The following functions are available in SDK 1.13.4:
 
 ### Decision Log Functions
 

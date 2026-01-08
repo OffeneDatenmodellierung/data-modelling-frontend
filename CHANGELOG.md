@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Tags Persistence**: Fixed tags disappearing when canvas redraws by including tags in table data change detection hash
+- **V2 Save Format**: Save button now uses V2 flat file format instead of V1 folder-based format
+
+### Changed
+- **SDK Version**: Upgraded to data-modelling-sdk 1.13.4
+
 ## [2.1.1] - 2026-01-08
 
 ### Fixed
