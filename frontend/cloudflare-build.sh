@@ -26,7 +26,7 @@ SDK_REPO="${WASM_SDK_REPO:-pixie79/data-modelling-sdk}"
 WASM_OUT_DIR="public/wasm"
 
 # DuckDB-WASM version (should match @duckdb/duckdb-wasm in package.json)
-DUCKDB_WASM_VERSION="1.29.0"
+DUCKDB_WASM_VERSION="1.32.0"
 DUCKDB_OUT_DIR="public/duckdb"
 
 # Function to download WASM SDK from GitHub Releases

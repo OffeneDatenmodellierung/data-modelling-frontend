@@ -8,7 +8,7 @@ import type { AsyncDuckDB, AsyncDuckDBConnection } from '@duckdb/duckdb-wasm';
 /**
  * DuckDB-WASM version (must match package.json)
  */
-export const DUCKDB_WASM_VERSION = '1.29.0';
+export const DUCKDB_WASM_VERSION = '1.32.0';
 
 /**
  * CDN URL for DuckDB-WASM files (used when local files exceed size limits)
