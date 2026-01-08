@@ -1157,6 +1157,60 @@ class ElectronFileService {
       allDecisionRecords
     );
 
+    // Build set of expected file names
+    const expectedFiles = new Set(files.map((f) => f.name));
+
+    // Clean up stale files (files that no longer exist in the workspace)
+    const workspaceFileExtensions = [
+      '.odcs.yaml',
+      '.cads.yaml',
+      '.odps.yaml',
+      '.bpmn',
+      '.dmn',
+      '.kb.yaml',
+      '.adr.yaml',
+      '.workspace.yaml',
+    ];
+
+    try {
+      const existingFiles = await platformFileService.readDirectory(workspacePath);
+      const filesToDelete: string[] = [];
+
+      for (const fileEntry of existingFiles) {
+        const fileName = fileEntry.name;
+        // Check if this is a workspace-managed file type
+        const isWorkspaceFile = workspaceFileExtensions.some((ext) =>
+          fileName.toLowerCase().endsWith(ext)
+        );
+
+        // If it's a workspace file but not in our expected files, mark for deletion
+        if (isWorkspaceFile && !expectedFiles.has(fileName)) {
+          filesToDelete.push(fileName);
+        }
+      }
+
+      // Delete stale files
+      for (const fileName of filesToDelete) {
+        try {
+          const filePath = joinPath(workspacePath, fileName);
+          await platformFileService.deleteFile(filePath);
+          console.log(`[ElectronFileService] Deleted stale file: ${fileName}`);
+        } catch (deleteError) {
+          console.warn(
+            `[ElectronFileService] Failed to delete stale file ${fileName}:`,
+            deleteError
+          );
+        }
+      }
+
+      if (filesToDelete.length > 0) {
+        console.log(`[ElectronFileService] Cleaned up ${filesToDelete.length} stale file(s)`);
+      }
+    } catch (listError) {
+      console.warn('[ElectronFileService] Could not list directory for cleanup:', listError);
+      // Continue with saving even if cleanup fails
+    }
+
     // Write files to disk
     for (const file of files) {
       const filePath = joinPath(workspacePath, file.name);

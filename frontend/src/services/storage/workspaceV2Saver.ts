@@ -314,11 +314,69 @@ export class WorkspaceV2Saver {
 
   /**
    * Save files using File System Access API (if available)
+   * Also removes files that no longer exist in the current workspace
    */
   static async saveWithFileSystemAPI(
     files: SavedFile[],
     directoryHandle: FileSystemDirectoryHandle
   ): Promise<void> {
+    // Build set of expected file names
+    const expectedFiles = new Set(files.map((f) => f.name));
+
+    // First, find and delete files that shouldn't exist anymore
+    // These are workspace-related files (.odcs.yaml, .cads.yaml, .odps.yaml, .bpmn, .dmn, .kb.yaml, .adr.yaml, .workspace.yaml)
+    const workspaceFileExtensions = [
+      '.odcs.yaml',
+      '.cads.yaml',
+      '.odps.yaml',
+      '.bpmn',
+      '.dmn',
+      '.kb.yaml',
+      '.adr.yaml',
+      '.workspace.yaml',
+    ];
+
+    try {
+      const filesToDelete: string[] = [];
+
+      // Iterate through all files in the directory
+      // Use type assertion for FileSystemDirectoryHandle.entries() which returns AsyncIterableIterator
+      const entries = (directoryHandle as any).entries() as AsyncIterableIterator<
+        [string, FileSystemHandle]
+      >;
+      for await (const [name, handle] of entries) {
+        if (handle.kind === 'file') {
+          // Check if this is a workspace-managed file type
+          const isWorkspaceFile = workspaceFileExtensions.some((ext) =>
+            name.toLowerCase().endsWith(ext)
+          );
+
+          // If it's a workspace file but not in our expected files, mark for deletion
+          if (isWorkspaceFile && !expectedFiles.has(name)) {
+            filesToDelete.push(name);
+          }
+        }
+      }
+
+      // Delete stale files
+      for (const fileName of filesToDelete) {
+        try {
+          await directoryHandle.removeEntry(fileName);
+          console.log(`[WorkspaceV2Saver] Deleted stale file: ${fileName}`);
+        } catch (deleteError) {
+          console.warn(`[WorkspaceV2Saver] Failed to delete stale file ${fileName}:`, deleteError);
+        }
+      }
+
+      if (filesToDelete.length > 0) {
+        console.log(`[WorkspaceV2Saver] Cleaned up ${filesToDelete.length} stale file(s)`);
+      }
+    } catch (listError) {
+      console.warn('[WorkspaceV2Saver] Could not list directory for cleanup:', listError);
+      // Continue with saving even if cleanup fails
+    }
+
+    // Now write all current files
     for (const file of files) {
       try {
         const fileHandle = await directoryHandle.getFileHandle(file.name, { create: true });

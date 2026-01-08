@@ -1057,6 +1057,8 @@ export const DomainCanvas: React.FC<DomainCanvasProps> = ({ workspaceId, domainI
         attributionPosition="bottom-left"
         edgesUpdatable={false}
         edgesFocusable={true}
+        minZoom={0.1}
+        maxZoom={4}
       >
         <Background />
         <Controls />
