@@ -100,6 +100,16 @@ export const RelationshipEditor: React.FC<RelationshipEditorProps> = ({
     return keys;
   };
 
+  // Derive relationship type from cardinalities
+  const getRelationshipTypeFromCardinalities = (
+    source: Cardinality,
+    target: Cardinality
+  ): RelationshipType => {
+    if (source === 'N' && target === 'N') return 'many-to-many';
+    if (source === 'N' || target === 'N') return 'one-to-many';
+    return 'one-to-one';
+  };
+
   // Get source and target node names for display
   const getNodeName = (nodeId: string, nodeType: 'table' | 'system' | 'compute-asset'): string => {
     if (nodeType === 'table') {
@@ -332,9 +342,10 @@ export const RelationshipEditor: React.FC<RelationshipEditorProps> = ({
             </div>
           </div>
 
-          {/* Relationship Type (only for table-to-table) */}
+          {/* Relationship Type and Cardinality (only for table-to-table) */}
           {isTableToTable && (
             <>
+              {/* Relationship Type */}
               <div>
                 <label
                   htmlFor="relationship-type"
@@ -367,6 +378,64 @@ export const RelationshipEditor: React.FC<RelationshipEditorProps> = ({
                   <option value="one-to-many">One-to-Many</option>
                   <option value="many-to-many">Many-to-Many</option>
                 </select>
+              </div>
+
+              {/* Cardinality */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label
+                    htmlFor="source-cardinality"
+                    className="block text-sm font-medium text-gray-700 mb-2"
+                    title="Crow's Foot notation: 0 = zero/optional, 1 = one/required, N = many"
+                  >
+                    Source Cardinality ({sourceName})
+                  </label>
+                  <select
+                    id="source-cardinality"
+                    value={sourceCardinality}
+                    onChange={(e) => {
+                      const newCardinality = e.target.value as Cardinality;
+                      setSourceCardinality(newCardinality);
+                      // Update relationship type based on new cardinalities
+                      setRelationshipType(
+                        getRelationshipTypeFromCardinalities(newCardinality, targetCardinality)
+                      );
+                    }}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    title="0 = zero/optional, 1 = one/required, N = many"
+                  >
+                    <option value="0">0 (Zero/Optional)</option>
+                    <option value="1">1 (One/Required)</option>
+                    <option value="N">N (Many)</option>
+                  </select>
+                </div>
+                <div>
+                  <label
+                    htmlFor="target-cardinality"
+                    className="block text-sm font-medium text-gray-700 mb-2"
+                    title="Crow's Foot notation: 0 = zero/optional, 1 = one/required, N = many"
+                  >
+                    Target Cardinality ({targetName})
+                  </label>
+                  <select
+                    id="target-cardinality"
+                    value={targetCardinality}
+                    onChange={(e) => {
+                      const newCardinality = e.target.value as Cardinality;
+                      setTargetCardinality(newCardinality);
+                      // Update relationship type based on new cardinalities
+                      setRelationshipType(
+                        getRelationshipTypeFromCardinalities(sourceCardinality, newCardinality)
+                      );
+                    }}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    title="0 = zero/optional, 1 = one/required, N = many"
+                  >
+                    <option value="0">0 (Zero/Optional)</option>
+                    <option value="1">1 (One/Required)</option>
+                    <option value="N">N (Many)</option>
+                  </select>
+                </div>
               </div>
 
               {/* Source Key Selection */}
@@ -425,52 +494,6 @@ export const RelationshipEditor: React.FC<RelationshipEditorProps> = ({
                 )}
               </div>
             </>
-          )}
-
-          {/* Cardinality (only for table-to-table) */}
-          {isTableToTable && (
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label
-                  htmlFor="source-cardinality"
-                  className="block text-sm font-medium text-gray-700 mb-2"
-                  title="Crow's Foot notation: 0 = zero/optional, 1 = one/required, N = many"
-                >
-                  Source Cardinality ({sourceName})
-                </label>
-                <select
-                  id="source-cardinality"
-                  value={sourceCardinality}
-                  onChange={(e) => setSourceCardinality(e.target.value as Cardinality)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  title="0 = zero/optional, 1 = one/required, N = many"
-                >
-                  <option value="0">0 (Zero/Optional)</option>
-                  <option value="1">1 (One/Required)</option>
-                  <option value="N">N (Many)</option>
-                </select>
-              </div>
-              <div>
-                <label
-                  htmlFor="target-cardinality"
-                  className="block text-sm font-medium text-gray-700 mb-2"
-                  title="Crow's Foot notation: 0 = zero/optional, 1 = one/required, N = many"
-                >
-                  Target Cardinality ({targetName})
-                </label>
-                <select
-                  id="target-cardinality"
-                  value={targetCardinality}
-                  onChange={(e) => setTargetCardinality(e.target.value as Cardinality)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  title="0 = zero/optional, 1 = one/required, N = many"
-                >
-                  <option value="0">0 (Zero/Optional)</option>
-                  <option value="1">1 (One/Required)</option>
-                  <option value="N">N (Many)</option>
-                </select>
-              </div>
-            </div>
           )}
 
           {/* Label */}
