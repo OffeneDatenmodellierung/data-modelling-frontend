@@ -785,6 +785,16 @@ export const DomainCanvas: React.FC<DomainCanvasProps> = ({ workspaceId, domainI
       .flatMap((p) => p.transformation_links || []);
   }, [bpmnProcesses, domainId]);
 
+  // Create a hash of relationship data to detect property changes (color, type, cardinality, etc.)
+  const relationshipDataHash = useMemo(() => {
+    return domainRelationships
+      .map(
+        (r) =>
+          `${r.id}:${r.type}:${r.color || ''}:${r.source_cardinality}:${r.target_cardinality}:${r.label || ''}`
+      )
+      .join('|');
+  }, [domainRelationships]);
+
   // Convert relationships to ReactFlow edges
   const initialEdges: Edge[] = useMemo(() => {
     console.log('[DomainCanvas] Computing initialEdges from relationships:', {
@@ -885,12 +895,14 @@ export const DomainCanvas: React.FC<DomainCanvasProps> = ({ workspaceId, domainI
     return [...relationshipEdges, ...transformationEdges];
   }, [
     domainRelationships,
+    relationshipDataHash,
     visibleTables,
     domainSystems,
     domainComputeAssets,
     selectedRelationshipId,
     transformationLinks,
     currentView,
+    sharedResources,
   ]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
