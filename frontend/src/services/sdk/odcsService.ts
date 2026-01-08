@@ -1642,45 +1642,80 @@ class ODCSService {
 
   /**
    * Fallback YAML converter for offline mode when WASM SDK is not available
-   * Converts workspace to basic ODCS YAML format
+   * Converts workspace to ODCS v3.1.0 YAML format
+   * Fallback when SDK is not available
    */
   private toYAMLFallback(workspace: ODCSWorkspace): string {
     try {
+      const tables = workspace.tables || [];
+
+      // If no tables, return minimal valid ODCS
+      if (tables.length === 0) {
+        const emptyContract: any = {
+          apiVersion: 'v3.1.0',
+          kind: 'DataContract',
+          id: workspace.workspace_id || 'unknown',
+          version: '1.0.0',
+          status: 'draft',
+        };
+        return yaml.dump(emptyContract, {
+          indent: 2,
+          lineWidth: 120,
+          noRefs: true,
+          sortKeys: false,
+        });
+      }
+
+      // For single table export (most common case), produce ODCS v3.1.0 format
+      const table = tables[0]!;
       const yamlData: any = {
-        workspace_id: workspace.workspace_id,
-        domain_id: workspace.domain_id,
-        tables: workspace.tables || [],
+        // Required fields per ODCS v3.1.0 schema
+        apiVersion: 'v3.1.0',
+        kind: 'DataContract',
+        id: table.id,
+        version: '1.0.0',
+        status: (table as any).metadata?.status || 'active',
+        name: table.name,
+
+        // Optional fields
+        ...(table.description && {
+          description: {
+            purpose: table.description,
+          },
+        }),
+        ...(workspace.domain_id && { domain: workspace.domain_id }),
+
+        // Schema array with table definition
+        schema: [
+          {
+            name: table.name,
+            ...(table.description && { description: table.description }),
+            logicalType: 'object',
+            properties: (table.columns || []).map((col: any) => ({
+              name: col.name,
+              ...(col.description && { description: col.description }),
+              logicalType: this.mapDataTypeToLogicalType(col.data_type),
+              physicalType: col.data_type,
+              required: !col.nullable,
+              ...(col.is_primary_key && { primaryKey: true }),
+            })),
+          },
+        ],
+
+        // Custom properties for metadata
+        ...((table as any).metadata && {
+          customProperties: Object.entries((table as any).metadata).map(([property, value]) => ({
+            property,
+            value: String(value),
+          })),
+        }),
+
+        // Tags
+        ...(table.tags &&
+          table.tags.length > 0 && {
+            tags: table.tags,
+          }),
       };
-
-      if (workspace.relationships && workspace.relationships.length > 0) {
-        yamlData.relationships = workspace.relationships;
-      }
-
-      if (workspace.data_flow_diagrams && workspace.data_flow_diagrams.length > 0) {
-        yamlData.data_flow_diagrams = workspace.data_flow_diagrams.map((diagram) => ({
-          id: diagram.id,
-          name: diagram.name,
-          // Legacy data flow diagrams removed - replaced by BPMN processes
-          nodes: (diagram as any).nodes?.map((node: any) => ({
-            id: node.id,
-            type: node.type,
-            label: node.label,
-            position_x: node.position_x,
-            position_y: node.position_y,
-            width: node.width,
-            height: node.height,
-            metadata: node.metadata,
-          })),
-          connections: (diagram as any).connections?.map((conn: any) => ({
-            id: conn.id,
-            source_node_id: conn.source_node_id,
-            target_node_id: conn.target_node_id,
-            label: conn.label,
-            metadata: conn.metadata,
-          })),
-          linked_tables: (diagram as any).linked_tables || [],
-        }));
-      }
 
       return yaml.dump(yamlData, {
         indent: 2,
@@ -1693,6 +1728,47 @@ class ODCSService {
         `Failed to convert to YAML: ${error instanceof Error ? error.message : 'Unknown error'}`
       );
     }
+  }
+
+  /**
+   * Map physical data type to ODCS logical type
+   */
+  private mapDataTypeToLogicalType(dataType: string): string {
+    const type = (dataType || 'VARCHAR').toUpperCase();
+
+    if (type.includes('INT') || type === 'BIGINT' || type === 'SMALLINT' || type === 'TINYINT') {
+      return 'integer';
+    }
+    if (
+      type.includes('FLOAT') ||
+      type.includes('DOUBLE') ||
+      type.includes('DECIMAL') ||
+      type.includes('NUMERIC') ||
+      type === 'REAL'
+    ) {
+      return 'number';
+    }
+    if (type.includes('BOOL')) {
+      return 'boolean';
+    }
+    if (type === 'DATE') {
+      return 'date';
+    }
+    if (type.includes('TIMESTAMP') || type.includes('DATETIME')) {
+      return 'timestamp';
+    }
+    if (type === 'TIME') {
+      return 'time';
+    }
+    if (type.includes('ARRAY') || type.includes('LIST')) {
+      return 'array';
+    }
+    if (type.includes('STRUCT') || type.includes('OBJECT') || type === 'JSON' || type === 'JSONB') {
+      return 'object';
+    }
+
+    // Default to string for VARCHAR, CHAR, TEXT, etc.
+    return 'string';
   }
 
   /**

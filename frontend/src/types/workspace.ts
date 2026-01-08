@@ -4,7 +4,6 @@
 
 import type { Domain, ViewPositions } from './domain';
 import type { System } from './system';
-import type { Relationship } from './relationship';
 import type { Owner } from './table';
 
 export interface Workspace {
@@ -32,37 +31,82 @@ export interface WorkspaceMetadata {
 }
 
 /**
- * WorkspaceV2 - New flat file format
+ * WorkspaceV2 - Flat file format matching SDK workspace-schema.json
  * Single {workspace}.workspace.yaml file containing all workspace structure
  */
 export interface WorkspaceV2 {
-  apiVersion: 'workspace/v2';
-  kind: 'Workspace';
-  metadata: WorkspaceV2Metadata;
-  spec: WorkspaceV2Spec;
-}
-
-export interface WorkspaceV2Metadata {
-  id: string; // UUID
-  name: string; // Used as filename prefix
-  description?: string;
-  version: string; // Schema version (e.g., "2.0.0")
+  // Required fields (per SDK schema)
+  id: string; // UUID - unique workspace identifier
+  name: string; // Alphanumeric with hyphens/underscores, max 255 chars
+  owner_id: string; // UUID - creator's user identifier
   created_at: string; // ISO 8601 timestamp
   last_modified_at: string; // ISO 8601 timestamp
-  owner?: Owner;
-  tags?: Array<{ key?: string; value: string }>;
-}
 
-export interface WorkspaceV2Spec {
-  domains: DomainV2[];
-  relationships: Relationship[];
+  // Optional fields
+  description?: string;
+  domains?: DomainV2[]; // Domain references with nested systems
+  assets?: AssetReference[]; // Asset references belonging to workspace
+  relationships?: RelationshipV2[]; // Connections between assets
 }
 
 /**
- * DomainV2 - Domain definition in workspace/v2 format
- * Contains full system objects, not just IDs
+ * AssetReference - Reference to an asset file in the workspace
+ * Matches SDK schema AssetReference definition
+ */
+export interface AssetReference {
+  id: string; // UUID
+  name: string; // Asset title
+  domain: string; // Parent domain name
+  system?: string; // Parent system name (optional)
+  asset_type: 'odcs' | 'odps' | 'cads' | 'bpmn' | 'dmn' | 'openapi';
+  file_path?: string; // Generated filename following convention
+}
+
+/**
+ * RelationshipV2 - Relationship definition matching SDK schema
+ */
+export interface RelationshipV2 {
+  id: string; // UUID
+  source_table_id: string; // UUID - origin asset
+  target_table_id: string; // UUID - destination asset
+  cardinality?: 'one_to_one' | 'one_to_many' | 'many_to_many';
+  source_optional?: boolean;
+  target_optional?: boolean;
+  relationship_type?: 'foreign_key' | 'data_flow' | 'dependency' | 'etl';
+  notes?: string;
+  owner?: string;
+  color?: string; // Hex or named color for visualization
+}
+
+/**
+ * DomainV2 - Domain definition matching SDK schema DomainReference
  */
 export interface DomainV2 {
+  // Required fields (per SDK schema)
+  id: string; // UUID
+  name: string; // Filename-compatible name
+
+  // Optional fields
+  description?: string;
+  systems?: SystemV2[]; // Nested system references
+}
+
+/**
+ * SystemV2 - System definition matching SDK schema SystemReference
+ */
+export interface SystemV2 {
+  // Required fields (per SDK schema)
+  id: string; // UUID
+  name: string; // Filename-compatible name
+
+  // Optional fields
+  description?: string;
+}
+
+/**
+ * @deprecated Use DomainV2 instead - kept for backward compatibility during migration
+ */
+export interface DomainV2Legacy {
   id: string; // UUID
   name: string;
   description?: string;
@@ -70,18 +114,12 @@ export interface DomainV2 {
   view_positions?: ViewPositions;
   created_at?: string;
   last_modified_at?: string;
-
-  // Systems nested under domain (full objects)
   systems: System[];
-
-  // Asset references (IDs only - actual data in separate files)
   tables?: string[];
   products?: string[];
   assets?: string[];
   processes?: string[];
   decisions?: string[];
-
-  // Tags
   tags?: Array<{ key?: string; value: string }>;
 }
 

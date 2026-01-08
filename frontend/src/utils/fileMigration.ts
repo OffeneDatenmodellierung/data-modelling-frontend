@@ -12,7 +12,6 @@ import type {
   CategorizedFiles,
 } from '../types/workspace';
 import type { Domain } from '../types/domain';
-import type { Relationship } from '../types/relationship';
 import type { System } from '../types/system';
 import type { Table } from '../types/table';
 import type { ComputeAsset } from '../types/cads';
@@ -20,53 +19,59 @@ import type { ComputeAsset } from '../types/cads';
 export class FileMigration {
   /**
    * Convert current Workspace structure to WorkspaceV2 format
+   * Matches SDK workspace-schema.json format
    */
-  static migrateWorkspace(workspace: Workspace, domains: Domain[]): WorkspaceV2 {
+  static migrateWorkspace(
+    workspace: Workspace,
+    domains: Domain[],
+    systems: System[] = []
+  ): WorkspaceV2 {
     const now = new Date().toISOString();
 
     return {
-      apiVersion: 'workspace/v2',
-      kind: 'Workspace',
-      metadata: {
-        id: workspace.id,
-        name: workspace.name,
-        version: '2.0.0',
-        created_at: workspace.created_at,
-        last_modified_at: now,
-      },
-      spec: {
-        domains: domains.map((d) => this.migrateDomain(d)),
-        relationships: this.collectAllRelationships(domains),
-      },
+      // Required fields per SDK schema
+      id: workspace.id,
+      name: workspace.name,
+      owner_id: workspace.owner_id,
+      created_at: workspace.created_at,
+      last_modified_at: now,
+      // Optional fields
+      domains: domains.map((d) =>
+        this.migrateDomain(
+          d,
+          systems.filter((s) => d.systems?.includes(s.id))
+        )
+      ),
+      relationships: this.collectAllRelationships(domains),
     };
   }
 
   /**
    * Convert Domain to DomainV2 format
+   * Matches SDK schema DomainReference
    */
   static migrateDomain(domain: Domain, systems: System[] = []): DomainV2 {
     return {
+      // Required fields per SDK schema
       id: domain.id,
       name: domain.name,
+      // Optional fields
       description: domain.description,
-      owner: domain.owner,
-      view_positions: domain.view_positions,
-      created_at: domain.created_at,
-      last_modified_at: domain.last_modified_at,
-      systems: systems,
-      tables: domain.tables,
-      products: domain.products,
-      assets: domain.assets,
-      processes: domain.processes,
-      decisions: domain.decisions,
+      systems: systems.map((s) => ({
+        id: s.id,
+        name: s.name,
+        description: s.description,
+      })),
     };
   }
 
   /**
    * Collect all relationships from all domains
-   * In v2, relationships are stored at workspace level
+   * In v2, relationships are stored at workspace level per SDK schema
    */
-  static collectAllRelationships(_domains: Domain[]): Relationship[] {
+  static collectAllRelationships(
+    _domains: Domain[]
+  ): import('../types/workspace').RelationshipV2[] {
     // Note: In current architecture, relationships are stored per-domain in domain.yaml
     // This would need to be loaded from the domain.yaml files
     // For now, return empty array as relationships will be loaded during file reading
@@ -236,15 +241,15 @@ export class FileMigration {
 
   /**
    * Convert WorkspaceV2 back to internal Workspace format
-   * Used when loading v2 files
+   * Used when loading v2 files (matches SDK schema)
    */
   static convertToInternalFormat(workspaceV2: WorkspaceV2, domains: Domain[]): Workspace {
     return {
-      id: workspaceV2.metadata.id,
-      name: workspaceV2.metadata.name,
-      owner_id: workspaceV2.metadata.owner?.name || 'unknown',
-      created_at: workspaceV2.metadata.created_at,
-      last_modified_at: workspaceV2.metadata.last_modified_at,
+      id: workspaceV2.id,
+      name: workspaceV2.name,
+      owner_id: workspaceV2.owner_id,
+      created_at: workspaceV2.created_at,
+      last_modified_at: workspaceV2.last_modified_at,
       domains: domains,
     };
   }

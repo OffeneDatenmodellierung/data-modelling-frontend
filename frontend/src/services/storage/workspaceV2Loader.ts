@@ -28,6 +28,7 @@ import type { DMNDecision } from '@/types/dmn';
 export class WorkspaceV2Loader {
   /**
    * Load workspace from flat file format (v2)
+   * Matches SDK workspace-schema.json format
    */
   static async loadFromFiles(files: FileList): Promise<Workspace> {
     const fileArray = Array.from(files);
@@ -42,7 +43,9 @@ export class WorkspaceV2Loader {
     const workspaceContent = await browserFileService.readFile(workspaceFile);
     const workspaceV2 = yaml.load(workspaceContent) as WorkspaceV2;
 
-    console.log('[WorkspaceV2Loader] Loaded workspace.yaml:', workspaceV2.metadata.name);
+    // SDK schema uses flat structure with 'name' at root level
+    const workspaceName = workspaceV2.name;
+    console.log('[WorkspaceV2Loader] Loaded workspace.yaml:', workspaceName);
 
     // 2. Categorize remaining files by pattern
     const fileNames = fileArray.map((f) => f.name);
@@ -57,9 +60,10 @@ export class WorkspaceV2Loader {
     });
 
     // 3. Load each domain's resources
+    const domainsSpec = workspaceV2.domains || [];
     const domains: Domain[] = await Promise.all(
-      workspaceV2.spec.domains.map(async (domainSpec) => {
-        return await this.loadDomain(domainSpec, workspaceV2.metadata.name, fileArray, categorized);
+      domainsSpec.map(async (domainSpec) => {
+        return await this.loadDomain(domainSpec, workspaceName, fileArray, categorized);
       })
     );
 
@@ -111,22 +115,20 @@ export class WorkspaceV2Loader {
     // Load decisions
     const decisions = await this.loadDecisions(domainFiles.dmn, domainSpec);
 
-    // Construct Domain object
+    // Construct Domain object (SDK schema has simpler DomainV2 structure)
     const domain: Domain = {
       id: domainSpec.id,
       workspace_id: '', // Will be set by parent
       name: domainSpec.name,
       description: domainSpec.description,
-      owner: domainSpec.owner,
-      created_at: domainSpec.created_at || new Date().toISOString(),
-      last_modified_at: domainSpec.last_modified_at || new Date().toISOString(),
+      created_at: new Date().toISOString(),
+      last_modified_at: new Date().toISOString(),
       systems: domainSpec.systems?.map((s) => s.id),
       tables: tables.map((t) => t.id),
       products: products.map((p) => p.id),
       assets: assets.map((a) => a.id),
       processes: processes.map((p) => p.id),
       decisions: decisions.map((d) => d.id),
-      view_positions: domainSpec.view_positions,
     };
 
     return domain;

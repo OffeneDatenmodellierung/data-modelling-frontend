@@ -164,6 +164,7 @@ export class WorkspaceV2Saver {
 
   /**
    * Convert internal Workspace format to WorkspaceV2
+   * Matches SDK workspace-schema.json format
    */
   private static convertToWorkspaceV2(
     workspace: Workspace,
@@ -173,39 +174,30 @@ export class WorkspaceV2Saver {
     const now = new Date().toISOString();
 
     return {
-      apiVersion: 'workspace/v2',
-      kind: 'Workspace',
-      metadata: {
-        id: workspace.id,
-        name: workspace.name,
-        version: '2.0.0',
-        created_at: workspace.created_at,
-        last_modified_at: now,
-      },
-      spec: {
-        domains: domains.map((domain) => {
-          const domainSystems = allSystems.filter(
-            (s) => (s as any).primary_domain_id === domain.id
-          );
+      // Required fields per SDK schema
+      id: workspace.id,
+      name: workspace.name,
+      owner_id: workspace.owner_id,
+      created_at: workspace.created_at,
+      last_modified_at: now,
+      // Optional fields
+      domains: domains.map((domain) => {
+        const domainSystems = allSystems.filter((s) => (s as any).primary_domain_id === domain.id);
 
-          return {
-            id: domain.id,
-            name: domain.name,
-            description: domain.description,
-            owner: domain.owner,
-            view_positions: domain.view_positions,
-            created_at: domain.created_at,
-            last_modified_at: domain.last_modified_at,
-            systems: domainSystems,
-            tables: domain.tables,
-            products: domain.products,
-            assets: domain.assets,
-            processes: domain.processes,
-            decisions: domain.decisions,
-          };
-        }),
-        relationships: [], // TODO: Extract relationships from domains
-      },
+        return {
+          // Required fields per SDK schema DomainReference
+          id: domain.id,
+          name: domain.name,
+          // Optional fields
+          description: domain.description,
+          systems: domainSystems.map((s) => ({
+            id: s.id,
+            name: s.name,
+            description: s.description,
+          })),
+        };
+      }),
+      relationships: [], // TODO: Extract relationships from domains
     };
   }
 
