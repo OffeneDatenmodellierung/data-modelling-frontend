@@ -126,6 +126,31 @@ interface ModelState {
   getFilteredTables: () => Table[]; // Filter by currentView and selectedDataLevel
 }
 
+// Helper function to extract data_level from dm_level tag
+const getDataLevelFromTags = (tags?: string[]): DataLevel | undefined => {
+  if (!tags || !Array.isArray(tags)) return undefined;
+
+  for (const tag of tags) {
+    if (typeof tag === 'string' && tag.toLowerCase().startsWith('dm_level:')) {
+      const levelValue = tag.substring('dm_level:'.length).toLowerCase();
+      if (['operational', 'bronze', 'silver', 'gold'].includes(levelValue)) {
+        return levelValue as DataLevel;
+      }
+    }
+  }
+  return undefined;
+};
+
+// Helper function to get effective data level (from field or tags)
+const getEffectiveDataLevel = (table: Table): DataLevel | undefined => {
+  // First check the data_level field
+  if (table.data_level) {
+    return table.data_level;
+  }
+  // Fall back to extracting from dm_level tag
+  return getDataLevelFromTags(table.tags);
+};
+
 // Helper function to filter tables based on view mode and data level
 const filterTablesByView = (
   tables: Table[],
@@ -146,15 +171,20 @@ const filterTablesByView = (
   // Filter by data level (for operational/analytical view)
   if (currentView === 'operational' || currentView === 'analytical') {
     if (selectedDataLevel) {
-      filtered = filtered.filter((t) => t.data_level === selectedDataLevel);
+      // Filter by specific data level - check both field and tags
+      filtered = filtered.filter((t) => getEffectiveDataLevel(t) === selectedDataLevel);
     } else if (currentView === 'operational') {
       // Operational view: show only operational tables if no level selected
-      filtered = filtered.filter((t) => t.data_level === 'operational' || !t.data_level);
+      filtered = filtered.filter((t) => {
+        const level = getEffectiveDataLevel(t);
+        return level === 'operational' || !level;
+      });
     } else {
       // Analytical view: show bronze/silver/gold if no level selected
-      filtered = filtered.filter(
-        (t) => t.data_level === 'bronze' || t.data_level === 'silver' || t.data_level === 'gold'
-      );
+      filtered = filtered.filter((t) => {
+        const level = getEffectiveDataLevel(t);
+        return level === 'bronze' || level === 'silver' || level === 'gold';
+      });
     }
   }
 
