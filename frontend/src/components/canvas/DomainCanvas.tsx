@@ -71,6 +71,7 @@ export const DomainCanvas: React.FC<DomainCanvasProps> = ({ workspaceId, domainI
     selectedSystemId,
     setSelectedSystem,
     setSelectedTable,
+    openTableEditor,
     currentView,
     getFilteredTables,
     updateSystem,
@@ -140,13 +141,13 @@ export const DomainCanvas: React.FC<DomainCanvasProps> = ({ workspaceId, domainI
     [setSelectedTable]
   );
 
-  // Handle table edit
+  // Handle table edit - opens table editor modal
   const handleTableEdit = React.useCallback(
     (tableId: string) => {
-      setSelectedTable(tableId);
-      // The ModelEditor will handle opening the table editor when selectedTableId changes
+      setSelectedTable(tableId); // Keep selection for canvas highlighting
+      openTableEditor(tableId); // Open the editor modal
     },
-    [setSelectedTable]
+    [setSelectedTable, openTableEditor]
   );
 
   // Handle table delete

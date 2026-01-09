@@ -50,6 +50,10 @@ interface ModelState {
   isLoading: boolean;
   error: string | null;
 
+  // Multi-editor support (max 3 editors open at once)
+  openTableEditorIds: string[]; // Array of table IDs with open editors
+  focusedTableEditorId: string | null; // Which editor is currently focused (in front)
+
   // Tag filter backup (stored when filtering is active)
   originalTables?: Table[];
   originalComputeAssets?: ComputeAsset[];
@@ -98,6 +102,11 @@ interface ModelState {
   setSelectedDataLevel: (level: DataLevel | null) => void;
   setLoading: (isLoading: boolean) => void;
   setError: (error: string | null) => void;
+
+  // Multi-editor actions
+  openTableEditor: (tableId: string) => void; // Opens editor or focuses if already open
+  closeTableEditor: (tableId: string) => void; // Closes specific editor
+  focusTableEditor: (tableId: string) => void; // Brings editor to front
 
   // CRUD Operations
   fetchTables: (domain: string) => Promise<void>;
@@ -238,6 +247,10 @@ export const useModelStore = create<ModelState>((set, get) => ({
   selectedDataLevel: null,
   isLoading: false,
   error: null,
+
+  // Multi-editor state
+  openTableEditorIds: [],
+  focusedTableEditorId: null,
 
   setTables: (tables) => set({ tables }),
   setRelationships: (relationships) => set({ relationships }),
@@ -479,6 +492,52 @@ export const useModelStore = create<ModelState>((set, get) => ({
   setSelectedDataLevel: (level) => set({ selectedDataLevel: level }),
   setLoading: (isLoading) => set({ isLoading }),
   setError: (error) => set({ error }),
+
+  // Multi-editor actions
+  openTableEditor: (tableId) => {
+    const { openTableEditorIds } = get();
+
+    // If already open, just focus it
+    if (openTableEditorIds.includes(tableId)) {
+      set({ focusedTableEditorId: tableId });
+      return;
+    }
+
+    // Check max limit (3 editors)
+    if (openTableEditorIds.length >= 3) {
+      console.warn('[ModelStore] Maximum 3 table editors can be open at once');
+      return;
+    }
+
+    // Add new editor and focus it
+    set({
+      openTableEditorIds: [...openTableEditorIds, tableId],
+      focusedTableEditorId: tableId,
+    });
+  },
+
+  closeTableEditor: (tableId) => {
+    const { openTableEditorIds, focusedTableEditorId } = get();
+    const newOpenIds = openTableEditorIds.filter((id) => id !== tableId);
+
+    // If closing the focused editor, focus the last remaining one
+    const newFocusedId =
+      focusedTableEditorId === tableId
+        ? newOpenIds[newOpenIds.length - 1] || null
+        : focusedTableEditorId;
+
+    set({
+      openTableEditorIds: newOpenIds,
+      focusedTableEditorId: newFocusedId,
+    });
+  },
+
+  focusTableEditor: (tableId) => {
+    const { openTableEditorIds } = get();
+    if (openTableEditorIds.includes(tableId)) {
+      set({ focusedTableEditorId: tableId });
+    }
+  },
 
   // CRUD Operations
   fetchTables: async (domain: string) => {
