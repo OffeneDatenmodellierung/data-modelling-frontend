@@ -6,6 +6,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useWorkspaceStore } from '@/stores/workspaceStore';
+import { useUIStore } from '@/stores/uiStore';
 import type { Workspace } from '@/types/workspace';
 
 export interface WorkspaceListProps {
@@ -13,15 +14,52 @@ export interface WorkspaceListProps {
   onWorkspaceSelect?: (workspaceId: string) => void;
 }
 
-export const WorkspaceList: React.FC<WorkspaceListProps> = ({ className = '', onWorkspaceSelect }) => {
-  const { workspaces, currentWorkspaceId, isLoading, setCurrentWorkspace, deleteWorkspaceRemote } =
-    useWorkspaceStore();
+export const WorkspaceList: React.FC<WorkspaceListProps> = ({
+  className = '',
+  onWorkspaceSelect,
+}) => {
+  const {
+    workspaces,
+    currentWorkspaceId,
+    isLoading,
+    setCurrentWorkspace,
+    deleteWorkspaceRemote,
+    reloadWorkspaceFromDisk,
+  } = useWorkspaceStore();
+  const { addToast } = useUIStore();
   const navigate = useNavigate();
   const [deletingId, setDeletingId] = React.useState<string | null>(null);
+  const [loadingId, setLoadingId] = React.useState<string | null>(null);
 
-  const handleWorkspaceClick = (workspace: Workspace) => {
+  const handleWorkspaceClick = async (workspace: Workspace) => {
+    setLoadingId(workspace.id);
+
+    try {
+      // Try to reload from disk first (checks for persisted directory handle)
+      const result = await reloadWorkspaceFromDisk(workspace.id);
+
+      if (result.reloaded) {
+        // Successfully loaded fresh data from disk
+        addToast({
+          type: 'info',
+          message: 'Loaded latest files from disk',
+        });
+      } else if (!result.success && result.error) {
+        // Failed to reload - show warning but continue with cached data
+        addToast({
+          type: 'warning',
+          message: result.error,
+        });
+      }
+      // If result.success && !result.reloaded, silently use cached data (no handle available)
+    } catch (error) {
+      console.error('[WorkspaceList] Error reloading from disk:', error);
+      // Continue with cached data on error
+    }
+
     setCurrentWorkspace(workspace.id);
     onWorkspaceSelect?.(workspace.id);
+    setLoadingId(null);
     navigate(`/workspace/${workspace.id}`);
   };
 
@@ -53,7 +91,9 @@ export const WorkspaceList: React.FC<WorkspaceListProps> = ({ className = '', on
   if (workspaces.length === 0) {
     return (
       <div className={`p-4 ${className}`}>
-        <div className="text-center text-gray-500">No workspaces found. Create your first workspace to get started.</div>
+        <div className="text-center text-gray-500">
+          No workspaces found. Create your first workspace to get started.
+        </div>
       </div>
     );
   }
@@ -63,15 +103,20 @@ export const WorkspaceList: React.FC<WorkspaceListProps> = ({ className = '', on
       {workspaces.map((workspace) => (
         <div
           key={workspace.id}
-          onClick={() => handleWorkspaceClick(workspace)}
+          onClick={() => !loadingId && handleWorkspaceClick(workspace)}
           className={`
             p-4 border rounded-lg cursor-pointer transition-colors
+            ${loadingId === workspace.id ? 'bg-gray-50 border-gray-300' : ''}
             ${currentWorkspaceId === workspace.id ? 'bg-blue-50 border-blue-500' : 'bg-white border-gray-200 hover:border-gray-300'}
+            ${loadingId && loadingId !== workspace.id ? 'opacity-50 pointer-events-none' : ''}
           `}
         >
           <div className="flex items-center justify-between">
             <div className="flex-1">
               <div className="flex items-center gap-2">
+                {loadingId === workspace.id && (
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                )}
                 <h3 className="font-semibold text-gray-900">{workspace.name}</h3>
                 <span
                   className={`
@@ -88,7 +133,8 @@ export const WorkspaceList: React.FC<WorkspaceListProps> = ({ className = '', on
                 </p>
                 {workspace.domains && workspace.domains.length > 0 && (
                   <p className="text-sm text-gray-500">
-                    {workspace.domains.length} {workspace.domains.length === 1 ? 'domain' : 'domains'}
+                    {workspace.domains.length}{' '}
+                    {workspace.domains.length === 1 ? 'domain' : 'domains'}
                   </p>
                 )}
               </div>
@@ -118,4 +164,3 @@ export const WorkspaceList: React.FC<WorkspaceListProps> = ({ className = '', on
     </div>
   );
 };
-

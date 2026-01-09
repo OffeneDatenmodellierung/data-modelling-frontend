@@ -51,6 +51,13 @@ interface WorkspaceState {
 
   // Browser refresh handling
   handleBrowserRefresh: () => Promise<{ hasLocalChanges: boolean; hasRemoteChanges: boolean }>;
+
+  // Disk sync
+  reloadWorkspaceFromDisk: (workspaceId: string) => Promise<{
+    success: boolean;
+    reloaded: boolean; // true if loaded from disk, false if used cache
+    error?: string;
+  }>;
 }
 
 export const useWorkspaceStore = create<WorkspaceState>()(
@@ -836,6 +843,140 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             hasLocalChanges,
             hasRemoteChanges,
           };
+        },
+
+        // Reload workspace from disk using persisted directory handle
+        reloadWorkspaceFromDisk: async (workspaceId: string) => {
+          const mode = await useSDKModeStore.getState().getMode();
+
+          // Only works in offline mode
+          if (mode !== 'offline') {
+            return { success: true, reloaded: false };
+          }
+
+          // Only works in browser (not Electron - Electron has file paths)
+          if (getPlatform() !== 'browser') {
+            return { success: true, reloaded: false };
+          }
+
+          try {
+            const { browserFileService } = await import('@/services/platform/browser');
+
+            // Try to load persisted directory handle
+            const handle = await browserFileService.loadDirectoryHandle(workspaceId);
+            if (!handle) {
+              console.log('[WorkspaceStore] No directory handle found for workspace:', workspaceId);
+              return { success: true, reloaded: false };
+            }
+
+            // Verify permission
+            const permission = await browserFileService.verifyDirectoryPermission(handle);
+            if (permission === 'denied') {
+              // Permission was explicitly denied - remove stale handle
+              await browserFileService.removeDirectoryHandle(workspaceId);
+              return {
+                success: false,
+                reloaded: false,
+                error: 'Directory access denied. Please use "Open Workspace Folder" to reload.',
+              };
+            }
+
+            if (permission === 'prompt') {
+              // Permission needs to be re-requested
+              const granted = await browserFileService.requestDirectoryPermission(handle);
+              if (!granted) {
+                return {
+                  success: false,
+                  reloaded: false,
+                  error: 'Directory access required. Please use "Open Workspace Folder" to reload.',
+                };
+              }
+            }
+
+            // Read files from directory
+            const files = await browserFileService.readFilesFromHandle(handle);
+            if (files.length === 0) {
+              return {
+                success: false,
+                reloaded: false,
+                error: 'No files found in workspace directory.',
+              };
+            }
+
+            // Create a FileList-like object from the files array
+            const fileList = {
+              length: files.length,
+              item: (index: number) => files[index] || null,
+              [Symbol.iterator]: function* () {
+                for (let i = 0; i < files.length; i++) {
+                  yield files[i];
+                }
+              },
+            } as FileList;
+
+            // Use localFileService to load the workspace
+            const { localFileService } = await import('@/services/storage/localFileService');
+            const workspace = await localFileService.loadWorkspaceFromFolder(fileList);
+
+            // Populate model store with loaded data
+            const { useModelStore } = await import('@/stores/modelStore');
+            const modelStore = useModelStore.getState();
+
+            if ((workspace as any).domains) {
+              modelStore.setDomains((workspace as any).domains);
+            }
+            if ((workspace as any).tables) {
+              modelStore.setTables((workspace as any).tables);
+            }
+            if ((workspace as any).relationships) {
+              modelStore.setRelationships((workspace as any).relationships);
+            }
+            if ((workspace as any).systems) {
+              modelStore.setSystems((workspace as any).systems);
+            }
+            if ((workspace as any).products) {
+              modelStore.setProducts((workspace as any).products);
+            }
+            if ((workspace as any).assets) {
+              modelStore.setComputeAssets((workspace as any).assets);
+            }
+            if ((workspace as any).bpmnProcesses) {
+              modelStore.setBPMNProcesses((workspace as any).bpmnProcesses);
+            }
+            if ((workspace as any).dmnDecisions) {
+              modelStore.setDMNDecisions((workspace as any).dmnDecisions);
+            }
+            if ((workspace as any).knowledgeArticles) {
+              const { useKnowledgeStore } = await import('@/stores/knowledgeStore');
+              useKnowledgeStore.getState().setArticles((workspace as any).knowledgeArticles);
+            }
+            if ((workspace as any).decisionRecords) {
+              const { useDecisionStore } = await import('@/stores/decisionStore');
+              useDecisionStore.getState().setDecisions((workspace as any).decisionRecords);
+            }
+
+            // Select first domain if available
+            if ((workspace as any).domains && (workspace as any).domains.length > 0) {
+              modelStore.setSelectedDomain((workspace as any).domains[0].id);
+            }
+
+            // Update workspace in store with fresh data
+            set((state) => ({
+              workspaces: state.workspaces.map((w) =>
+                w.id === workspaceId ? { ...w, ...workspace, id: workspaceId } : w
+              ),
+            }));
+
+            console.log('[WorkspaceStore] Reloaded workspace from disk:', workspaceId);
+            return { success: true, reloaded: true };
+          } catch (error) {
+            console.error('[WorkspaceStore] Failed to reload workspace from disk:', error);
+            return {
+              success: false,
+              reloaded: false,
+              error: error instanceof Error ? error.message : 'Failed to reload from disk',
+            };
+          }
         },
       };
     },

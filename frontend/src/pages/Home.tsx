@@ -249,7 +249,33 @@ const Home: React.FC = () => {
   // Handle opening local workspace folder in offline mode
   const handleOpenLocalFolder = async () => {
     try {
-      const files = await localFileService.pickFolder();
+      let files: FileList | File[] | null = null;
+      let directoryHandle: FileSystemDirectoryHandle | null = null;
+
+      // Try to use File System Access API for better sync support
+      if ('showDirectoryPicker' in window) {
+        try {
+          directoryHandle = await (window as any).showDirectoryPicker({
+            mode: 'readwrite',
+            startIn: 'documents',
+          });
+
+          // Read files from the directory handle
+          const { browserFileService } = await import('@/services/platform/browser');
+          files = await browserFileService.readFilesFromHandle(directoryHandle!);
+        } catch (error) {
+          if ((error as Error).name === 'AbortError') {
+            return; // User cancelled
+          }
+          console.warn('[Home] showDirectoryPicker failed, falling back to file input:', error);
+          // Fall back to file input
+          files = await localFileService.pickFolder();
+        }
+      } else {
+        // Browser doesn't support File System Access API
+        files = await localFileService.pickFolder();
+      }
+
       if (!files || files.length === 0) {
         return; // User cancelled
       }
@@ -259,7 +285,27 @@ const Home: React.FC = () => {
         message: 'Loading workspace from folder...',
       });
 
-      const workspace = await localFileService.loadWorkspaceFromFolder(files);
+      // Convert File[] to FileList-like object if needed
+      const fileList = Array.isArray(files)
+        ? ({
+            length: files.length,
+            item: (index: number) => files[index] || null,
+            [Symbol.iterator]: function* () {
+              for (let i = 0; i < files.length; i++) {
+                yield files[i];
+              }
+            },
+          } as FileList)
+        : files;
+
+      const workspace = await localFileService.loadWorkspaceFromFolder(fileList);
+
+      // Save directory handle for future sync (if we have one)
+      if (directoryHandle && workspace.id) {
+        const { browserFileService } = await import('@/services/platform/browser');
+        await browserFileService.saveDirectoryHandle(workspace.id, directoryHandle);
+        console.log('[Home] Saved directory handle for workspace:', workspace.id);
+      }
 
       // Populate model store with loaded data
       const { useModelStore } = await import('@/stores/modelStore');
