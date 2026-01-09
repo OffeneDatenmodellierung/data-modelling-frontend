@@ -476,12 +476,13 @@ export const DomainCanvas: React.FC<DomainCanvasProps> = ({ workspaceId, domainI
           // For shared systems: only show tables that are explicitly shared AND belong to this system
           // This prevents new tables from appearing without being explicitly shared
           const sharedTableIds = new Set(sharedResources.tables.map((t) => t.id));
-          filtered = tables.filter(
+          filtered = filtered.filter(
             (t) => selectedSystem.table_ids?.includes(t.id) && sharedTableIds.has(t.id)
           );
         } else {
           // For owned systems: only show tables from current domain that belong to this system
-          filtered = tables.filter(
+          // Use filtered (not tables) to preserve data level filtering from getFilteredTables()
+          filtered = filtered.filter(
             (t) => t.primary_domain_id === domainId && selectedSystem.table_ids?.includes(t.id)
           );
         }
