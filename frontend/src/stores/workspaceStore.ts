@@ -522,9 +522,15 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                 try {
                   const { indexedDBStorage } = await import('@/services/storage/indexedDBStorage');
                   const { useModelStore } = await import('@/stores/modelStore');
+                  const knowledgeStoreModule = await import('@/stores/knowledgeStore');
+                  const decisionStoreModule = await import('@/stores/decisionStore');
 
                   // Get compute assets from model store
                   const { computeAssets } = useModelStore.getState();
+
+                  // Get KB articles and decision records
+                  const { articles } = knowledgeStoreModule.useKnowledgeStore.getState();
+                  const { decisions } = decisionStoreModule.useDecisionStore.getState();
 
                   // Save workspace state to IndexedDB
                   await indexedDBStorage.saveWorkspace(
@@ -540,6 +546,8 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                       assets: computeAssets,
                       bpmnProcesses,
                       dmnDecisions,
+                      knowledgeArticles: articles,
+                      decisionRecords: decisions,
                     }
                   );
 
