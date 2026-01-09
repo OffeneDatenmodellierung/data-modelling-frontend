@@ -156,7 +156,12 @@ describe('KnowledgeService', () => {
       const result = await knowledgeService.exportKnowledgeToYaml(mockArticle);
 
       expect(result).toBe('article: yaml');
-      expect(mockExport).toHaveBeenCalledWith(JSON.stringify(mockArticle));
+      // Service converts number to string for SDK compatibility
+      const expectedArticle = {
+        ...mockArticle,
+        number: String(mockArticle.number),
+      };
+      expect(mockExport).toHaveBeenCalledWith(JSON.stringify(expectedArticle));
     });
   });
 

@@ -293,42 +293,43 @@ class ODCSService {
               const workspaceId = normalized.workspace_id || generateUUID();
 
               // Clean tables (remove complex nested objects, but preserve metadata including system_id)
-              // SDK export_to_odcs_yaml expects camelCase field names
+              // SDK export_to_odcs_yaml expects snake_case field names
               const cleanedTables = Array.isArray(normalized.tables)
                 ? normalized.tables.map((table: any) => {
                     const cleaned: any = {
                       id: table.id,
-                      workspaceId: table.workspace_id,
+                      workspace_id: table.workspace_id,
                       name: table.name,
-                      modelType: table.model_type || 'conceptual',
+                      model_type: table.model_type || 'conceptual',
                       // Ensure status is present (required by ODCS schema)
                       status: table.status || table.metadata?.status || 'draft',
                       columns: Array.isArray(table.columns)
                         ? table.columns.map((col: any) => ({
                             id: col.id,
-                            tableId: col.table_id,
+                            table_id: col.table_id,
                             name: col.name,
-                            dataType: col.data_type,
+                            data_type: col.data_type,
                             nullable: col.nullable ?? false,
-                            isPrimaryKey: col.is_primary_key ?? false,
-                            isForeignKey: col.is_foreign_key ?? false,
+                            is_primary_key: col.is_primary_key ?? false,
+                            is_foreign_key: col.is_foreign_key ?? false,
                             order: col.order ?? 0,
-                            createdAt: col.created_at || now,
+                            created_at: col.created_at || now,
                             ...(col.description && { description: col.description }),
                             ...(col.foreign_key_reference && {
-                              foreignKeyReference: col.foreign_key_reference,
+                              foreign_key_reference: col.foreign_key_reference,
                             }),
-                            ...(col.default_value && { defaultValue: col.default_value }),
+                            ...(col.default_value && { default_value: col.default_value }),
                           }))
                         : [],
-                      createdAt: table.created_at || now,
-                      updatedAt: table.last_modified_at || table.updated_at || now,
+                      created_at: table.created_at || now,
+                      updated_at: table.last_modified_at || table.updated_at || now,
                     };
-                    if (table.primary_domain_id) cleaned.primaryDomainId = table.primary_domain_id;
+                    if (table.primary_domain_id)
+                      cleaned.primary_domain_id = table.primary_domain_id;
                     if (table.alias) cleaned.alias = table.alias;
                     if (table.description) cleaned.description = table.description;
                     if (Array.isArray(table.tags)) cleaned.tags = table.tags;
-                    if (table.data_level) cleaned.dataLevel = table.data_level;
+                    if (table.data_level) cleaned.data_level = table.data_level;
                     // IMPORTANT: Preserve metadata (including system_id) when saving
                     if (table.metadata && typeof table.metadata === 'object') {
                       cleaned.metadata = { ...table.metadata };
@@ -340,24 +341,24 @@ class ODCSService {
                     }
                     // IMPORTANT: Preserve compound keys (composite primary/unique keys)
                     if (Array.isArray(table.compoundKeys) && table.compoundKeys.length > 0) {
-                      cleaned.compoundKeys = table.compoundKeys.map((ck: any) => ({
+                      cleaned.compound_keys = table.compoundKeys.map((ck: any) => ({
                         id: ck.id,
-                        tableId: ck.table_id || table.id,
-                        columnIds: ck.column_ids || ck.columnIds,
-                        isPrimary: ck.is_primary ?? ck.isPrimary ?? false,
-                        createdAt: ck.created_at || ck.createdAt || now,
+                        table_id: ck.table_id || table.id,
+                        column_ids: ck.column_ids || ck.columnIds,
+                        is_primary: ck.is_primary ?? ck.isPrimary ?? false,
+                        created_at: ck.created_at || ck.createdAt || now,
                         ...(ck.name && { name: ck.name }),
                       }));
                     } else if (
                       Array.isArray(table.compound_keys) &&
                       table.compound_keys.length > 0
                     ) {
-                      cleaned.compoundKeys = table.compound_keys.map((ck: any) => ({
+                      cleaned.compound_keys = table.compound_keys.map((ck: any) => ({
                         id: ck.id,
-                        tableId: ck.table_id || table.id,
-                        columnIds: ck.column_ids || ck.columnIds,
-                        isPrimary: ck.is_primary ?? ck.isPrimary ?? false,
-                        createdAt: ck.created_at || ck.createdAt || now,
+                        table_id: ck.table_id || table.id,
+                        column_ids: ck.column_ids || ck.columnIds,
+                        is_primary: ck.is_primary ?? ck.isPrimary ?? false,
+                        created_at: ck.created_at || ck.createdAt || now,
                         ...(ck.name && { name: ck.name }),
                       }));
                     }
@@ -365,16 +366,16 @@ class ODCSService {
                   })
                 : [];
 
-              // Clean relationships (SDK expects camelCase)
+              // Clean relationships (SDK expects snake_case)
               const cleanedRelationships = Array.isArray(normalized.relationships)
                 ? normalized.relationships.map((rel: any) => ({
                     id: rel.id,
-                    workspaceId: rel.workspace_id,
-                    sourceTableId: rel.source_table_id || rel.source_id,
-                    targetTableId: rel.target_table_id || rel.target_id,
-                    createdAt: rel.created_at || now,
-                    updatedAt: rel.last_modified_at || rel.updated_at || now,
-                    ...(rel.domain_id && { domainId: rel.domain_id }),
+                    workspace_id: rel.workspace_id,
+                    source_table_id: rel.source_table_id || rel.source_id,
+                    target_table_id: rel.target_table_id || rel.target_id,
+                    created_at: rel.created_at || now,
+                    updated_at: rel.last_modified_at || rel.updated_at || now,
+                    ...(rel.domain_id && { domain_id: rel.domain_id }),
                     ...(rel.cardinality && { cardinality: rel.cardinality }),
                     ...(rel.type && { type: rel.type }),
                     ...(rel.name && { name: rel.name }),
@@ -382,19 +383,19 @@ class ODCSService {
                   }))
                 : [];
 
-              // Create DataModel structure with all required fields (SDK expects camelCase)
+              // Create DataModel structure with all required fields (SDK expects snake_case)
               const dataModel = {
                 id: workspaceId,
                 name: (normalized as any).name || 'Workspace',
-                gitDirectoryPath: (normalized as any).git_directory_path || '',
-                controlFilePath: (normalized as any).control_file_path || '',
+                git_directory_path: (normalized as any).git_directory_path || '',
+                control_file_path: (normalized as any).control_file_path || '',
                 tables: cleanedTables,
                 relationships: cleanedRelationships,
                 domains: [],
-                createdAt: (normalized as any).created_at || now,
-                updatedAt:
+                created_at: (normalized as any).created_at || now,
+                updated_at:
                   (normalized as any).updated_at || (normalized as any).last_modified_at || now,
-                isSubfolder: (normalized as any).is_subfolder ?? false,
+                is_subfolder: (normalized as any).is_subfolder ?? false,
               };
 
               // Convert DataModel to JSON string

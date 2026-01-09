@@ -31,6 +31,24 @@ import {
 } from '@/types/decision';
 
 /**
+ * Map frontend DecisionStatus to SDK-compatible status values.
+ * SDK only supports: proposed, accepted, deprecated, superseded
+ * Frontend additionally has: draft, rejected
+ */
+function mapStatusForSDK(status: DecisionStatus): string {
+  switch (status) {
+    case DecisionStatus.Draft:
+      // Map draft to proposed for SDK (closest equivalent)
+      return 'proposed';
+    case DecisionStatus.Rejected:
+      // Map rejected to deprecated for SDK (closest equivalent)
+      return 'deprecated';
+    default:
+      return status;
+  }
+}
+
+/**
  * Decision Service for SDK 1.13.3+ decision management
  *
  * This service provides methods to work with decisions using the SDK.
@@ -156,7 +174,13 @@ class DecisionService {
     }
 
     try {
-      const decisionJson = JSON.stringify(decision);
+      // SDK expects 'number' as string and only supports certain status values
+      const decisionForExport = {
+        ...decision,
+        number: String(decision.number),
+        status: mapStatusForSDK(decision.status),
+      };
+      const decisionJson = JSON.stringify(decisionForExport);
       const yaml = sdk.export_decision_to_yaml(decisionJson);
       return yaml;
     } catch (error) {
@@ -174,7 +198,13 @@ class DecisionService {
       const sdk = await sdkLoader.load();
       if (sdk.export_decision_to_markdown) {
         try {
-          const decisionJson = JSON.stringify(decision);
+          // SDK expects 'number' as string and only supports certain status values
+          const decisionForExport = {
+            ...decision,
+            number: String(decision.number),
+            status: mapStatusForSDK(decision.status),
+          };
+          const decisionJson = JSON.stringify(decisionForExport);
           const markdown = sdk.export_decision_to_markdown(decisionJson);
           return markdown;
         } catch {
@@ -267,7 +297,13 @@ class DecisionService {
 
     try {
       const indexJson = JSON.stringify(index);
-      const decisionJson = JSON.stringify(decision);
+      // SDK expects 'number' as string and only supports certain status values
+      const decisionForExport = {
+        ...decision,
+        number: String(decision.number),
+        status: mapStatusForSDK(decision.status),
+      };
+      const decisionJson = JSON.stringify(decisionForExport);
       const resultJson = sdk.add_decision_to_index(indexJson, decisionJson, filename);
       const result = JSON.parse(resultJson);
 

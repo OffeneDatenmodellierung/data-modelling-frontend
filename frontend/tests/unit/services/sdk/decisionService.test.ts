@@ -162,7 +162,13 @@ describe('DecisionService', () => {
       const result = await decisionService.exportDecisionToYaml(mockDecision);
 
       expect(result).toBe('decision: yaml');
-      expect(mockExport).toHaveBeenCalledWith(JSON.stringify(mockDecision));
+      // Service converts number to string and maps status for SDK compatibility
+      const expectedDecision = {
+        ...mockDecision,
+        number: String(mockDecision.number),
+        // Status 'accepted' is already SDK-compatible, no mapping needed
+      };
+      expect(mockExport).toHaveBeenCalledWith(JSON.stringify(expectedDecision));
     });
   });
 

@@ -316,8 +316,28 @@ export const ArticleEditor: React.FC<ArticleEditorProps> = ({
 
         {/* Content */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Content</label>
-          <p className="text-xs text-gray-500 mb-2">Full article content. Markdown is supported.</p>
+          <div className="flex items-center justify-between mb-1">
+            <label className="block text-sm font-medium text-gray-700">Content</label>
+            <a
+              href="https://docs.github.com/en/get-started/writing-on-github/getting-started-with-writing-and-formatting-on-github/basic-writing-and-formatting-syntax"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+              Markdown guide
+            </a>
+          </div>
+          <p className="text-xs text-gray-500 mb-2">
+            Supports GitHub Flavored Markdown including tables, task lists, and code blocks.
+          </p>
           <textarea
             value={formData.content}
             onChange={(e) => handleInputChange('content', e.target.value)}

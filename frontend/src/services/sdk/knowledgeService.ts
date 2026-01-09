@@ -156,7 +156,12 @@ class KnowledgeService {
     }
 
     try {
-      const articleJson = JSON.stringify(article);
+      // SDK expects 'number' field as string, convert before serialization
+      const articleForExport = {
+        ...article,
+        number: String(article.number),
+      };
+      const articleJson = JSON.stringify(articleForExport);
       const yaml = sdk.export_knowledge_to_yaml(articleJson);
       return yaml;
     } catch (error) {
@@ -174,7 +179,12 @@ class KnowledgeService {
       const sdk = await sdkLoader.load();
       if (sdk.export_knowledge_to_markdown) {
         try {
-          const articleJson = JSON.stringify(article);
+          // SDK expects 'number' field as string
+          const articleForExport = {
+            ...article,
+            number: String(article.number),
+          };
+          const articleJson = JSON.stringify(articleForExport);
           const markdown = sdk.export_knowledge_to_markdown(articleJson);
           return markdown;
         } catch {
@@ -204,7 +214,12 @@ class KnowledgeService {
     }
 
     try {
-      const articlesJson = JSON.stringify(articles);
+      // SDK expects 'number' field as string
+      const articlesForExport = articles.map((article) => ({
+        ...article,
+        number: String(article.number),
+      }));
+      const articlesJson = JSON.stringify(articlesForExport);
       const resultJson = sdk.search_knowledge_articles(articlesJson, query);
       const result = JSON.parse(resultJson);
 
@@ -300,7 +315,12 @@ class KnowledgeService {
 
     try {
       const indexJson = JSON.stringify(index);
-      const articleJson = JSON.stringify(article);
+      // SDK expects 'number' field as string
+      const articleForExport = {
+        ...article,
+        number: String(article.number),
+      };
+      const articleJson = JSON.stringify(articleForExport);
       const resultJson = sdk.add_article_to_knowledge_index(indexJson, articleJson, filename);
       const result = JSON.parse(resultJson);
 
