@@ -276,8 +276,14 @@ export const ComputeAssetEditor: React.FC<ComputeAssetEditorProps> = ({
 
           {/* Basic Information */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Name</label>
+            <label
+              htmlFor="readonly-asset-name"
+              className="block text-sm font-medium text-gray-700 mb-2"
+            >
+              Name
+            </label>
             <input
+              id="readonly-asset-name"
               type="text"
               value={asset.name}
               disabled
@@ -286,8 +292,14 @@ export const ComputeAssetEditor: React.FC<ComputeAssetEditorProps> = ({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Type</label>
+            <label
+              htmlFor="readonly-asset-type"
+              className="block text-sm font-medium text-gray-700 mb-2"
+            >
+              Type
+            </label>
             <input
+              id="readonly-asset-type"
               type="text"
               value={
                 asset.type === 'ai'
@@ -303,8 +315,14 @@ export const ComputeAssetEditor: React.FC<ComputeAssetEditorProps> = ({
 
           {asset.description && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
+              <label
+                htmlFor="readonly-asset-description"
+                className="block text-sm font-medium text-gray-700 mb-2"
+              >
+                Description
+              </label>
               <textarea
+                id="readonly-asset-description"
                 value={asset.description}
                 disabled
                 rows={3}
@@ -315,8 +333,14 @@ export const ComputeAssetEditor: React.FC<ComputeAssetEditorProps> = ({
 
           {asset.owner && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Owner</label>
+              <label
+                htmlFor="readonly-asset-owner"
+                className="block text-sm font-medium text-gray-700 mb-2"
+              >
+                Owner
+              </label>
               <input
+                id="readonly-asset-owner"
                 type="text"
                 value={asset.owner.name || asset.owner.email || 'Unknown'}
                 disabled
@@ -327,10 +351,14 @@ export const ComputeAssetEditor: React.FC<ComputeAssetEditorProps> = ({
 
           {asset.engineering_team && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label
+                htmlFor="readonly-asset-team"
+                className="block text-sm font-medium text-gray-700 mb-2"
+              >
                 Engineering Team
               </label>
               <input
+                id="readonly-asset-team"
                 type="text"
                 value={asset.engineering_team}
                 disabled
@@ -341,10 +369,14 @@ export const ComputeAssetEditor: React.FC<ComputeAssetEditorProps> = ({
 
           {asset.source_repo && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label
+                htmlFor="readonly-asset-repo"
+                className="block text-sm font-medium text-gray-700 mb-2"
+              >
                 Source Repository
               </label>
               <input
+                id="readonly-asset-repo"
                 type="text"
                 value={asset.source_repo}
                 disabled
@@ -355,8 +387,14 @@ export const ComputeAssetEditor: React.FC<ComputeAssetEditorProps> = ({
 
           {asset.status && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
+              <label
+                htmlFor="readonly-asset-status"
+                className="block text-sm font-medium text-gray-700 mb-2"
+              >
+                Status
+              </label>
               <input
+                id="readonly-asset-status"
                 type="text"
                 value={asset.status.charAt(0).toUpperCase() + asset.status.slice(1)}
                 disabled
@@ -367,7 +405,7 @@ export const ComputeAssetEditor: React.FC<ComputeAssetEditorProps> = ({
 
           {asset.tags && asset.tags.length > 0 && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Tags</label>
+              <span className="block text-sm font-medium text-gray-700 mb-2">Tags</span>
               <div className="flex flex-wrap gap-2">
                 {tagsToStrings(asset.tags).map((tag, index) => (
                   <span key={index} className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded">
@@ -380,9 +418,9 @@ export const ComputeAssetEditor: React.FC<ComputeAssetEditorProps> = ({
 
           {asset.custom_properties && Object.keys(asset.custom_properties).length > 0 && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <span className="block text-sm font-medium text-gray-700 mb-2">
                 Custom Properties
-              </label>
+              </span>
               <div className="border border-gray-300 rounded-lg p-3 bg-gray-50">
                 <pre className="text-xs text-gray-700 overflow-auto max-h-40">
                   {JSON.stringify(asset.custom_properties, null, 2)}
@@ -626,7 +664,16 @@ export const ComputeAssetEditor: React.FC<ComputeAssetEditorProps> = ({
               </button>
               {showExportMenu && (
                 <>
-                  <div className="fixed inset-0 z-10" onClick={() => setShowExportMenu(false)} />
+                  <div
+                    className="fixed inset-0 z-10"
+                    onClick={() => setShowExportMenu(false)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Escape') setShowExportMenu(false);
+                    }}
+                    role="button"
+                    tabIndex={0}
+                    aria-label="Close export menu"
+                  />
                   <div className="absolute left-0 bottom-full mb-1 w-48 bg-white rounded-md shadow-lg border border-gray-200 z-20">
                     <div className="py-1">
                       <button
