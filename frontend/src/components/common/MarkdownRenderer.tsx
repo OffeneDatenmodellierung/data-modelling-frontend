@@ -26,8 +26,9 @@ export function MarkdownRenderer({ content, className = '' }: MarkdownRendererPr
         prose-table:border-collapse prose-table:w-full
         prose-th:border prose-th:border-gray-300 prose-th:bg-gray-100 prose-th:px-3 prose-th:py-2 prose-th:text-left
         prose-td:border prose-td:border-gray-300 prose-td:px-3 prose-td:py-2
-        prose-code:bg-gray-100 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:text-sm
-        prose-pre:bg-gray-900 prose-pre:text-gray-100
+        prose-code:bg-gray-100 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:text-sm prose-code:text-gray-800
+        prose-pre:bg-gray-900 prose-pre:text-gray-100 prose-pre:overflow-x-auto
+        [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_pre_code]:text-inherit
         ${className}`}
     >
       <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
