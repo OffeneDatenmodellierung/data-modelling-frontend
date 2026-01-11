@@ -1,19 +1,14 @@
-version: '1.0.0'
 apiVersion: v3.1.0
 kind: DataContract
 id: 9f910cbb-3abe-4235-812e-faa33d66dee0
+version: 1.0.0
 status: active
 name: raw_customers
-domain: ecommerce
-tenant: jaffleshop
-
 description:
   purpose: Raw customer data ingested from source systems
-
 schema:
   - name: raw_customers
-    description: Raw customer data from Jaffle Shop source systems
-    physicalName: raw.customers
+    description: Raw customer data ingested from source systems
     logicalType: object
     properties:
       - name: id
@@ -25,13 +20,25 @@ schema:
       - name: name
         description: Customer full name
         logicalType: string
-        physicalType: VARCHAR
+        physicalType: STRING
         required: true
-
 customProperties:
+  - property: tableIndex
+    value: '0'
+  - property: apiVersion
+    value: v3.1.0
+  - property: version
+    value: 1.0.0
+  - property: status
+    value: active
+  - property: kind
+    value: DataContract
+  - property: odcsMetadata
+    value: '[object Object]'
+  - property: customProperties
+    value: '[object Object]'
   - property: system_id
     value: ad789620-a825-4bc4-afd7-429db96a6359
-
 tags:
   - raw
   - customers

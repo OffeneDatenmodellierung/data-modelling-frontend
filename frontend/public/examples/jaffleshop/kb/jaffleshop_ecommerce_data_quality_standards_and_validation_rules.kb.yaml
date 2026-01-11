@@ -1,12 +1,11 @@
 id: 67b8fa82-545d-4acf-9d67-28c139c887b0
 number: 2401161430
 title: Data Quality Standards and Validation Rules
-type: reference
+articleType: reference
 status: published
-summary: >-
-  Reference documentation for data quality standards, validation rules,
-  and data contracts used across the Jaffleshop data platform.
-
+domainId: d9004c83-fd63-43fe-afb8-77726c3e276e
+workspaceId: f47ac10b-58cc-4372-a567-0e02b2c3d479
+summary: Reference documentation for data quality standards, validation rules, and data contracts used across the Jaffleshop data platform.
 content: |
   # Data Quality Standards and Validation Rules
 
@@ -107,17 +106,14 @@ content: |
   3. Root cause analysis within 4 hours
   4. Fix deployed within 24 hours for ERROR severity
   5. Post-mortem for recurring issues
-
-domain_id: d9004c83-fd63-43fe-afb8-77726c3e276e
-workspace_id: f47ac10b-58cc-4372-a567-0e02b2c3d479
 authors:
   - data-quality-team@jaffleshop.example
 reviewers:
   - data-governance@jaffleshop.example
-related_articles:
-  - 82ab7dc8-e596-419c-9a8e-c91fe84b5c7e
 tags:
-  - name: data-quality
-  - name: validation
-  - name: standards
-  - name: sla
+  - '[object Object]'
+  - '[object Object]'
+  - '[object Object]'
+  - '[object Object]'
+createdAt: 2026-01-11T15:39:33.862Z
+updatedAt: 2026-01-11T15:39:33.862Z

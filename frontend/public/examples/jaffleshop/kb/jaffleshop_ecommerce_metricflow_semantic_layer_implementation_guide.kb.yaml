@@ -1,12 +1,11 @@
 id: e87dcbc8-bd38-4b46-8b8c-9b243bf1cfc4
 number: 2401200900
 title: MetricFlow Semantic Layer Implementation Guide
-type: tutorial
+articleType: tutorial
 status: published
-summary: >-
-  Step-by-step guide for implementing and using the MetricFlow semantic layer
-  for consistent metric definitions across Jaffleshop analytics.
-
+domainId: d9004c83-fd63-43fe-afb8-77726c3e276e
+workspaceId: f47ac10b-58cc-4372-a567-0e02b2c3d479
+summary: Step-by-step guide for implementing and using the MetricFlow semantic layer for consistent metric definitions across Jaffleshop analytics.
 content: |
   # MetricFlow Semantic Layer Implementation Guide
 
@@ -148,19 +147,14 @@ content: |
   - **Notebooks:** Jupyter, Databricks
   - **APIs:** REST and GraphQL endpoints
   - **Exports:** Scheduled CSV/Parquet exports
-
-domain_id: d9004c83-fd63-43fe-afb8-77726c3e276e
-workspace_id: f47ac10b-58cc-4372-a567-0e02b2c3d479
 authors:
   - analytics-engineering@jaffleshop.example
 reviewers:
   - bi-team@jaffleshop.example
-related_articles:
-  - 82ab7dc8-e596-419c-9a8e-c91fe84b5c7e
-prerequisites:
-  - 82ab7dc8-e596-419c-9a8e-c91fe84b5c7e
 tags:
-  - name: metricflow
-  - name: semantic-layer
-  - name: analytics
-  - name: metrics
+  - '[object Object]'
+  - '[object Object]'
+  - '[object Object]'
+  - '[object Object]'
+createdAt: 2026-01-11T15:39:33.852Z
+updatedAt: 2026-01-11T15:39:33.852Z

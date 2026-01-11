@@ -1,19 +1,14 @@
-version: '1.0.0'
 apiVersion: v3.1.0
 kind: DataContract
 id: 1a5e3e4e-80ee-4ecd-836a-fc303bad3d36
+version: 1.0.0
 status: active
 name: metricflow_time_spine
-domain: ecommerce
-tenant: jaffleshop
-
 description:
   purpose: Time dimension table for MetricFlow time-series analytics
-
 schema:
   - name: metricflow_time_spine
-    description: Date dimension for time-series analytics and MetricFlow
-    physicalName: marts.metricflow_time_spine
+    description: Time dimension table for MetricFlow time-series analytics
     logicalType: object
     properties:
       - name: date_day
@@ -77,11 +72,23 @@ schema:
         logicalType: integer
         physicalType: INTEGER
         required: false
-
 customProperties:
+  - property: tableIndex
+    value: '0'
+  - property: apiVersion
+    value: v3.1.0
+  - property: version
+    value: 1.0.0
+  - property: status
+    value: active
+  - property: kind
+    value: DataContract
+  - property: odcsMetadata
+    value: '[object Object]'
+  - property: customProperties
+    value: '[object Object]'
   - property: system_id
     value: ad789620-a825-4bc4-afd7-429db96a6359
-
 tags:
   - mart
   - time

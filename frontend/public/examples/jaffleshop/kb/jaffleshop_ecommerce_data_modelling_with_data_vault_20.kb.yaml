@@ -1,13 +1,11 @@
 id: 3f8a2b1c-9d4e-4f5a-8c7b-6e5d4c3b2a1f
 number: 2501111000
 title: Data Modelling with Data Vault 2.0
-type: guide
+articleType: guide
 status: published
-summary: >-
-  Comprehensive guide to Data Vault 2.0 (DV2) modelling methodology, including
-  naming conventions, hash key generation, satellite patterns, and performance
-  optimization through hash-based joins.
-
+domainId: d9004c83-fd63-43fe-afb8-77726c3e276e
+workspaceId: f47ac10b-58cc-4372-a567-0e02b2c3d479
+summary: Comprehensive guide to Data Vault 2.0 (DV2) modelling methodology, including naming conventions, hash key generation, satellite patterns, and performance optimization through hash-based joins.
 content: |
   # Data Modelling with Data Vault 2.0
 
@@ -402,16 +400,15 @@ content: |
   By following the naming conventions and patterns outlined in this guide,
   you can build a consistent, maintainable data vault that grows with your
   organization's needs.
-
-domain_id: d9004c83-fd63-43fe-afb8-77726c3e276e
-workspace_id: f47ac10b-58cc-4372-a567-0e02b2c3d479
 authors:
   - data-architecture-team@jaffleshop.example
 reviewers:
   - data-governance@jaffleshop.example
 tags:
-  - name: data-vault
-  - name: dv2
-  - name: modelling
-  - name: hash-keys
-  - name: architecture
+  - '[object Object]'
+  - '[object Object]'
+  - '[object Object]'
+  - '[object Object]'
+  - '[object Object]'
+createdAt: 2026-01-11T15:39:33.858Z
+updatedAt: 2026-01-11T15:39:33.858Z

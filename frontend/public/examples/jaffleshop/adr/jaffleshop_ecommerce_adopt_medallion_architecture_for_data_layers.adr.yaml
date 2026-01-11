@@ -14,7 +14,6 @@ context: |
 
   We need a layered architecture that provides clear separation of
   concerns and enables incremental processing.
-
 decision: |
   We will adopt the Medallion Architecture pattern with three layers:
 
@@ -32,7 +31,6 @@ decision: |
      - No prefix, business-friendly names
      - Star schema design
      - Optimized for analytics
-
 consequences: |
   **Positive:**
   - Clear data lineage from source to consumption
@@ -51,7 +49,6 @@ consequences: |
   - Document layer responsibilities clearly
   - Implement storage lifecycle policies
   - Provide training on medallion architecture
-
 options:
   - title: Medallion Architecture (Selected)
     description: Three-layer architecture (Bronze/Silver/Gold)
@@ -81,25 +78,17 @@ options:
       - Requires streaming infrastructure
       - Reprocessing challenges
       - Higher cost for batch workloads
-
 domain_id: d9004c83-fd63-43fe-afb8-77726c3e276e
 workspace_id: f47ac10b-58cc-4372-a567-0e02b2c3d479
 authors:
   - data-architecture-team@jaffleshop.example
 deciders:
   - head-of-data@jaffleshop.example
-consulted:
-  - data-engineering@jaffleshop.example
-  - analytics@jaffleshop.example
-informed:
-  - all-engineering@jaffleshop.example
-related_decisions:
-  - bc9a9569-a8d8-430a-8df3-0af171f2d2eb
-related_knowledge:
-  - 82ab7dc8-e596-419c-9a8e-c91fe84b5c7e
 tags:
   - name: architecture
   - name: medallion
   - name: data-layers
   - name: patterns
+created_at: '2026-01-11T15:39:33.867Z'
+updated_at: '2026-01-11T15:39:33.867Z'
 decided_at: '2024-01-11T14:00:00Z'

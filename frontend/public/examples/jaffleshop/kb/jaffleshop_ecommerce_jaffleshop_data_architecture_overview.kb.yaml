@@ -1,13 +1,11 @@
 id: 82ab7dc8-e596-419c-9a8e-c91fe84b5c7e
 number: 2401151000
 title: Jaffleshop Data Architecture Overview
-type: guide
+articleType: guide
 status: published
-summary: >-
-  Comprehensive overview of the Jaffleshop data architecture, including the
-  medallion architecture (bronze/silver/gold layers), data flow patterns,
-  and key design principles.
-
+domainId: d9004c83-fd63-43fe-afb8-77726c3e276e
+workspaceId: f47ac10b-58cc-4372-a567-0e02b2c3d479
+summary: Comprehensive overview of the Jaffleshop data architecture, including the medallion architecture (bronze/silver/gold layers), data flow patterns, and key design principles.
 content: |
   # Jaffleshop Data Architecture Overview
 
@@ -96,15 +94,14 @@ content: |
   - **Processing:** dbt (data build tool)
   - **Orchestration:** BPMN-defined workflows
   - **Metrics:** MetricFlow semantic layer
-
-domain_id: d9004c83-fd63-43fe-afb8-77726c3e276e
-workspace_id: f47ac10b-58cc-4372-a567-0e02b2c3d479
 authors:
   - data-architecture-team@jaffleshop.example
 reviewers:
   - data-governance@jaffleshop.example
 tags:
-  - name: architecture
-  - name: medallion
-  - name: data-platform
-  - name: overview
+  - '[object Object]'
+  - '[object Object]'
+  - '[object Object]'
+  - '[object Object]'
+createdAt: 2026-01-11T15:39:33.848Z
+updatedAt: 2026-01-11T15:39:33.848Z

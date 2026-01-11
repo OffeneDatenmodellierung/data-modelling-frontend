@@ -1,25 +1,20 @@
-version: '1.0.0'
 apiVersion: v3.1.0
 kind: DataContract
 id: 2636c98e-0dec-4d3d-895a-e7ba8339d6be
+version: 1.0.0
 status: active
 name: orders
-domain: ecommerce
-tenant: jaffleshop
-
 description:
   purpose: Order fact table with enriched order details
-
 schema:
   - name: orders
-    description: Order fact table for analytics with customer and location context
-    physicalName: marts.orders
+    description: Order fact table with enriched order details
     logicalType: object
     properties:
       - name: order_id
         description: Unique order identifier
         logicalType: string
-        physicalType: VARCHAR
+        physicalType: STRING
         required: true
         primaryKey: true
       - name: customer_id
@@ -30,7 +25,7 @@ schema:
       - name: location_id
         description: Location identifier (FK to locations dimension)
         logicalType: string
-        physicalType: VARCHAR
+        physicalType: STRING
         required: true
       - name: order_date
         description: Date order was placed
@@ -44,18 +39,18 @@ schema:
         required: true
       - name: order_total
         description: Total order amount in dollars
-        logicalType: number
-        physicalType: DOUBLE
+        logicalType: string
+        physicalType: NUMBER
         required: false
       - name: tax_paid
         description: Tax amount in dollars
-        logicalType: number
-        physicalType: DOUBLE
+        logicalType: string
+        physicalType: NUMBER
         required: false
       - name: subtotal
         description: Subtotal in dollars
-        logicalType: number
-        physicalType: DOUBLE
+        logicalType: string
+        physicalType: NUMBER
         required: false
       - name: item_count
         description: Number of items in order
@@ -67,11 +62,23 @@ schema:
         logicalType: boolean
         physicalType: BOOLEAN
         required: false
-
 customProperties:
+  - property: tableIndex
+    value: '0'
+  - property: apiVersion
+    value: v3.1.0
+  - property: version
+    value: 1.0.0
+  - property: status
+    value: active
+  - property: kind
+    value: DataContract
+  - property: odcsMetadata
+    value: '[object Object]'
+  - property: customProperties
+    value: '[object Object]'
   - property: system_id
     value: ad789620-a825-4bc4-afd7-429db96a6359
-
 tags:
   - mart
   - orders
