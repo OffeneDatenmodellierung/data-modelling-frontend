@@ -1,5 +1,5 @@
 id: 635103fe-6ebc-4b35-ab5c-2dd99005045c
-number: 2
+number: 2401111400
 title: Adopt Medallion Architecture for Data Layers
 status: accepted
 category: architecture
@@ -102,6 +102,4 @@ tags:
   - name: medallion
   - name: data-layers
   - name: patterns
-created_at: '2024-01-11T14:00:00Z'
-updated_at: '2024-01-11T14:00:00Z'
 decided_at: '2024-01-11T14:00:00Z'

@@ -1,5 +1,5 @@
 id: 3f8a2b1c-9d4e-4f5a-8c7b-6e5d4c3b2a1f
-number: 4
+number: 2501111000
 title: Data Modelling with Data Vault 2.0
 type: guide
 status: published
@@ -415,6 +415,3 @@ tags:
   - name: modelling
   - name: hash-keys
   - name: architecture
-created_at: '2025-01-11T10:00:00Z'
-updated_at: '2025-01-11T10:00:00Z'
-published_at: '2025-01-11T10:00:00Z'

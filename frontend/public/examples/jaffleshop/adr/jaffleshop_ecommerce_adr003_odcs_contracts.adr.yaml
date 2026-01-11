@@ -1,5 +1,5 @@
 id: 38d932cf-02c3-4b0c-af9f-8bc3efcfec77
-number: 3
+number: 2401121030
 title: Use ODCS Data Contracts for Schema Documentation
 status: accepted
 category: process
@@ -104,6 +104,4 @@ tags:
   - name: odcs
   - name: governance
   - name: documentation
-created_at: '2024-01-12T10:30:00Z'
-updated_at: '2024-01-12T10:30:00Z'
 decided_at: '2024-01-12T10:30:00Z'
