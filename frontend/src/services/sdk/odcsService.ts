@@ -293,7 +293,7 @@ class ODCSService {
               const workspaceId = normalized.workspace_id || generateUUID();
 
               // Clean tables (remove complex nested objects, but preserve metadata including system_id)
-              // SDK export_to_odcs_yaml expects camelCase field names
+              // SDK 1.14.2+ export_to_odcs_yaml expects camelCase field names
               const cleanedTables = Array.isArray(normalized.tables)
                 ? normalized.tables.map((table: any) => {
                     const cleaned: any = {
@@ -304,22 +304,28 @@ class ODCSService {
                       // Ensure status is present (required by ODCS schema)
                       status: table.status || table.metadata?.status || 'draft',
                       columns: Array.isArray(table.columns)
-                        ? table.columns.map((col: any) => ({
-                            id: col.id,
-                            tableId: col.table_id,
-                            name: col.name,
-                            dataType: col.data_type,
-                            nullable: col.nullable ?? false,
-                            isPrimaryKey: col.is_primary_key ?? false,
-                            isForeignKey: col.is_foreign_key ?? false,
-                            order: col.order ?? 0,
-                            createdAt: col.created_at || now,
-                            ...(col.description && { description: col.description }),
-                            ...(col.foreign_key_reference && {
-                              foreignKeyReference: col.foreign_key_reference,
-                            }),
-                            ...(col.default_value && { defaultValue: col.default_value }),
-                          }))
+                        ? table.columns.map((col: any) => {
+                            const column: any = {
+                              id: col.id,
+                              tableId: col.table_id,
+                              name: col.name,
+                              dataType: col.data_type || col.dataType || 'string',
+                              nullable: col.nullable ?? false,
+                              primaryKey: col.is_primary_key ?? col.primaryKey ?? false,
+                              order: col.order ?? 0,
+                              createdAt: col.created_at || col.createdAt || now,
+                            };
+                            // Only add foreignKey as an object if there's a reference
+                            if (col.is_foreign_key || col.foreignKey) {
+                              column.foreignKey = {
+                                columnId:
+                                  col.foreign_key_reference || col.foreignKeyReference || null,
+                              };
+                            }
+                            if (col.description) column.description = col.description;
+                            if (col.default_value) column.defaultValue = col.default_value;
+                            return column;
+                          })
                         : [],
                       createdAt: table.created_at || now,
                       updatedAt: table.last_modified_at || table.updated_at || now,
@@ -365,7 +371,7 @@ class ODCSService {
                   })
                 : [];
 
-              // Clean relationships (SDK expects camelCase)
+              // Clean relationships (SDK 1.14.2+ expects camelCase)
               const cleanedRelationships = Array.isArray(normalized.relationships)
                 ? normalized.relationships.map((rel: any) => ({
                     id: rel.id,
@@ -382,7 +388,7 @@ class ODCSService {
                   }))
                 : [];
 
-              // Create DataModel structure with all required fields (SDK expects camelCase)
+              // Create DataModel structure with all required fields (SDK 1.14.2+ expects camelCase)
               const dataModel = {
                 id: workspaceId,
                 name: (normalized as any).name || 'Workspace',
@@ -1992,6 +1998,250 @@ class ODCSService {
         valid: false,
         errors: [error instanceof Error ? error.message : 'Validation failed'],
       };
+    }
+  }
+
+  /**
+   * Convert a frontend Table object to SDK export format
+   * The SDK expects a specific Table structure with camelCase field names
+   */
+  private tableToSDKFormat(table: Table): Record<string, unknown> {
+    // Transform columns to SDK format
+    const sdkColumns = (table.columns || []).map((col) => ({
+      id: col.id,
+      name: col.name,
+      dataType: col.data_type,
+      ...(col.description && { description: col.description }),
+      nullable: col.nullable !== false, // Default to true if not specified
+      ...(col.is_primary_key && { primaryKey: true }),
+      ...(col.is_foreign_key && { foreignKey: true }),
+      ...(col.default_value && { defaultValue: col.default_value }),
+    }));
+
+    // Transform SLA to SDK format (array of {property, value, unit})
+    const sdkSla: Array<{ property: string; value: number | string; unit?: string }> = [];
+    if (table.sla) {
+      if (table.sla.latency !== undefined) {
+        sdkSla.push({ property: 'latency', value: table.sla.latency, unit: 'milliseconds' });
+      }
+      if (table.sla.uptime !== undefined) {
+        sdkSla.push({ property: 'uptime', value: table.sla.uptime, unit: 'percent' });
+      }
+      if (table.sla.response_time !== undefined) {
+        sdkSla.push({
+          property: 'response_time',
+          value: table.sla.response_time,
+          unit: 'milliseconds',
+        });
+      }
+      if (table.sla.error_rate !== undefined) {
+        sdkSla.push({ property: 'error_rate', value: table.sla.error_rate, unit: 'percent' });
+      }
+      if (table.sla.update_frequency) {
+        sdkSla.push({ property: 'update_frequency', value: table.sla.update_frequency });
+      }
+    }
+
+    // Transform owner to SDK format
+    const sdkOwner = table.owner
+      ? {
+          ...(table.owner.name && { name: table.owner.name }),
+          ...(table.owner.email && { email: table.owner.email }),
+        }
+      : undefined;
+
+    // Build SDK Table structure
+    const sdkTable: Record<string, unknown> = {
+      id: table.id,
+      name: table.name,
+      columns: sdkColumns,
+      ...(table.alias && { alias: table.alias }),
+      ...(table.description && { notes: table.description }),
+      ...(table.tags && table.tags.length > 0 && { tags: table.tags }),
+      ...(table.data_level && { medallionLayers: [table.data_level] }),
+      ...(sdkOwner && Object.keys(sdkOwner).length > 0 && { contactDetails: sdkOwner }),
+      ...(sdkSla.length > 0 && { sla: sdkSla }),
+      createdAt: table.created_at,
+      updatedAt: table.last_modified_at,
+    };
+
+    return sdkTable;
+  }
+
+  /**
+   * Convert a frontend Table object to ODCS v3.1.0 format for SDK export
+   * The SDK expects ODCS Data Contract format, not the internal frontend Table type
+   */
+  // @ts-expect-error - Method retained for potential future use with ODCS Data Contract export
+  private _tableToODCSFormat(table: Table): Record<string, unknown> {
+    const now = new Date().toISOString();
+
+    // Build schema properties from columns
+    const schemaProperties = (table.columns || []).map((col) => ({
+      name: col.name,
+      ...(col.description && { description: col.description }),
+      logicalType: this.mapDataTypeToLogicalType(col.data_type),
+      physicalType: col.data_type,
+      ...(col.is_primary_key && { primaryKey: true }),
+      ...(col.is_foreign_key && { foreignKey: true }),
+      ...(col.nullable === false && { required: true }),
+      ...(col.default_value && { default: col.default_value }),
+    }));
+
+    // Build ODCS v3.1.0 Data Contract structure
+    const odcsContract: Record<string, unknown> = {
+      apiVersion: 'v3.1.0',
+      kind: 'DataContract',
+      id: table.id,
+      version: '1.0.0',
+      status: (table as any).metadata?.status || 'active',
+      name: table.name,
+
+      // Optional description
+      ...(table.description && {
+        description: {
+          purpose: table.description,
+        },
+      }),
+
+      // Domain
+      ...(table.primary_domain_id && { domain: table.primary_domain_id }),
+
+      // Owner information
+      ...(table.owner && {
+        owner: {
+          ...(table.owner.name && { name: table.owner.name }),
+          ...(table.owner.email && { email: table.owner.email }),
+          ...(table.owner.team && { team: table.owner.team }),
+        },
+      }),
+
+      // Tags
+      ...(table.tags && table.tags.length > 0 && { tags: table.tags }),
+
+      // SLA
+      ...(table.sla && { sla: table.sla }),
+
+      // Team
+      ...(table.team && table.team.length > 0 && { team: table.team }),
+
+      // Roles
+      ...(table.roles && table.roles.length > 0 && { roles: table.roles }),
+
+      // Support channels
+      ...(table.support && table.support.length > 0 && { support: table.support }),
+
+      // Pricing
+      ...(table.pricing && { pricing: table.pricing }),
+
+      // Quality rules
+      ...(table.quality_rules && { quality: table.quality_rules }),
+
+      // Schema array with table definition
+      schema: [
+        {
+          name: table.name,
+          ...(table.description && { description: table.description }),
+          logicalType: 'object',
+          columns: schemaProperties,
+        },
+      ],
+
+      // Timestamps
+      contractCreatedTs: table.created_at || now,
+    };
+
+    return odcsContract;
+  }
+
+  /**
+   * Export a table to Markdown format
+   * Uses SDK 1.14.2+ export_odcs_yaml_to_markdown method
+   * Converts table to ODCS YAML first, then exports to Markdown
+   */
+  async exportTableToMarkdown(table: Table): Promise<string> {
+    if (!sdkLoader.hasODCSExport()) {
+      throw new Error('ODCS Markdown export requires SDK 1.14.1 or later');
+    }
+
+    try {
+      await sdkLoader.load();
+      const sdk = sdkLoader.getModule();
+
+      // SDK 1.14.2+: Use export_odcs_yaml_to_markdown which accepts ODCS YAML directly
+      if (sdk && typeof (sdk as any).export_odcs_yaml_to_markdown === 'function') {
+        console.log('[ODCSService] Using export_odcs_yaml_to_markdown (SDK 1.14.2+)');
+        // Convert table to ODCS YAML using existing toYAML method
+        const odcsYaml = await this.toYAML({
+          tables: [table],
+          relationships: [],
+        });
+        console.log('[ODCSService] Markdown export - ODCS YAML length:', odcsYaml.length);
+        return (sdk as any).export_odcs_yaml_to_markdown(odcsYaml);
+      }
+
+      // Fallback to SDK 1.14.1 method if available
+      if (sdk && typeof (sdk as any).export_table_to_markdown === 'function') {
+        console.log('[ODCSService] Falling back to export_table_to_markdown (SDK 1.14.1)');
+        const sdkTable = this.tableToSDKFormat(table);
+        const tableJson = JSON.stringify(sdkTable);
+        return (sdk as any).export_table_to_markdown(tableJson);
+      }
+
+      throw new Error('SDK export_odcs_yaml_to_markdown method not available');
+    } catch (error) {
+      console.error('[ODCSService] Failed to export table to Markdown:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Export a table to PDF format
+   * Uses SDK 1.14.2+ export_odcs_yaml_to_pdf method
+   * Converts table to ODCS YAML first, then exports to PDF
+   * Returns base64-encoded PDF data
+   */
+  async exportTableToPDF(
+    table: Table,
+    branding?: { logo_base64?: string; company_name?: string; footer_text?: string }
+  ): Promise<{ pdf_base64: string }> {
+    if (!sdkLoader.hasODCSExport()) {
+      throw new Error('ODCS PDF export requires SDK 1.14.1 or later');
+    }
+
+    try {
+      await sdkLoader.load();
+      const sdk = sdkLoader.getModule();
+
+      // SDK 1.14.2+: Use export_odcs_yaml_to_pdf which accepts ODCS YAML directly
+      if (sdk && typeof (sdk as any).export_odcs_yaml_to_pdf === 'function') {
+        console.log('[ODCSService] Using export_odcs_yaml_to_pdf (SDK 1.14.2+)');
+        // Convert table to ODCS YAML using existing toYAML method
+        const odcsYaml = await this.toYAML({
+          tables: [table],
+          relationships: [],
+        });
+        console.log('[ODCSService] PDF export - ODCS YAML length:', odcsYaml.length);
+        const brandingJson = branding ? JSON.stringify(branding) : null;
+        const resultJson = (sdk as any).export_odcs_yaml_to_pdf(odcsYaml, brandingJson);
+        return JSON.parse(resultJson);
+      }
+
+      // Fallback to SDK 1.14.1 method if available
+      if (sdk && typeof (sdk as any).export_table_to_pdf === 'function') {
+        console.log('[ODCSService] Falling back to export_table_to_pdf (SDK 1.14.1)');
+        const sdkTable = this.tableToSDKFormat(table);
+        const tableJson = JSON.stringify(sdkTable);
+        console.log('[ODCSService] PDF export - SDK Table JSON length:', tableJson.length);
+        const brandingJson = branding ? JSON.stringify(branding) : null;
+        const resultJson = (sdk as any).export_table_to_pdf(tableJson, brandingJson);
+        return JSON.parse(resultJson);
+      }
+
+      throw new Error('SDK export_odcs_yaml_to_pdf method not available');
+    } catch (error) {
+      console.error('[ODCSService] Failed to export table to PDF:', error);
+      throw error;
     }
   }
 
