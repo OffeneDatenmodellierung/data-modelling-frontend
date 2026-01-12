@@ -134,6 +134,12 @@ jobs:
           name: dist
           path: frontend/dist
 
+      - name: Create release archive
+        if: steps.check_tag.outputs.exists == 'false'
+        run: |
+          cd frontend
+          zip -r dist-v${{ steps.version.outputs.version }}.zip dist
+
       - name: Create Release
         if: steps.check_tag.outputs.exists == 'false'
         uses: softprops/action-gh-release@v1
@@ -144,6 +150,6 @@ jobs:
           prerelease: false
           generate_release_notes: true
           files: |
-            frontend/dist/**/*
+            frontend/dist-v${{ steps.version.outputs.version }}.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
