@@ -45,22 +45,98 @@ export const WorkspaceList: React.FC<WorkspaceListProps> = ({
           message: 'Loaded latest files from disk',
         });
       } else if (!result.success && result.error) {
-        // Failed to reload - show warning but continue with cached data
+        // Failed to reload - show warning but continue with workspace data
         addToast({
           type: 'warning',
           message: result.error,
         });
+        // Load from workspace object if it has embedded data
+        await loadWorkspaceDataFromObject(workspace);
+      } else {
+        // No directory handle available - load from workspace object if it has data
+        await loadWorkspaceDataFromObject(workspace);
       }
-      // If result.success && !result.reloaded, silently use cached data (no handle available)
     } catch (error) {
       console.error('[WorkspaceList] Error reloading from disk:', error);
-      // Continue with cached data on error
+      // Try loading from workspace object as fallback
+      await loadWorkspaceDataFromObject(workspace);
     }
 
     setCurrentWorkspace(workspace.id);
     onWorkspaceSelect?.(workspace.id);
     setLoadingId(null);
     navigate(`/workspace/${workspace.id}`);
+  };
+
+  // Helper function to load data from workspace object into model store
+  const loadWorkspaceDataFromObject = async (workspace: Workspace) => {
+    const workspaceData = workspace as any;
+
+    // Only load if workspace has embedded data
+    const hasData =
+      workspaceData.tables ||
+      workspaceData.systems ||
+      workspaceData.relationships ||
+      workspaceData.domains;
+
+    if (!hasData) {
+      console.log(
+        '[WorkspaceList] Workspace has no embedded data, ModelEditor will handle loading'
+      );
+      return;
+    }
+
+    console.log('[WorkspaceList] Loading data from workspace object');
+
+    // Import model store dynamically
+    const { useModelStore } = await import('@/stores/modelStore');
+    const modelStore = useModelStore.getState();
+
+    // Load all data types if present
+    if (workspaceData.domains && Array.isArray(workspaceData.domains)) {
+      modelStore.setDomains(workspaceData.domains);
+      if (workspaceData.domains.length > 0) {
+        modelStore.setSelectedDomain(workspaceData.domains[0].id);
+      }
+    }
+    if (workspaceData.tables && Array.isArray(workspaceData.tables)) {
+      modelStore.setTables(workspaceData.tables);
+    }
+    if (workspaceData.relationships && Array.isArray(workspaceData.relationships)) {
+      modelStore.setRelationships(workspaceData.relationships);
+    }
+    if (workspaceData.systems && Array.isArray(workspaceData.systems)) {
+      modelStore.setSystems(workspaceData.systems);
+    }
+    if (workspaceData.products && Array.isArray(workspaceData.products)) {
+      modelStore.setProducts(workspaceData.products);
+    }
+    if (workspaceData.assets && Array.isArray(workspaceData.assets)) {
+      modelStore.setComputeAssets(workspaceData.assets);
+    }
+    if (workspaceData.bpmnProcesses && Array.isArray(workspaceData.bpmnProcesses)) {
+      modelStore.setBPMNProcesses(workspaceData.bpmnProcesses);
+    }
+    if (workspaceData.dmnDecisions && Array.isArray(workspaceData.dmnDecisions)) {
+      modelStore.setDMNDecisions(workspaceData.dmnDecisions);
+    }
+
+    // Load knowledge and decision records if present
+    if (workspaceData.knowledgeArticles && Array.isArray(workspaceData.knowledgeArticles)) {
+      const { useKnowledgeStore } = await import('@/stores/knowledgeStore');
+      useKnowledgeStore.getState().setArticles(workspaceData.knowledgeArticles);
+    }
+    if (workspaceData.decisionRecords && Array.isArray(workspaceData.decisionRecords)) {
+      const { useDecisionStore } = await import('@/stores/decisionStore');
+      useDecisionStore.getState().setDecisions(workspaceData.decisionRecords);
+    }
+
+    console.log('[WorkspaceList] Loaded data from workspace object:', {
+      domains: workspaceData.domains?.length || 0,
+      tables: workspaceData.tables?.length || 0,
+      systems: workspaceData.systems?.length || 0,
+      relationships: workspaceData.relationships?.length || 0,
+    });
   };
 
   const handleDelete = async (workspaceId: string, e: React.MouseEvent) => {

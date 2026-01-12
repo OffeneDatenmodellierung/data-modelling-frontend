@@ -219,6 +219,35 @@ const ModelEditor: React.FC = () => {
     };
   }, [workspaceId]);
 
+  // Clear model store when leaving workspace (navigating away)
+  // This prevents stale data from appearing when returning to a different workspace
+  useEffect(() => {
+    return () => {
+      // Cleanup on unmount - clear model store to prevent stale data
+      const modelStore = useModelStore.getState();
+      console.log('[ModelEditor] Unmounting - clearing stores to prevent stale data');
+      modelStore.setTables([]);
+      modelStore.setRelationships([]);
+      modelStore.setSystems([]);
+      modelStore.setProducts([]);
+      modelStore.setComputeAssets([]);
+      modelStore.setBPMNProcesses([]);
+      modelStore.setDMNDecisions([]);
+      modelStore.setDomains([]);
+      modelStore.setSelectedDomain(null);
+      modelStore.setSelectedTable(null);
+      modelStore.setSelectedSystem(null);
+
+      // Also clear knowledge and decision stores
+      import('@/stores/knowledgeStore').then(({ useKnowledgeStore }) => {
+        useKnowledgeStore.getState().setArticles([]);
+      });
+      import('@/stores/decisionStore').then(({ useDecisionStore }) => {
+        useDecisionStore.getState().setDecisions([]);
+      });
+    };
+  }, []);
+
   // Handle browser refresh
   useEffect(() => {
     const handleBeforeUnload = async (e: BeforeUnloadEvent) => {

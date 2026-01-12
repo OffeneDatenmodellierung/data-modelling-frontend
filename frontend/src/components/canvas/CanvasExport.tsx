@@ -72,7 +72,6 @@ export const CanvasExport: React.FC<CanvasExportProps> = ({ filenamePrefix = 'ca
 
       // Calculate bounds of all nodes
       const nodesBounds = getNodesBounds(nodes);
-      const currentViewport = getViewport();
 
       // Add padding around the bounds
       const padding = 50;
