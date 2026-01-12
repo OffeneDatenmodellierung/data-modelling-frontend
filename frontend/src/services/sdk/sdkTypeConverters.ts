@@ -165,6 +165,7 @@ export function sdkDecisionToFrontend(sdk: SDKDecision): Decision {
     options: (sdk.options || []).map(sdkDecisionOptionToFrontend),
     domain_id: sdk.domainId || undefined,
     workspace_id: sdk.workspaceId || undefined,
+    date: sdk.date || undefined, // SDK 2.0.0 date field
     superseded_by: sdk.supersededBy || undefined,
     supersedes: sdk.supersedes || undefined,
     related_decisions: sdk.relatedDecisions || undefined,
@@ -196,6 +197,8 @@ export function frontendDecisionToSDK(frontend: Decision): SDKDecision {
     options: (frontend.options || []).map(frontendDecisionOptionToSDK),
     domainId: frontend.domain_id || null,
     workspaceId: frontend.workspace_id || null,
+    // SDK 2.0.0 requires 'date' field - use decided_at, created_at, or current date
+    date: frontend.decided_at || frontend.created_at || new Date().toISOString(),
     supersededBy: frontend.superseded_by || null,
     supersedes: frontend.supersedes || null,
     relatedDecisions: frontend.related_decisions || [],
@@ -220,6 +223,7 @@ function sdkDecisionOptionToFrontend(sdk: SDKDecisionOption): DecisionOption {
     description: sdk.description,
     pros: sdk.pros || [],
     cons: sdk.cons || [],
+    selected: sdk.selected,
   };
 }
 
@@ -232,6 +236,7 @@ function frontendDecisionOptionToSDK(frontend: DecisionOption): SDKDecisionOptio
     description: frontend.description,
     pros: frontend.pros || [],
     cons: frontend.cons || [],
+    selected: frontend.selected ?? false, // SDK 2.0.0 requires this field
   };
 }
 
