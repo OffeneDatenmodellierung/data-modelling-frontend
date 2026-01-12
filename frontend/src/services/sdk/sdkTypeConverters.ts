@@ -220,6 +220,7 @@ function sdkDecisionOptionToFrontend(sdk: SDKDecisionOption): DecisionOption {
     description: sdk.description,
     pros: sdk.pros || [],
     cons: sdk.cons || [],
+    selected: sdk.selected,
   };
 }
 
@@ -232,6 +233,7 @@ function frontendDecisionOptionToSDK(frontend: DecisionOption): SDKDecisionOptio
     description: frontend.description,
     pros: frontend.pros || [],
     cons: frontend.cons || [],
+    selected: frontend.selected ?? false, // SDK 2.0.0 requires this field
   };
 }
 
