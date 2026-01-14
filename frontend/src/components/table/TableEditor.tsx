@@ -1435,6 +1435,12 @@ export const TableEditor: React.FC<TableEditorProps> = ({ tableId, workspaceId, 
             table={table}
             isOpen={showTableMetadata}
             onClose={() => setShowTableMetadata(false)}
+            onSave={(metadataUpdates) => {
+              // Merge metadata updates with current table state without losing pending column changes
+              // The metadata modal only updates metadata-related fields, not columns/keys
+              updateTable(tableId, metadataUpdates);
+              setHasUnsavedChanges(true);
+            }}
           />
         )}
 
