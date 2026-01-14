@@ -35,9 +35,34 @@ export const TableMetadataModal: React.FC<TableMetadataModalProps> = ({
   const [tags, setTags] = useState<string[]>([]);
   const [tagsInput, setTagsInput] = useState('');
   const [metadata, setMetadata] = useState<Record<string, unknown>>({});
+  const [internalMetadata, setInternalMetadata] = useState<Record<string, unknown>>({});
   const [qualityRules, setQualityRules] = useState<Record<string, unknown>>({});
+  const [status, setStatus] = useState<string>('');
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+
+  // Internal metadata keys that should not be shown in the UI
+  const INTERNAL_METADATA_KEYS = [
+    'system_id',
+    'indexes',
+    'status',
+    'customProperties',
+    'apiVersion',
+    'version',
+    'kind',
+  ];
+
+  // Valid ODCS status values
+  const STATUS_OPTIONS = ['proposed', 'draft', 'active', 'deprecated', 'retired'] as const;
+
+  // Helper to get status from customProperties
+  const getStatusFromCustomProperties = (
+    customProps: Array<{ property: string; value: unknown }> | undefined
+  ): string => {
+    if (!customProps || !Array.isArray(customProps)) return '';
+    const statusProp = customProps.find((p) => p.property === 'status');
+    return typeof statusProp?.value === 'string' ? statusProp.value : '';
+  };
 
   // Initialize form when table changes
   useEffect(() => {
@@ -54,8 +79,24 @@ export const TableMetadataModal: React.FC<TableMetadataModalProps> = ({
       );
       setTags(editableTags);
       setTagsInput(editableTags.join(', '));
-      setMetadata(table.metadata || {});
+
+      // Separate internal metadata from user-editable metadata
+      const tableMetadata = table.metadata || {};
+      const internal: Record<string, unknown> = {};
+      const userEditable: Record<string, unknown> = {};
+      for (const [key, value] of Object.entries(tableMetadata)) {
+        if (INTERNAL_METADATA_KEYS.includes(key)) {
+          internal[key] = value;
+        } else {
+          userEditable[key] = value;
+        }
+      }
+      setInternalMetadata(internal);
+      setMetadata(userEditable);
+
       setQualityRules(table.quality_rules || {});
+      // Read status from customProperties (ODCS compliant)
+      setStatus(getStatusFromCustomProperties(table.customProperties));
       setHasUnsavedChanges(false);
     }
   }, [table]);
@@ -78,7 +119,16 @@ export const TableMetadataModal: React.FC<TableMetadataModalProps> = ({
         (t) => (t.username && t.username.trim().length > 0) || (t.name && t.name.trim().length > 0)
       );
 
+      // Build customProperties with status (ODCS compliant)
+      const updatedCustomProperties: Array<{ property: string; value: unknown }> = [
+        // Keep existing customProperties except status
+        ...(table.customProperties || []).filter((p) => p.property !== 'status'),
+        // Add status if set
+        ...(status ? [{ property: 'status', value: status }] : []),
+      ];
+
       const updates: Partial<Table> = {
+        customProperties: updatedCustomProperties.length > 0 ? updatedCustomProperties : undefined,
         owner: owner && (owner.name || owner.email) ? owner : undefined,
         roles: validRoles.length > 0 ? validRoles : undefined,
         support: validSupport.length > 0 ? validSupport : undefined,
@@ -105,7 +155,11 @@ export const TableMetadataModal: React.FC<TableMetadataModalProps> = ({
           const allTags = dmLevelTag ? [...tags, dmLevelTag] : tags;
           return allTags.length > 0 ? allTags : undefined;
         })(),
-        metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
+        // Merge user-editable metadata with preserved internal metadata
+        metadata: (() => {
+          const merged = { ...internalMetadata, ...metadata };
+          return Object.keys(merged).length > 0 ? merged : undefined;
+        })(),
         quality_rules: Object.keys(qualityRules).length > 0 ? qualityRules : undefined,
         last_modified_at: new Date().toISOString(),
       };
@@ -201,6 +255,32 @@ export const TableMetadataModal: React.FC<TableMetadataModalProps> = ({
                 <span className="font-medium text-gray-600">Data Level:</span>{' '}
                 <span className="text-gray-900 capitalize">{table.data_level}</span>
               </div>
+            )}
+          </div>
+          {/* Status Dropdown */}
+          <div className="mt-3">
+            <label htmlFor="table-status" className="block text-sm font-medium text-gray-600 mb-1">
+              Status
+            </label>
+            {isEditable ? (
+              <select
+                id="table-status"
+                value={status}
+                onChange={(e) => {
+                  setStatus(e.target.value);
+                  setHasUnsavedChanges(true);
+                }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+              >
+                <option value="">Select status...</option>
+                {STATUS_OPTIONS.map((opt) => (
+                  <option key={opt} value={opt}>
+                    {opt.charAt(0).toUpperCase() + opt.slice(1)}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <span className="text-gray-900 capitalize">{status || 'Not set'}</span>
             )}
           </div>
         </div>
@@ -1364,26 +1444,82 @@ export const TableMetadataModal: React.FC<TableMetadataModalProps> = ({
           )}
         </div>
 
-        {/* Metadata (JSON) */}
+        {/* Custom Metadata - Key/Value Pairs */}
         {isEditable && (
           <div>
-            <h3 className="text-sm font-semibold text-gray-700 mb-2">Custom Metadata (JSON)</h3>
-            <textarea
-              value={JSON.stringify(metadata, null, 2)}
-              onChange={(e) => {
-                try {
-                  const parsed = JSON.parse(e.target.value);
-                  setMetadata(parsed);
+            <h3 className="text-sm font-semibold text-gray-700 mb-2">Custom Metadata</h3>
+            <div className="space-y-2">
+              {Object.entries(metadata).map(([key, value], index) => (
+                <div key={index} className="flex gap-2 items-center">
+                  <input
+                    type="text"
+                    value={key}
+                    onChange={(e) => {
+                      const newKey = e.target.value;
+                      const entries = Object.entries(metadata);
+                      entries[index] = [newKey, value];
+                      setMetadata(Object.fromEntries(entries));
+                      setHasUnsavedChanges(true);
+                    }}
+                    placeholder="Key"
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                  />
+                  <input
+                    type="text"
+                    value={typeof value === 'string' ? value : JSON.stringify(value)}
+                    onChange={(e) => {
+                      const newValue = e.target.value;
+                      // Try to parse as JSON, otherwise keep as string
+                      let parsedValue: unknown = newValue;
+                      try {
+                        parsedValue = JSON.parse(newValue);
+                      } catch {
+                        // Keep as string
+                      }
+                      setMetadata({ ...metadata, [key]: parsedValue });
+                      setHasUnsavedChanges(true);
+                    }}
+                    placeholder="Value"
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const { [key]: _, ...rest } = metadata;
+                      setMetadata(rest);
+                      setHasUnsavedChanges(true);
+                    }}
+                    className="px-2 py-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded"
+                    title="Remove"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M6 18L18 6M6 6l12 12"
+                      />
+                    </svg>
+                  </button>
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={() => {
+                  const newKey = `key_${Object.keys(metadata).length + 1}`;
+                  setMetadata({ ...metadata, [newKey]: '' });
                   setHasUnsavedChanges(true);
-                } catch {
-                  // Invalid JSON, don't update
-                }
-              }}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm font-mono"
-              rows={6}
-              placeholder='{"quality_tier": "gold", "data_modeling_method": "dimensional"}'
-            />
-            <p className="mt-1 text-xs text-gray-500">Enter valid JSON for custom metadata</p>
+                }}
+                className="w-full px-3 py-2 text-sm border-2 border-dashed border-gray-300 rounded-md text-gray-600 hover:border-blue-500 hover:text-blue-600 transition-colors"
+              >
+                + Add Metadata
+              </button>
+            </div>
+            {Object.keys(metadata).length === 0 && (
+              <p className="mt-2 text-xs text-gray-500">
+                Add custom key-value pairs for additional metadata
+              </p>
+            )}
           </div>
         )}
 
