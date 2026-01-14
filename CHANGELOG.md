@@ -23,6 +23,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Dot notation detection only used as fallback for SQL imports without existing hierarchy
   - Maps original column IDs to preserve `parent_column_id` references when IDs are regenerated
   - Fixes nested columns being lost when saving after ODCS import
+- **Column Order Preservation**: Fixed column order not being preserved on save
+  - Columns are now sorted by `order` property before export to ODCS
+  - Checks both direct `order` property and `customProperties` array for order value
 - **KnowledgeStore Infinite Loop**: Fixed `setFilter` being called hundreds of times per second
   - Updated `setFilter` to support functional updates: `setFilter(prev => ({ ...prev, ... }))`
   - Removed `filter` from useEffect dependency arrays in KnowledgeList and DecisionList
