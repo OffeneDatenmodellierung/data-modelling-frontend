@@ -430,22 +430,20 @@ class ODCSService {
 
     // Build metadata
     const metadata: Record<string, unknown> = {};
-    if (table.metadata) Object.assign(metadata, table.metadata);
+    if (table.metadata) {
+      // Copy metadata but exclude internal fields that shouldn't be duplicated
+      const {
+        status: _status,
+        customProperties: _cp,
+        ...rest
+      } = table.metadata as Record<string, unknown>;
+      Object.assign(metadata, rest);
+    }
     if (table.apiVersion) metadata.apiVersion = table.apiVersion;
     if (table.version) metadata.version = table.version;
-    if (table.status) metadata.status = table.status;
+    // Note: status is stored in customProperties per ODCS spec, not in metadata
     if (table.kind) metadata.kind = table.kind;
-    if (table.customProperties) {
-      metadata.customProperties = table.customProperties;
-      // Also flatten customProperties to metadata
-      if (Array.isArray(table.customProperties)) {
-        for (const prop of table.customProperties) {
-          if (prop.property && prop.value !== undefined) {
-            metadata[prop.property] = prop.value;
-          }
-        }
-      }
-    }
+    // Note: customProperties are stored at table level, not duplicated in metadata
 
     // MIGRATION: Move contract-level tags to table tags (legacy files have tags at root)
     // This ensures tags like dm_level:Silver get applied to the table where they belong
@@ -1597,23 +1595,12 @@ class ODCSService {
     if (item.tableIndex !== undefined) metadata.tableIndex = item.tableIndex;
     if (item.apiVersion) metadata.apiVersion = item.apiVersion;
     if (item.version) metadata.version = item.version;
-    if (item.status) metadata.status = item.status;
+    // Note: status is stored in customProperties per ODCS spec, not in metadata
     if (item.kind) metadata.kind = item.kind;
     if (item.odcsMetadata && typeof item.odcsMetadata === 'object') {
       metadata.odcsMetadata = item.odcsMetadata;
     }
-
-    // Convert customProperties array to metadata object (ODCS v3.1.0 format)
-    // customProperties: [{ property: "system_id", value: "js-system-duckdb" }]
-    // Also store the raw customProperties for reference
-    if (item.customProperties && Array.isArray(item.customProperties)) {
-      metadata.customProperties = item.customProperties;
-      for (const prop of item.customProperties) {
-        if (prop.property && prop.value !== undefined) {
-          metadata[prop.property] = prop.value;
-        }
-      }
-    }
+    // Note: customProperties are stored at table level, not duplicated in metadata
 
     // Apply ODCL table-level metadata if provided
     // IMPORTANT: In ODCS format, description can be an object like { purpose: "..." }
@@ -1644,9 +1631,7 @@ class ODCSService {
       if (odclTableMetadata.version) {
         metadata.version = odclTableMetadata.version;
       }
-      if (odclTableMetadata.status) {
-        metadata.status = odclTableMetadata.status;
-      }
+      // Note: status is stored in customProperties per ODCS spec, not in metadata
 
       // Map ODCL owner fields to owner object
       if (odclTableMetadata.odcl_owner_team && !owner) {
@@ -2176,13 +2161,23 @@ class ODCSService {
       ...(col.default_value && { default: col.default_value }),
     }));
 
+    // Helper to get status from customProperties
+    const getStatusFromCustomProps = (
+      customProps: Array<{ property: string; value: unknown }> | undefined
+    ): string => {
+      if (!customProps || !Array.isArray(customProps)) return 'active';
+      const statusProp = customProps.find((p) => p.property === 'status');
+      return typeof statusProp?.value === 'string' ? statusProp.value : 'active';
+    };
+
     // Build ODCS v3.1.0 Data Contract structure
     const odcsContract: Record<string, unknown> = {
       apiVersion: 'v3.1.0',
       kind: 'DataContract',
       id: table.id,
       version: '1.0.0',
-      status: (table as any).metadata?.status || 'active',
+      // Status is stored in customProperties per ODCS spec
+      status: getStatusFromCustomProps(table.customProperties),
       name: table.name,
 
       // Optional description
