@@ -68,7 +68,7 @@ export const SDKErrorPage: React.FC<SDKErrorPageProps> = ({ error }) => {
               <p className="text-gray-700">This could be caused by:</p>
               <ul className="list-disc list-inside text-gray-700 space-y-1">
                 <li>The WASM file failed to download</li>
-                <li>Browser doesn't support WebAssembly</li>
+                <li>Browser does not support WebAssembly</li>
                 <li>Content Security Policy blocking WASM execution</li>
                 <li>Network issues preventing the SDK from loading</li>
               </ul>
@@ -77,7 +77,7 @@ export const SDKErrorPage: React.FC<SDKErrorPageProps> = ({ error }) => {
                 <li>Refresh the page</li>
                 <li>Clear browser cache and reload</li>
                 <li>Check browser console for additional errors</li>
-                <li>Ensure you're using a modern browser (Chrome, Firefox, Safari, Edge)</li>
+                <li>Ensure you are using a modern browser (Chrome, Firefox, Safari, Edge)</li>
               </ul>
             </div>
           )}
