@@ -979,6 +979,20 @@ class ODCSService {
       };
 
       /**
+       * Get column order from either direct property or customProperties
+       */
+      const getColumnOrder = (col: any): number => {
+        // Check direct order property first
+        if (col.order !== undefined) return col.order;
+        // Check customProperties array
+        if (Array.isArray(col.customProperties)) {
+          const orderProp = col.customProperties.find((p: any) => p.property === 'order');
+          if (orderProp?.value !== undefined) return orderProp.value as number;
+        }
+        return Number.MAX_SAFE_INTEGER; // Put columns without order at the end
+      };
+
+      /**
        * Recursively build properties with nested structure for array/object types
        * Reconstructs items.properties for arrays and properties for objects
        */
@@ -987,6 +1001,9 @@ class ODCSService {
         const levelColumns = allColumns.filter((col) =>
           parentId ? col.parent_column_id === parentId : !col.parent_column_id
         );
+
+        // Sort by order before mapping
+        levelColumns.sort((a, b) => getColumnOrder(a) - getColumnOrder(b));
 
         return levelColumns.map((col) => {
           const prop = columnToProperty(col);
