@@ -15,12 +15,14 @@ export interface TableMetadataModalProps {
   table: Table | null;
   isOpen: boolean;
   onClose: () => void;
+  onSave?: (updates: Partial<Table>) => void;
 }
 
 export const TableMetadataModal: React.FC<TableMetadataModalProps> = ({
   table,
   isOpen,
   onClose,
+  onSave,
 }) => {
   const { updateTable, updateTableRemote, selectedDomainId } = useModelStore();
   const { addToast } = useUIStore();
@@ -164,15 +166,20 @@ export const TableMetadataModal: React.FC<TableMetadataModalProps> = ({
         last_modified_at: new Date().toISOString(),
       };
 
-      // Update local state
-      updateTable(table.id, updates);
+      // If onSave callback is provided, use it (allows parent to merge with pending changes)
+      if (onSave) {
+        onSave(updates);
+      } else {
+        // Fallback: Update store directly (when used standalone)
+        updateTable(table.id, updates);
 
-      // Update remote if online
-      if (mode === 'online' && selectedDomainId) {
-        try {
-          await updateTableRemote(selectedDomainId, table.id, updates);
-        } catch (error) {
-          console.warn('Remote update failed, changes saved locally', error);
+        // Update remote if online
+        if (mode === 'online' && selectedDomainId) {
+          try {
+            await updateTableRemote(selectedDomainId, table.id, updates);
+          } catch (error) {
+            console.warn('Remote update failed, changes saved locally', error);
+          }
         }
       }
 
