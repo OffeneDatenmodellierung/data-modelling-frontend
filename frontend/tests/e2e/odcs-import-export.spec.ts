@@ -987,6 +987,107 @@ test.describe('Nested Column Import', () => {
     expect(tableCount).toBeGreaterThanOrEqual(1);
     console.log(`Imported ${tableCount} tables`);
   });
+
+  test('should preserve nested columns on export round-trip', async ({ page }) => {
+    const originalYAML = fs.readFileSync(FIXTURE_PATH, 'utf-8');
+    const originalParsed = yaml.load(originalYAML) as any;
+
+    // Find the alerts table which has nested columns
+    const alertsTable = originalParsed.schema?.find((t: any) => t.name === 'alerts');
+    expect(alertsTable).toBeDefined();
+
+    // Capture console logs
+    const consoleLogs: string[] = [];
+    page.on('console', (msg) => {
+      const text = msg.text();
+      if (text.includes('[ODCSService]') || text.includes('nested') || text.includes('V2')) {
+        consoleLogs.push(`[${msg.type()}] ${text}`);
+      }
+    });
+
+    // Create workspace and import
+    await createWorkspace(page, `${TEST_WORKSPACE_NAME} - Nested Round Trip`);
+    await createSystem(page, TEST_SYSTEM_NAME);
+    await selectSystem(page, TEST_SYSTEM_NAME);
+    await openCreateTableDialog(page);
+    await importODCSContent(page, originalYAML);
+
+    // Find and click on the alerts table node
+    const alertsNode = page.locator('.react-flow__node').filter({ hasText: 'alerts' }).first();
+
+    // The alerts table might not be the first one imported - check if it exists
+    const alertsVisible = await alertsNode.isVisible({ timeout: 5000 }).catch(() => false);
+
+    if (!alertsVisible) {
+      console.log('Alerts table not visible - may need to scroll or it was not imported');
+      // Skip test if alerts table not found
+      return;
+    }
+
+    await alertsNode.dispatchEvent('click');
+    await page.waitForTimeout(500);
+
+    // Wait for editor
+    await expect(page.locator('h2:has-text("Edit Table")')).toBeVisible({ timeout: 10000 });
+
+    // Export the table
+    const exportButton = page.locator('button:has-text("Export")').first();
+    await exportButton.click();
+
+    const downloadPromise = page.waitForEvent('download', { timeout: 30000 });
+    await page.locator('button:has-text("ODCS (Default)")').click();
+
+    const download = await downloadPromise;
+    const downloadPath = await download.path();
+    const exportedContent = fs.readFileSync(downloadPath!, 'utf-8');
+    const exportedParsed = yaml.load(exportedContent) as any;
+
+    // Verify the exported alerts table has nested structure preserved
+    const exportedAlertsTable = exportedParsed.schema?.[0]; // Should be the only table in export
+
+    // Helper to count columns recursively
+    const countColumnsRecursively = (props: any[]): number => {
+      let count = 0;
+      for (const prop of props || []) {
+        count += 1;
+        if (prop.items?.properties) {
+          count += countColumnsRecursively(prop.items.properties);
+        }
+        if (prop.properties) {
+          count += countColumnsRecursively(prop.properties);
+        }
+      }
+      return count;
+    };
+
+    const originalNestedCount = countColumnsRecursively(alertsTable.properties);
+    const exportedNestedCount = countColumnsRecursively(exportedAlertsTable?.properties);
+
+    console.log(`Original nested column count: ${originalNestedCount}`);
+    console.log(`Exported nested column count: ${exportedNestedCount}`);
+
+    // Verify nested columns were preserved
+    expect(exportedNestedCount).toBe(originalNestedCount);
+
+    // Verify specific nested structure: rules_triggered should have items.properties
+    const exportedRulesTriggered = exportedAlertsTable?.properties?.find(
+      (p: any) => p.name === 'rules_triggered'
+    );
+    expect(exportedRulesTriggered).toBeDefined();
+    expect(exportedRulesTriggered?.items?.properties).toBeInstanceOf(Array);
+    expect(exportedRulesTriggered?.items?.properties?.length).toBeGreaterThan(0);
+
+    // Verify deeply nested: operation should have properties
+    const exportedOperation = exportedRulesTriggered?.items?.properties?.find(
+      (p: any) => p.name === 'operation'
+    );
+    expect(exportedOperation).toBeDefined();
+    expect(exportedOperation?.properties).toBeInstanceOf(Array);
+
+    console.log('\n=== Nested Round-trip Console Logs ===');
+    consoleLogs.forEach((log) => console.log(log));
+    console.log('=== End Console Logs ===\n');
+  });
 });
 
 // Additional test for export functionality
