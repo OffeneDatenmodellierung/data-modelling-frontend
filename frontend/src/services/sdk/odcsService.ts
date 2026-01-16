@@ -957,25 +957,40 @@ class ODCSService {
           // Build customProperties array including order and is_foreign_key
           ...(() => {
             const customProps: Array<{ property: string; value: unknown }> = [];
-            // Add existing customProperties
+            // Add existing customProperties, excluding order and is_foreign_key (we'll add those fresh)
             if (col.customProperties && Array.isArray(col.customProperties)) {
-              customProps.push(...col.customProperties);
+              customProps.push(
+                ...col.customProperties.filter(
+                  (p: any) => p.property !== 'order' && p.property !== 'is_foreign_key'
+                )
+              );
             }
-            // Add order if not already in customProperties
-            if (col.order !== undefined && !customProps.find((p) => p.property === 'order')) {
+            // Always add current order value (from col.order, which reflects UI changes)
+            if (col.order !== undefined) {
               customProps.push({ property: 'order', value: col.order });
             }
-            // Add is_foreign_key if true and not already in customProperties
-            if (
-              col.is_foreign_key === true &&
-              !customProps.find((p) => p.property === 'is_foreign_key')
-            ) {
+            // Add is_foreign_key if true
+            if (col.is_foreign_key === true) {
               customProps.push({ property: 'is_foreign_key', value: true });
             }
             return customProps.length > 0 ? { customProperties: customProps } : {};
           })(),
           ...(col.quality && col.quality.length > 0 && { quality: col.quality }),
         };
+      };
+
+      /**
+       * Get column order from either direct property or customProperties
+       */
+      const getColumnOrder = (col: any): number => {
+        // Check direct order property first
+        if (col.order !== undefined) return col.order;
+        // Check customProperties array
+        if (Array.isArray(col.customProperties)) {
+          const orderProp = col.customProperties.find((p: any) => p.property === 'order');
+          if (orderProp?.value !== undefined) return orderProp.value as number;
+        }
+        return Number.MAX_SAFE_INTEGER; // Put columns without order at the end
       };
 
       /**
@@ -987,6 +1002,9 @@ class ODCSService {
         const levelColumns = allColumns.filter((col) =>
           parentId ? col.parent_column_id === parentId : !col.parent_column_id
         );
+
+        // Sort by order before mapping
+        levelColumns.sort((a, b) => getColumnOrder(a) - getColumnOrder(b));
 
         return levelColumns.map((col) => {
           const prop = columnToProperty(col);
