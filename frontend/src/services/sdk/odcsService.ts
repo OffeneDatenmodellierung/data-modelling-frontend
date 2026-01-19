@@ -829,7 +829,8 @@ class ODCSService {
 
   /**
    * Convert constraints/quality_rules object to ODCS quality array format
-   * ODCS v3.1.0 uses great-expectations format for quality rules
+   * ODCS v3.1.0 quality rules require: name, dimension, type
+   * For custom implementations (great-expectations), use type: "custom" with engine field
    *
    * @param constraints - Simple constraints object (e.g., { validValues: [...], minimum: 5 })
    * @param qualityRules - Quality rules object or existing quality array
@@ -839,9 +840,14 @@ class ODCSService {
     constraints?: Record<string, unknown>,
     qualityRules?: Record<string, unknown> | unknown[]
   ): unknown[] | undefined {
-    // If qualityRules is already an array, return it (already in ODCS format)
+    // If qualityRules is already an array, check if it's in correct ODCS format
     if (Array.isArray(qualityRules) && qualityRules.length > 0) {
-      return qualityRules;
+      // Check if already in correct ODCS format (has dimension field)
+      const firstRule = qualityRules[0] as Record<string, unknown>;
+      if (firstRule.dimension) {
+        return qualityRules;
+      }
+      // Otherwise it might be in old great-expectations format, convert it
     }
 
     const qualityArray: unknown[] = [];
@@ -854,11 +860,15 @@ class ODCSService {
         : {}),
     };
 
-    // Convert validValues to expect_column_values_to_be_in_set
+    // Convert validValues to ODCS format with great-expectations implementation
     if (allRules.validValues && Array.isArray(allRules.validValues)) {
       qualityArray.push({
-        type: 'expect_column_values_to_be_in_set',
+        name: 'Valid Values Check',
+        dimension: 'conformity',
+        type: 'custom',
+        engine: 'great-expectations',
         implementation: {
+          expectation: 'expect_column_values_to_be_in_set',
           kwargs: {
             value_set: allRules.validValues,
           },
@@ -866,24 +876,32 @@ class ODCSService {
       });
     }
 
-    // Convert minimum to expect_column_values_to_be_between
+    // Convert minimum/maximum to ODCS format
     if (allRules.minimum !== undefined || allRules.maximum !== undefined) {
       const kwargs: Record<string, unknown> = {};
       if (allRules.minimum !== undefined) kwargs.min_value = allRules.minimum;
       if (allRules.maximum !== undefined) kwargs.max_value = allRules.maximum;
       qualityArray.push({
-        type: 'expect_column_values_to_be_between',
+        name: 'Value Range Check',
+        dimension: 'accuracy',
+        type: 'custom',
+        engine: 'great-expectations',
         implementation: {
+          expectation: 'expect_column_values_to_be_between',
           kwargs,
         },
       });
     }
 
-    // Convert pattern to expect_column_values_to_match_regex
+    // Convert pattern to ODCS format
     if (allRules.pattern) {
       qualityArray.push({
-        type: 'expect_column_values_to_match_regex',
+        name: 'Pattern Match Check',
+        dimension: 'conformity',
+        type: 'custom',
+        engine: 'great-expectations',
         implementation: {
+          expectation: 'expect_column_values_to_match_regex',
           kwargs: {
             regex: allRules.pattern,
           },
@@ -891,34 +909,46 @@ class ODCSService {
       });
     }
 
-    // Convert minLength/maxLength to expect_column_value_lengths_to_be_between
+    // Convert minLength/maxLength to ODCS format
     if (allRules.minLength !== undefined || allRules.maxLength !== undefined) {
       const kwargs: Record<string, unknown> = {};
       if (allRules.minLength !== undefined) kwargs.min_value = allRules.minLength;
       if (allRules.maxLength !== undefined) kwargs.max_value = allRules.maxLength;
       qualityArray.push({
-        type: 'expect_column_value_lengths_to_be_between',
+        name: 'Length Check',
+        dimension: 'conformity',
+        type: 'custom',
+        engine: 'great-expectations',
         implementation: {
+          expectation: 'expect_column_value_lengths_to_be_between',
           kwargs,
         },
       });
     }
 
-    // Convert notNull to expect_column_values_to_not_be_null
+    // Convert notNull to ODCS format
     if (allRules.notNull === true) {
       qualityArray.push({
-        type: 'expect_column_values_to_not_be_null',
+        name: 'Not Null Check',
+        dimension: 'completeness',
+        type: 'custom',
+        engine: 'great-expectations',
         implementation: {
+          expectation: 'expect_column_values_to_not_be_null',
           kwargs: {},
         },
       });
     }
 
-    // Convert unique to expect_column_values_to_be_unique
+    // Convert unique to ODCS format
     if (allRules.unique === true) {
       qualityArray.push({
-        type: 'expect_column_values_to_be_unique',
+        name: 'Uniqueness Check',
+        dimension: 'uniqueness',
+        type: 'custom',
+        engine: 'great-expectations',
         implementation: {
+          expectation: 'expect_column_values_to_be_unique',
           kwargs: {},
         },
       });
