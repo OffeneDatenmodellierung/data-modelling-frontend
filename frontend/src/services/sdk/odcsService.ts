@@ -569,7 +569,7 @@ class ODCSService {
       tags: tableTags.length > 0 ? tableTags : undefined,
       model_type: table.model_type || 'logical',
       columns: normalizedColumns,
-      compoundKeys: this.normalizeCompoundKeys(table, tableId, now),
+      compoundKeys: this.normalizeCompoundKeys(table, tableId, now, normalizedColumns),
       owner,
       roles: table.roles,
       support: table.support,
@@ -828,6 +828,136 @@ class ODCSService {
   }
 
   /**
+   * Convert constraints/quality_rules object to ODCS quality array format
+   * ODCS v3.1.0 quality rules require: name, dimension, type
+   * For custom implementations (great-expectations), use type: "custom" with engine field
+   *
+   * @param constraints - Simple constraints object (e.g., { validValues: [...], minimum: 5 })
+   * @param qualityRules - Quality rules object or existing quality array
+   * @returns ODCS quality array or undefined if no rules
+   */
+  private constraintsToQualityArray(
+    constraints?: Record<string, unknown>,
+    qualityRules?: Record<string, unknown> | unknown[]
+  ): unknown[] | undefined {
+    // If qualityRules is already an array, check if it's in correct ODCS format
+    if (Array.isArray(qualityRules) && qualityRules.length > 0) {
+      // Check if already in correct ODCS format (has dimension field)
+      const firstRule = qualityRules[0] as Record<string, unknown>;
+      if (firstRule.dimension) {
+        return qualityRules;
+      }
+      // Otherwise it might be in old great-expectations format, convert it
+    }
+
+    const qualityArray: unknown[] = [];
+
+    // Merge constraints and qualityRules objects
+    const allRules: Record<string, unknown> = {
+      ...(constraints || {}),
+      ...(qualityRules && typeof qualityRules === 'object' && !Array.isArray(qualityRules)
+        ? qualityRules
+        : {}),
+    };
+
+    // Convert validValues to ODCS format with great-expectations implementation
+    if (allRules.validValues && Array.isArray(allRules.validValues)) {
+      qualityArray.push({
+        name: 'Valid Values Check',
+        dimension: 'conformity',
+        type: 'custom',
+        engine: 'great-expectations',
+        implementation: {
+          expectation: 'expect_column_values_to_be_in_set',
+          kwargs: {
+            value_set: allRules.validValues,
+          },
+        },
+      });
+    }
+
+    // Convert minimum/maximum to ODCS format
+    if (allRules.minimum !== undefined || allRules.maximum !== undefined) {
+      const kwargs: Record<string, unknown> = {};
+      if (allRules.minimum !== undefined) kwargs.min_value = allRules.minimum;
+      if (allRules.maximum !== undefined) kwargs.max_value = allRules.maximum;
+      qualityArray.push({
+        name: 'Value Range Check',
+        dimension: 'accuracy',
+        type: 'custom',
+        engine: 'great-expectations',
+        implementation: {
+          expectation: 'expect_column_values_to_be_between',
+          kwargs,
+        },
+      });
+    }
+
+    // Convert pattern to ODCS format
+    if (allRules.pattern) {
+      qualityArray.push({
+        name: 'Pattern Match Check',
+        dimension: 'conformity',
+        type: 'custom',
+        engine: 'great-expectations',
+        implementation: {
+          expectation: 'expect_column_values_to_match_regex',
+          kwargs: {
+            regex: allRules.pattern,
+          },
+        },
+      });
+    }
+
+    // Convert minLength/maxLength to ODCS format
+    if (allRules.minLength !== undefined || allRules.maxLength !== undefined) {
+      const kwargs: Record<string, unknown> = {};
+      if (allRules.minLength !== undefined) kwargs.min_value = allRules.minLength;
+      if (allRules.maxLength !== undefined) kwargs.max_value = allRules.maxLength;
+      qualityArray.push({
+        name: 'Length Check',
+        dimension: 'conformity',
+        type: 'custom',
+        engine: 'great-expectations',
+        implementation: {
+          expectation: 'expect_column_value_lengths_to_be_between',
+          kwargs,
+        },
+      });
+    }
+
+    // Convert notNull to ODCS format
+    if (allRules.notNull === true) {
+      qualityArray.push({
+        name: 'Not Null Check',
+        dimension: 'completeness',
+        type: 'custom',
+        engine: 'great-expectations',
+        implementation: {
+          expectation: 'expect_column_values_to_not_be_null',
+          kwargs: {},
+        },
+      });
+    }
+
+    // Convert unique to ODCS format
+    if (allRules.unique === true) {
+      qualityArray.push({
+        name: 'Uniqueness Check',
+        dimension: 'uniqueness',
+        type: 'custom',
+        engine: 'great-expectations',
+        implementation: {
+          expectation: 'expect_column_values_to_be_unique',
+          kwargs: {},
+        },
+      });
+    }
+
+    return qualityArray.length > 0 ? qualityArray : undefined;
+  }
+
+  /**
    * Convert workspace object to ODCS YAML format
    * Uses API when online, WASM SDK when offline
    */
@@ -975,7 +1105,14 @@ class ODCSService {
             }
             return customProps.length > 0 ? { customProperties: customProps } : {};
           })(),
-          ...(col.quality && col.quality.length > 0 && { quality: col.quality }),
+          // Convert constraints/quality_rules to ODCS quality array format
+          ...(() => {
+            const qualityArray = this.constraintsToQualityArray(
+              col.constraints,
+              col.quality || col.quality_rules
+            );
+            return qualityArray ? { quality: qualityArray } : {};
+          })(),
         };
       };
 
@@ -1033,6 +1170,56 @@ class ODCSService {
       };
 
       schemaEntry.properties = buildPropertiesRecursively(columns);
+
+      // Handle compound keys export
+      // 1. For compound PRIMARY keys: set primaryKeyPosition on columns (ODCS standard)
+      // 2. Store all compound keys in customProperties for round-trip (especially unique keys)
+      const compoundKeys = table.compoundKeys || table.compound_keys;
+      if (Array.isArray(compoundKeys) && compoundKeys.length > 0) {
+        // Build a map of column_id -> column name for lookup
+        const columnIdToName: Record<string, string> = {};
+        columns.forEach((col: any) => {
+          if (col.id && col.name) {
+            columnIdToName[col.id] = col.name;
+          }
+        });
+
+        // Set primaryKeyPosition for compound primary keys
+        compoundKeys.forEach((ck: any) => {
+          if (ck.is_primary && Array.isArray(ck.column_ids)) {
+            ck.column_ids.forEach((colId: string, position: number) => {
+              const colName = columnIdToName[colId];
+              if (colName) {
+                // Find the property in schemaEntry.properties and set primaryKeyPosition
+                const prop = schemaEntry.properties.find((p: any) => p.name === colName);
+                if (prop) {
+                  prop.primaryKey = true;
+                  prop.primaryKeyPosition = position + 1; // 1-based position per ODCS spec
+                }
+              }
+            });
+          }
+        });
+
+        // Store compound keys in customProperties for full round-trip support
+        // Convert to serializable format using column names instead of IDs
+        const serializedCompoundKeys = compoundKeys.map((ck: any) => ({
+          name: ck.name,
+          columns: (ck.column_ids || [])
+            .map((colId: string) => columnIdToName[colId])
+            .filter(Boolean),
+          is_primary: ck.is_primary ?? false,
+        }));
+
+        // Merge with existing customProperties
+        const existingCustomProps = Array.isArray(schemaEntry.customProperties)
+          ? schemaEntry.customProperties.filter((p: any) => p.property !== 'compoundKeys')
+          : [];
+        schemaEntry.customProperties = [
+          ...existingCustomProps,
+          { property: 'compoundKeys', value: serializedCompoundKeys },
+        ];
+      }
 
       return schemaEntry;
     });
@@ -2073,7 +2260,7 @@ class ODCSService {
       quality_rules: qualityRules,
       is_owned_by_domain: true, // Default to true for imported tables
       // Load compound keys (composite primary/unique keys) from YAML
-      compoundKeys: this.normalizeCompoundKeys(item, tableId, now),
+      compoundKeys: this.normalizeCompoundKeys(item, tableId, now, normalizedColumns),
       created_at: item.created_at || now,
       last_modified_at: item.last_modified_at || now,
     };
@@ -2081,9 +2268,61 @@ class ODCSService {
 
   /**
    * Normalize compound keys from YAML to CompoundKey[] type
+   * Supports multiple formats:
+   * 1. Direct compoundKeys/compound_keys array with column_ids
+   * 2. customProperties with compoundKeys using column names (ODCS export format)
+   * 3. Reconstructed from primaryKeyPosition on columns (ODCS standard)
    */
-  private normalizeCompoundKeys(item: any, tableId: string, now: string): any[] | undefined {
-    const rawKeys = item.compoundKeys || item.compound_keys;
+  private normalizeCompoundKeys(
+    item: any,
+    tableId: string,
+    now: string,
+    columns?: any[]
+  ): any[] | undefined {
+    // First check for direct compound keys
+    let rawKeys = item.compoundKeys || item.compound_keys;
+
+    // If not found, check customProperties for compoundKeys
+    if ((!rawKeys || rawKeys.length === 0) && item.customProperties) {
+      const customPropsArray = Array.isArray(item.customProperties) ? item.customProperties : [];
+      const compoundKeysProp = customPropsArray.find((p: any) => p.property === 'compoundKeys');
+      if (compoundKeysProp?.value && Array.isArray(compoundKeysProp.value)) {
+        // Convert from column names to column IDs
+        const colNameToId: Record<string, string> = {};
+        (columns || item.columns || item.properties || []).forEach((col: any) => {
+          if (col.name) {
+            colNameToId[col.name] = col.id || col.name; // Use name as fallback ID
+          }
+        });
+
+        rawKeys = compoundKeysProp.value.map((ck: any) => ({
+          name: ck.name,
+          column_ids: (ck.columns || [])
+            .map((colName: string) => colNameToId[colName] || colName)
+            .filter(Boolean),
+          is_primary: ck.is_primary ?? false,
+        }));
+      }
+    }
+
+    // If still not found, try to reconstruct from primaryKeyPosition on columns
+    if ((!rawKeys || rawKeys.length === 0) && columns) {
+      const pkColumns = columns
+        .filter((col: any) => col.primaryKeyPosition !== undefined && col.primaryKeyPosition > 0)
+        .sort((a: any, b: any) => a.primaryKeyPosition - b.primaryKeyPosition);
+
+      if (pkColumns.length > 1) {
+        // Multiple columns with primaryKeyPosition = compound primary key
+        rawKeys = [
+          {
+            name: 'Primary Key',
+            column_ids: pkColumns.map((col: any) => col.id || col.name),
+            is_primary: true,
+          },
+        ];
+      }
+    }
+
     if (!Array.isArray(rawKeys) || rawKeys.length === 0) {
       return undefined;
     }

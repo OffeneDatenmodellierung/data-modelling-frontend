@@ -80,6 +80,157 @@ const LabelWithTooltip: React.FC<{ label: string; tooltip: string; required?: bo
   </label>
 );
 
+// Comma-separated input component - uses local state to allow typing commas
+// Parses values on blur to avoid the issue of commas being stripped while typing
+const CommaSeparatedInput: React.FC<{
+  value: string[];
+  onChange: (values: string[]) => void;
+  label: string;
+  tooltip: string;
+  placeholder: string;
+  helpText?: string;
+  inputClassName?: string;
+}> = ({ value, onChange, label, tooltip, placeholder, helpText, inputClassName }) => {
+  const [inputValue, setInputValue] = useState(value.join(', '));
+
+  // Sync local state when external value changes (e.g., on initial load)
+  useEffect(() => {
+    setInputValue(value.join(', '));
+  }, [value]);
+
+  const parseValues = (text: string): string[] => {
+    return text
+      .split(',')
+      .map((v) => v.trim())
+      .filter((v) => v.length > 0);
+  };
+
+  const handleBlur = () => {
+    // Parse and update parent on blur
+    onChange(parseValues(inputValue));
+  };
+
+  return (
+    <div>
+      <LabelWithTooltip label={label} tooltip={tooltip} />
+      <input
+        type="text"
+        value={inputValue}
+        onChange={(e) => setInputValue(e.target.value)}
+        onBlur={handleBlur}
+        className={
+          inputClassName ||
+          'w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500'
+        }
+        placeholder={placeholder}
+      />
+      {helpText && <p className="text-xs text-gray-500 mt-1">{helpText}</p>}
+    </div>
+  );
+};
+
+// List-based Valid Values input component - displays values as removable tags
+// with the ability to add new values via input field
+const ValidValuesInput: React.FC<{
+  value: string[];
+  onChange: (values: string[]) => void;
+}> = ({ value, onChange }) => {
+  const [newValue, setNewValue] = useState('');
+
+  const handleAddValue = () => {
+    const trimmed = newValue.trim();
+    if (trimmed && !value.includes(trimmed)) {
+      onChange([...value, trimmed]);
+      setNewValue('');
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleAddValue();
+    } else if (e.key === ',' && newValue.trim()) {
+      // Allow adding values by typing comma
+      e.preventDefault();
+      handleAddValue();
+    }
+  };
+
+  const handleRemoveValue = (indexToRemove: number) => {
+    onChange(value.filter((_, index) => index !== indexToRemove));
+  };
+
+  const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    const pastedText = e.clipboardData.getData('text');
+    // Check if pasted text contains commas (multiple values)
+    if (pastedText.includes(',')) {
+      e.preventDefault();
+      const newValues = pastedText
+        .split(',')
+        .map((v) => v.trim())
+        .filter((v) => v.length > 0 && !value.includes(v));
+      if (newValues.length > 0) {
+        onChange([...value, ...newValues]);
+      }
+    }
+  };
+
+  return (
+    <div>
+      <LabelWithTooltip
+        label="Valid Values"
+        tooltip="List of allowed values (enumeration). Press Enter or comma to add each value."
+      />
+      {/* Display existing values as removable tags */}
+      {value.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mb-2 p-2 bg-gray-50 rounded border border-gray-200 max-h-32 overflow-y-auto">
+          {value.map((val, index) => (
+            <span
+              key={index}
+              className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 text-blue-800 text-xs rounded-full"
+            >
+              <span className="max-w-[150px] truncate" title={val}>
+                {val}
+              </span>
+              <button
+                type="button"
+                onClick={() => handleRemoveValue(index)}
+                className="text-blue-600 hover:text-blue-800 font-bold leading-none"
+                title="Remove value"
+              >
+                ×
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+      {/* Input for adding new values */}
+      <div className="flex gap-2">
+        <input
+          type="text"
+          value={newValue}
+          onChange={(e) => setNewValue(e.target.value)}
+          onKeyDown={handleKeyDown}
+          onPaste={handlePaste}
+          className="flex-1 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+          placeholder="Type a value and press Enter"
+        />
+        <button
+          type="button"
+          onClick={handleAddValue}
+          disabled={!newValue.trim()}
+          className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          Add
+        </button>
+      </div>
+      <p className="text-xs text-gray-500 mt-1">
+        Press Enter, comma, or click Add. Paste comma-separated values to add multiple at once.
+      </p>
+    </div>
+  );
+};
+
 // Classification options (ODCS standard)
 const CLASSIFICATION_OPTIONS = [
   { value: '', label: 'Select classification...' },
@@ -653,27 +804,14 @@ export const ColumnDetailsModal: React.FC<ColumnDetailsModalProps> = ({
                 />
               </div>
 
-              <div>
-                <LabelWithTooltip
-                  label="Examples"
-                  tooltip="Example values to help understand the expected data format and content."
-                />
-                <input
-                  type="text"
-                  value={examples.join(', ')}
-                  onChange={(e) =>
-                    setExamples(
-                      e.target.value
-                        .split(',')
-                        .map((s) => s.trim())
-                        .filter((s) => s)
-                    )
-                  }
-                  placeholder="e.g., John Doe, Jane Smith, Bob Wilson"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                <p className="text-xs text-gray-500 mt-1">Comma-separated list of example values</p>
-              </div>
+              <CommaSeparatedInput
+                value={examples}
+                onChange={setExamples}
+                label="Examples"
+                tooltip="Example values to help understand the expected data format and content."
+                placeholder="e.g., John Doe, Jane Smith, Bob Wilson"
+                helpText="Comma-separated list of example values"
+              />
             </div>
           )}
 
@@ -994,27 +1132,14 @@ export const ColumnDetailsModal: React.FC<ColumnDetailsModalProps> = ({
                 description="Document how this column is derived or transformed"
               />
 
-              <div>
-                <LabelWithTooltip
-                  label="Source Objects"
-                  tooltip="List of source tables, columns, or objects used to derive this column's value."
-                />
-                <input
-                  type="text"
-                  value={transformSourceObjects.join(', ')}
-                  onChange={(e) =>
-                    setTransformSourceObjects(
-                      e.target.value
-                        .split(',')
-                        .map((s) => s.trim())
-                        .filter((s) => s)
-                    )
-                  }
-                  placeholder="e.g., orders.total_amount, customers.discount_rate"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                <p className="text-xs text-gray-500 mt-1">Comma-separated list of source objects</p>
-              </div>
+              <CommaSeparatedInput
+                value={transformSourceObjects}
+                onChange={setTransformSourceObjects}
+                label="Source Objects"
+                tooltip="List of source tables, columns, or objects used to derive this column's value."
+                placeholder="e.g., orders.total_amount, customers.discount_rate"
+                helpText="Comma-separated list of source objects"
+              />
 
               <div>
                 <LabelWithTooltip
@@ -1233,29 +1358,12 @@ export const ColumnDetailsModal: React.FC<ColumnDetailsModalProps> = ({
                       )}
 
                       {rule.type === 'valid_values' && (
-                        <div>
-                          <LabelWithTooltip
-                            label="Valid Values"
-                            tooltip="List of allowed values (enumeration)"
-                          />
-                          <input
-                            type="text"
-                            value={rule.validValues?.join(', ') || ''}
-                            onChange={(e) =>
-                              handleUpdateQualityRule(index, {
-                                validValues: e.target.value
-                                  .split(',')
-                                  .map((v) => v.trim())
-                                  .filter((v) => v.length > 0),
-                              })
-                            }
-                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
-                            placeholder="active, inactive, pending"
-                          />
-                          <p className="text-xs text-gray-500 mt-1">
-                            Comma-separated list of valid values
-                          </p>
-                        </div>
+                        <ValidValuesInput
+                          value={rule.validValues || []}
+                          onChange={(validValues) =>
+                            handleUpdateQualityRule(index, { validValues })
+                          }
+                        />
                       )}
                     </div>
                   ))}
