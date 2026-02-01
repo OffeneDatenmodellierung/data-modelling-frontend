@@ -170,6 +170,7 @@ export class FileMigration {
     const dmnPattern = /\.dmn$/;
     const kbPattern = /_.*\.kb\.yaml$/;
     const adrPattern = /_.*\.adr\.yaml$/;
+    const sketchPattern = /_.*\.sketch\.json$/;
 
     return {
       workspace: fileNames.find((f) => workspacePattern.test(f)),
@@ -180,6 +181,7 @@ export class FileMigration {
       dmn: fileNames.filter((f) => dmnPattern.test(f)),
       kb: fileNames.filter((f) => kbPattern.test(f)),
       adr: fileNames.filter((f) => adrPattern.test(f)),
+      sketch: fileNames.filter((f) => sketchPattern.test(f)),
     };
   }
 
@@ -205,6 +207,7 @@ export class FileMigration {
       dmn: filterByPrefix(categorized.dmn),
       kb: filterByPrefix(categorized.kb),
       adr: filterByPrefix(categorized.adr),
+      sketch: filterByPrefix(categorized.sketch),
     };
   }
 

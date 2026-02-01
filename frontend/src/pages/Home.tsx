@@ -180,15 +180,18 @@ const Home: React.FC = () => {
       const workspace = await loadExampleWorkspace(example);
 
       // Pre-import all stores BEFORE populating data to avoid race conditions
-      const [{ useModelStore }, { useKnowledgeStore }, { useDecisionStore }] = await Promise.all([
-        import('@/stores/modelStore'),
-        import('@/stores/knowledgeStore'),
-        import('@/stores/decisionStore'),
-      ]);
+      const [{ useModelStore }, { useKnowledgeStore }, { useDecisionStore }, { useSketchStore }] =
+        await Promise.all([
+          import('@/stores/modelStore'),
+          import('@/stores/knowledgeStore'),
+          import('@/stores/decisionStore'),
+          import('@/stores/sketchStore'),
+        ]);
 
       const modelStore = useModelStore.getState();
       const knowledgeStore = useKnowledgeStore.getState();
       const decisionStore = useDecisionStore.getState();
+      const sketchStore = useSketchStore.getState();
 
       // Now populate all stores synchronously
       if ((workspace as any).domains) {
@@ -222,6 +225,9 @@ const Home: React.FC = () => {
       }
       if ((workspace as any).decisionRecords) {
         decisionStore.setDecisions((workspace as any).decisionRecords);
+      }
+      if ((workspace as any).sketches) {
+        sketchStore.setSketches((workspace as any).sketches);
       }
 
       // Select first domain if available
@@ -382,6 +388,13 @@ const Home: React.FC = () => {
           'record(s)'
         );
         useDecisionStore.getState().setDecisions((workspace as any).decisionRecords);
+      }
+
+      // Set sketches
+      if ((workspace as any).sketches) {
+        const { useSketchStore } = await import('@/stores/sketchStore');
+        console.log('[Home] Setting sketches:', (workspace as any).sketches.length, 'sketch(es)');
+        useSketchStore.getState().setSketches((workspace as any).sketches);
       }
 
       // Select first domain if available

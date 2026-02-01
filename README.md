@@ -11,6 +11,7 @@ A domain-centric data modelling application built with React and Electron. Creat
 
 - **Data Modelling**: Conceptual, logical, and physical models with crow's feet notation
 - **Infinite Canvas**: ReactFlow-based canvas for visualizing data models
+- **Excalidraw Sketches** (v2.5.0+): Freeform diagramming for architecture, dataflow, ER, sequence, flowchart, wireframe, and infrastructure diagrams
 - **Offline Mode**: **Currently only supports offline mode** - Works without API using local files and WASM SDK
 - **Import/Export**: Support for ODCS, SQL, AVRO, JSON Schema, and Protobuf formats
 - **Cross-Platform**: Electron desktop app (macOS, Windows, Linux)
@@ -187,19 +188,25 @@ frontend/
 
 ## WASM SDK Integration
 
-The application uses a WASM build of the `data-modelling-sdk` (version **1.13.6**) for offline functionality:
+The application uses a WASM build of the `data-modelling-sdk` (version **2.1.0**) for offline functionality:
 
-1. **SDK Version**: Requires `data-modelling-sdk = "1.13.6"` crate
+1. **SDK Version**: Requires `@offenedatenmodellierung/data-modelling-sdk = "^2.1.0"` npm package
 2. **Build Process**: The SDK is built using `wasm-pack` and copied to `public/wasm/`
 3. **Automatic Build**: Runs automatically before `npm run build` via `prebuild` script
 4. **Development**: Can be built manually with `npm run build:wasm`
 5. **Fallback**: If WASM SDK is not available, the app uses a JavaScript YAML parser fallback
 
-**Note**: The SDK must be version 1.13.6 or compatible. The API project (`data-modelling-api`) is available on [crates.io](https://crates.io/crates/data-modelling-api) and uses `data-modelling-sdk = "1.13.6"` with features `["api-backend", "git"]`.
+**Note**: The SDK must be version 2.1.0 or compatible for full sketch support.
 
-### SDK 1.13.1 Features
+### SDK 2.1.0 Features
 
-The SDK 1.13.1 release includes these new capabilities:
+The SDK 2.1.0 release includes these capabilities:
+
+- **Excalidraw Sketches** (NEW in v2.5.0): Freeform diagramming integration
+  - Sketch types: architecture, dataflow, entity-relationship, sequence, flowchart, wireframe, concept, infrastructure
+  - Status workflow: draft → review → published → archived
+  - Link sketches to tables, systems, decisions, and knowledge articles
+  - Export to PNG, SVG, and JSON formats
 
 - **Decision Logs (MADR)**: Architecture Decision Records following the MADR format
   - Status workflow: Draft → Proposed → Accepted/Rejected → Superseded

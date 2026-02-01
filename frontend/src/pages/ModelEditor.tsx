@@ -36,6 +36,7 @@ import { filterService } from '@/services/sdk/filterService';
 import { SharedResourcePicker } from '@/components/domain/SharedResourcePicker';
 import { DecisionPanel } from '@/components/decision/DecisionPanel';
 import { KnowledgePanel } from '@/components/knowledge/KnowledgePanel';
+import { SketchPanel } from '@/components/sketch/SketchPanel';
 import type { SharedResourceReference } from '@/types/domain';
 
 const ModelEditor: React.FC = () => {
@@ -651,10 +652,19 @@ const ModelEditor: React.FC = () => {
               domainId={selectedDomainId}
             />
           )}
+          {selectedDomainId && workspaceId && currentView === 'sketch' && (
+            <SketchPanel
+              workspacePath={
+                domains.find((d) => d.id === selectedDomainId)?.workspace_path || workspaceId
+              }
+              domainId={selectedDomainId}
+            />
+          )}
           {selectedDomainId &&
             workspaceId &&
             currentView !== 'decisions' &&
-            currentView !== 'knowledge' && (
+            currentView !== 'knowledge' &&
+            currentView !== 'sketch' && (
               <DomainCanvas
                 key={canvasRefreshKey}
                 workspaceId={workspaceId}

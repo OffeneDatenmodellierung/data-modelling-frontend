@@ -1119,7 +1119,8 @@ class LocalFileService {
     allBpmnProcesses: BPMNProcess[],
     allDmnDecisions: DMNDecision[],
     allKnowledgeArticles: import('@/types/knowledge').KnowledgeArticle[] = [],
-    allDecisionRecords: import('@/types/decision').Decision[] = []
+    allDecisionRecords: import('@/types/decision').Decision[] = [],
+    allSketches: import('@/types/sketch').Sketch[] = []
   ): Promise<void> {
     console.log('[LocalFileService] Saving workspace in V2 format:', workspace.name);
 
@@ -1135,7 +1136,8 @@ class LocalFileService {
       allBpmnProcesses,
       allDmnDecisions,
       allKnowledgeArticles,
-      allDecisionRecords
+      allDecisionRecords,
+      allSketches
     );
 
     const workspaceName = FileMigration.sanitizeFileName(workspace.name);

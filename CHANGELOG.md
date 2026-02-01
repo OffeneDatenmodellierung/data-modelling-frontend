@@ -7,6 +7,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.5.0] - 2026-02-01
+
+### Added
+- **Excalidraw Sketches**: New freeform diagramming feature with Excalidraw integration
+  - Sketch types: architecture, dataflow, entity-relationship, sequence, flowchart, wireframe, concept, infrastructure, other
+  - Status workflow: draft → review → published → archived
+  - Per-domain organization with sequential numbering
+  - Full-featured editor with toolbar and modal interface
+  - Read-only viewer mode with export options
+  - List view with thumbnails and filtering (by status, type, search)
+  - Link sketches to tables, systems, decisions, and knowledge articles
+  - Related sketches cross-referencing
+  - Export to PNG, SVG, and JSON formats
+- **Sketch Components**:
+  - `ExcalidrawEditor`: Modal editor following BPMNEditor pattern with deferred initialization
+  - `SketchPanel`: Two-panel layout (list + viewer/editor) following KnowledgePanel pattern
+  - `SketchList`: Filterable list with thumbnail previews
+  - `SketchViewer`: Read-only view with export dropdown
+- **Sketch Service**: Parse, validate, and export utilities in `sketchService.ts`
+  - Dual format parsing (SDK camelCase and frontend snake_case)
+  - Full validation against SDK v2.1.0 sketch-schema.json
+  - Thumbnail generation
+  - PNG/SVG export via Excalidraw utilities
+- **Sketch Store**: Zustand store in `sketchStore.ts`
+  - CRUD operations with auto-numbering per domain
+  - Linking operations for tables, systems, articles, decisions, related sketches
+  - Filtering by domain, status, type, and search term
+  - Selectors: `getSketchesByDomain`, `getSketchesByStatus`, `getSketchesByType`, `getNextNumber`
+- **Workspace Persistence**: Sketches saved to `sketches/` directory
+  - File pattern: `{workspace}_{domain}_{name}.sketch.json`
+  - Global sketches: `{workspace}_global_{name}.sketch.json`
+  - Integrated with workspaceV2Loader and workspaceV2Saver
+- **Sketch Tests**: Comprehensive unit test coverage
+  - `sketchStore.test.ts`: 50 tests for store operations
+  - `sketchService.test.ts`: 37 tests for service utilities
+
+### Changed
+- **SDK Upgrade**: Upgraded `@offenedatenmodellierung/data-modelling-sdk` from v2.0.9 to v2.1.0
+  - SDK v2.1.0 includes comprehensive sketch support with sketch-schema.json
+  - New SketchType and SketchStatus enums
+  - Linked assets, decisions, and knowledge fields
+- **View Modes**: Added 'sketch' to ViewMode type for Sketch panel navigation
+- **Editor Modal**: Extended EditorType union to include 'excalidraw'
+- **Test Count**: Increased from 657 to 744 tests
+
+### Dependencies
+- Added `@excalidraw/excalidraw: ^0.17.6` for freeform diagramming
+
 ## [2.4.3] - 2026-01-28
 
 ### Changed

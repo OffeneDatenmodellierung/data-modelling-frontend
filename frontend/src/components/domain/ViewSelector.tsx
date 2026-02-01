@@ -53,6 +53,11 @@ const VIEW_MODES: Array<{ value: ViewMode; label: string; description: string }>
     label: 'Knowledge',
     description: 'Knowledge base articles and documentation',
   },
+  {
+    value: 'sketch',
+    label: 'Sketches',
+    description: 'Freeform diagrams and visual documentation',
+  },
 ];
 
 export const ViewSelector: React.FC<ViewSelectorProps> = ({ domainId }) => {

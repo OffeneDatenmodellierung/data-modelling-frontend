@@ -7,7 +7,7 @@ This file provides context for Large Language Models working with this codebase.
 A domain-centric data modelling application built with React, TypeScript, and Electron.
 Creates data architectures, models, and flow diagrams entirely offline.
 
-**Version**: 2.4.3
+**Version**: 2.5.0
 **License**: ISC
 
 ## Technology Stack
@@ -16,6 +16,7 @@ Creates data architectures, models, and flow diagrams entirely offline.
 - React 18 with TypeScript
 - Vite build system
 - ReactFlow for infinite canvas
+- Excalidraw for freeform sketches
 - Zustand for state management
 - TanStack Query for async state
 - TailwindCSS for styling
@@ -27,18 +28,19 @@ Creates data architectures, models, and flow diagrams entirely offline.
 - IPC for main/renderer communication
 
 ### WASM Modules
-- **data-modelling-sdk 2.0.9**: YAML parsing, validation, ODCS/ODPS/CADS format support, Knowledge Base, Decision Records, stable YAML key ordering
+- **data-modelling-sdk 2.1.0**: YAML parsing, validation, ODCS/ODPS/CADS format support, Knowledge Base, Decision Records, Sketches, stable YAML key ordering
 - **DuckDB-WASM 1.29.0**: In-browser SQL database (DuckDB 1.4.3)
 
 ## Key Features
 
 1. **Data Modelling**: Conceptual, logical, physical models with crow's feet notation
 2. **Domain-Centric**: Organize by business domains with systems, tables, relationships
-3. **Decision Logs**: MADR-format Architecture Decision Records
-4. **Knowledge Base**: Documentation articles (Guide, Tutorial, Reference, etc.)
-5. **DuckDB-WASM**: In-browser SQL with OPFS persistence
-6. **Import/Export**: ODCS, SQL, AVRO, JSON Schema, Protobuf formats
-7. **Offline Only**: No backend server required
+3. **Excalidraw Sketches**: Freeform diagramming with Excalidraw integration (architecture, dataflow, ER, sequence, flowchart, wireframe, concept, infrastructure diagrams)
+4. **Decision Logs**: MADR-format Architecture Decision Records
+5. **Knowledge Base**: Documentation articles (Guide, Tutorial, Reference, etc.)
+6. **DuckDB-WASM**: In-browser SQL with OPFS persistence
+7. **Import/Export**: ODCS, SQL, AVRO, JSON Schema, Protobuf formats
+8. **Offline Only**: No backend server required
 
 ## Project Structure
 
@@ -49,7 +51,7 @@ dm/
 │   │   ├── components/       # React components
 │   │   ├── services/         # Business logic
 │   │   │   ├── database/     # DuckDB services
-│   │   │   ├── sdk/          # WASM SDK integration
+│   │   │   ├── sdk/          # WASM SDK integration (incl. sketchService)
 │   │   │   ├── storage/      # File storage
 │   │   │   └── platform/     # Platform abstraction
 │   │   ├── stores/           # Zustand stores
@@ -103,7 +105,9 @@ dm/
 
 ### Tests
 - `tests/unit/services/database/`: DuckDB unit tests (117 tests)
-- Total test count: 657 tests
+- `tests/unit/stores/sketchStore.test.ts`: Sketch store tests (50 tests)
+- `tests/unit/services/sdk/sketchService.test.ts`: Sketch service tests (37 tests)
+- Total test count: 744 tests
 
 ## Development Commands
 
@@ -155,6 +159,41 @@ const { sql, params } = query
 - Hash-based change detection (SHA-256)
 - Bidirectional YAML ↔ DuckDB sync
 - Configurable sync strategies
+
+## Excalidraw Sketches (v2.5.0)
+
+### Overview
+Excalidraw integration provides freeform diagramming for architecture, dataflow, entity-relationship, sequence, flowchart, wireframe, concept, and infrastructure diagrams. Sketches are stored per domain and support linking to tables, systems, decisions, and knowledge articles.
+
+### Types
+- `sketch.ts`: Sketch interface aligned with SDK v2.1.0 sketch-schema.json
+- `SketchType`: architecture, dataflow, entity-relationship, sequence, flowchart, wireframe, concept, infrastructure, other
+- `SketchStatus`: draft, review, published, archived
+
+### Components
+- `ExcalidrawEditor.tsx`: Modal editor with deferred initialization
+- `SketchPanel.tsx`: Two-panel layout (list + viewer/editor)
+- `SketchList.tsx`: Filterable list with thumbnails
+- `SketchViewer.tsx`: Read-only view mode
+
+### Services
+- `sketchService.ts`: Parse, validate, export utilities
+  - `parseJSON()`: Handles SDK format (camelCase) and frontend format (snake_case)
+  - `toSDKJSON()`: Export to SDK format
+  - `exportToPNG()`, `exportToSVG()`: Image export via Excalidraw utilities
+  - `validateSketch()`: Full sketch validation
+
+### Store
+- `sketchStore.ts`: Zustand store following existing patterns
+  - CRUD operations with auto-numbering per domain
+  - Linking operations: tables, systems, articles, decisions, related sketches
+  - Filtering by domain, status, type, search term
+  - `getNextNumber()`: Sequential numbering within domain
+
+### Storage
+- Directory: `sketches/`
+- File pattern: `{workspace}_{domain}_{name}.sketch.json`
+- Global sketches: `{workspace}_global_{name}.sketch.json`
 
 ## Common Tasks
 

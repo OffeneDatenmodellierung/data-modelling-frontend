@@ -10,6 +10,7 @@ import { bpmnService } from '@/services/sdk/bpmnService';
 import { dmnService } from '@/services/sdk/dmnService';
 import { knowledgeService } from '@/services/sdk/knowledgeService';
 import { decisionService } from '@/services/sdk/decisionService';
+import { sketchService } from '@/services/sdk/sketchService';
 import { sdkLoader } from '@/services/sdk/sdkLoader';
 import * as yaml from 'js-yaml';
 import { FileMigration } from '@/utils/fileMigration';
@@ -24,6 +25,7 @@ import type { BPMNProcess } from '@/types/bpmn';
 import type { DMNDecision } from '@/types/dmn';
 import type { KnowledgeArticle } from '@/types/knowledge';
 import type { Decision } from '@/types/decision';
+import type { Sketch } from '@/types/sketch';
 
 export interface SavedFile {
   name: string;
@@ -46,7 +48,8 @@ export class WorkspaceV2Saver {
     allBpmnProcesses: BPMNProcess[],
     allDmnDecisions: DMNDecision[],
     allKnowledgeArticles: KnowledgeArticle[] = [],
-    allDecisionRecords: Decision[] = []
+    allDecisionRecords: Decision[] = [],
+    allSketches: Sketch[] = []
   ): Promise<SavedFile[]> {
     const files: SavedFile[] = [];
 
@@ -97,6 +100,7 @@ export class WorkspaceV2Saver {
       const domainSystems = allSystems.filter((s) => (s as any).domain_id === domain.id);
       const domainKnowledge = allKnowledgeArticles.filter((k) => k.domain_id === domain.id);
       const domainADRs = allDecisionRecords.filter((d) => d.domain_id === domain.id);
+      const domainSketches = allSketches.filter((s) => s.domain_id === domain.id);
 
       // Generate ODCS files grouped by system in odcs/ directory
       // Group tables by their system (lookup via system.table_ids)
@@ -304,6 +308,25 @@ export class WorkspaceV2Saver {
           }
         }
       }
+
+      // Generate sketch files (.sketch.json) in sketches/ directory
+      for (const sketch of domainSketches) {
+        const sketchName = FileMigration.sanitizeFileName(sketch.name || `sketch_${sketch.id}`);
+        const fileName = FileMigration.generateFileName(
+          workspaceName,
+          domainName,
+          sketchName,
+          undefined,
+          'sketch.json'
+        );
+
+        try {
+          const content = await sketchService.toJSON(sketch);
+          files.push({ name: fileName, content, directory: 'sketches' });
+        } catch (error) {
+          console.error(`[WorkspaceV2Saver] Failed to export sketch ${sketch.name}:`, error);
+        }
+      }
     }
 
     // 4. Generate global KB articles (no domain_id) - save with workspace prefix only
@@ -354,6 +377,21 @@ export class WorkspaceV2Saver {
         } catch (fallbackError) {
           console.error(`[WorkspaceV2Saver] Fallback also failed for global ADR:`, fallbackError);
         }
+      }
+    }
+
+    // 6. Generate global sketches (no domain_id) - save with workspace prefix only
+    const globalSketches = allSketches.filter((s) => !s.domain_id);
+    for (const sketch of globalSketches) {
+      const sketchName = FileMigration.sanitizeFileName(sketch.name || `sketch_${sketch.id}`);
+      const fileName = `${workspaceName}_global_${sketchName}.sketch.json`;
+
+      try {
+        const content = await sketchService.toJSON(sketch);
+        files.push({ name: fileName, content, directory: 'sketches' });
+        console.log(`[WorkspaceV2Saver] Generated global sketch: ${sketch.name}`);
+      } catch (error) {
+        console.error(`[WorkspaceV2Saver] Failed to export global sketch ${sketch.name}:`, error);
       }
     }
 
@@ -462,7 +500,8 @@ This workspace was created with the Data Modelling tool.
 ├── bpmn/                        # Business processes (BPMN)
 ├── dmn/                         # Decision models (DMN)
 ├── kb/                          # Knowledge base articles
-└── adr/                         # Architecture decision records
+├── adr/                         # Architecture decision records
+└── sketches/                    # Excalidraw diagrams
 \`\`\`
 
 ## Usage
@@ -516,7 +555,7 @@ will be synchronized with the workspace settings.
     );
 
     // Subdirectories we manage
-    const managedDirectories = ['odcs', 'odps', 'cads', 'bpmn', 'dmn', 'kb', 'adr'];
+    const managedDirectories = ['odcs', 'odps', 'cads', 'bpmn', 'dmn', 'kb', 'adr', 'sketches'];
 
     // Workspace-related file extensions
     const workspaceFileExtensions = [
@@ -527,6 +566,7 @@ will be synchronized with the workspace settings.
       '.dmn',
       '.kb.yaml',
       '.adr.yaml',
+      '.sketch.json',
       '.workspace.yaml',
     ];
 
