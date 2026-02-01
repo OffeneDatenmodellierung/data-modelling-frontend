@@ -6,9 +6,10 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { DomainCanvas } from '@/components/canvas/DomainCanvas';
-import { DomainTabs } from '@/components/domain/DomainTabs';
 import { DomainSelector } from '@/components/domain/DomainSelector';
-import { ViewSelector } from '@/components/domain/ViewSelector';
+import { ViewModeSelector } from '@/components/domain/ViewModeSelector';
+import { BPMNProcessLinks } from '@/components/domain/BPMNProcessLinks';
+import { SaveExitControls } from '@/components/domain/SaveExitControls';
 // import { EditorModal } from '@/components/editors/EditorModal';
 // import { bpmnService } from '@/services/sdk/bpmnService';
 import { TableEditor } from '@/components/table/TableEditor';
@@ -626,11 +627,15 @@ const ModelEditor: React.FC = () => {
         )}
       </div>
 
-      {/* Domain Tabs */}
-      <DomainTabs workspaceId={workspaceId ?? ''} />
-
-      {/* View Selector */}
-      {selectedDomainId && <ViewSelector domainId={selectedDomainId} />}
+      {/* Secondary toolbar: View mode, BPMN links, Save/Exit */}
+      {selectedDomainId && (
+        <div className="bg-gray-50 border-b border-gray-200 px-4 py-2 flex items-center gap-4">
+          <ViewModeSelector domainId={selectedDomainId} />
+          <BPMNProcessLinks domainId={selectedDomainId} />
+          <div className="flex-1" />
+          <SaveExitControls />
+        </div>
+      )}
 
       {/* Main Content */}
       <div className="flex-1 flex overflow-hidden">
