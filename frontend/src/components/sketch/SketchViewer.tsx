@@ -245,7 +245,8 @@ export const SketchViewer: React.FC<SketchViewerProps> = ({
           <div className="bg-white rounded-lg shadow-xl p-6 max-w-md mx-4">
             <h3 className="text-lg font-semibold text-gray-900 mb-2">Delete Sketch</h3>
             <p className="text-gray-600 mb-4">
-              Are you sure you want to delete "{sketch.name}"? This action cannot be undone.
+              Are you sure you want to delete &quot;{sketch.name}&quot;? This action cannot be
+              undone.
             </p>
             <div className="flex justify-end gap-3">
               <button
