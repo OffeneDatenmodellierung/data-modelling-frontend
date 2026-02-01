@@ -121,6 +121,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   /**
    * Get git status for a workspace
+   * Supports workspaces that are subdirectories of a git repo
    */
   gitStatus: async (
     workspacePath: string
@@ -139,6 +140,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     remoteUrl: string | null;
     hasConflicts: boolean;
     conflictFiles: string[];
+    gitRoot: string | null;
   }> => {
     return await ipcRenderer.invoke('git:status', workspacePath);
   },
@@ -221,5 +223,169 @@ contextBridge.exposeInMainWorld('electronAPI', {
    */
   gitInit: async (workspacePath: string): Promise<{ success: boolean; error?: string }> => {
     return await ipcRenderer.invoke('git:init', workspacePath);
+  },
+
+  // ============================================================================
+  // Phase 3: Branch Management
+  // ============================================================================
+
+  /**
+   * List all branches (local and remote)
+   */
+  gitBranches: async (
+    workspacePath: string
+  ): Promise<{
+    success: boolean;
+    error?: string;
+    current: string;
+    local: Array<{ name: string; commit: string; label: string; current: boolean }>;
+    remote: Array<{ name: string; commit: string; remoteName: string; branchName: string }>;
+  }> => {
+    return await ipcRenderer.invoke('git:branches', workspacePath);
+  },
+
+  /**
+   * Create a new branch
+   */
+  gitBranchCreate: async (
+    workspacePath: string,
+    branchName: string,
+    options?: { checkout?: boolean; startPoint?: string }
+  ): Promise<{ success: boolean; error?: string }> => {
+    return await ipcRenderer.invoke('git:branch-create', workspacePath, branchName, options);
+  },
+
+  /**
+   * Switch to a branch
+   */
+  gitBranchCheckout: async (
+    workspacePath: string,
+    branchName: string
+  ): Promise<{ success: boolean; error?: string }> => {
+    return await ipcRenderer.invoke('git:branch-checkout', workspacePath, branchName);
+  },
+
+  /**
+   * Delete a branch
+   */
+  gitBranchDelete: async (
+    workspacePath: string,
+    branchName: string,
+    options?: { force?: boolean }
+  ): Promise<{ success: boolean; error?: string }> => {
+    return await ipcRenderer.invoke('git:branch-delete', workspacePath, branchName, options);
+  },
+
+  /**
+   * Rename a branch
+   */
+  gitBranchRename: async (
+    workspacePath: string,
+    oldName: string,
+    newName: string
+  ): Promise<{ success: boolean; error?: string }> => {
+    return await ipcRenderer.invoke('git:branch-rename', workspacePath, oldName, newName);
+  },
+
+  // ============================================================================
+  // Phase 4: Remote Operations
+  // ============================================================================
+
+  /**
+   * List remotes
+   */
+  gitRemotes: async (
+    workspacePath: string
+  ): Promise<{
+    success: boolean;
+    error?: string;
+    remotes: Array<{ name: string; fetchUrl: string | null; pushUrl: string | null }>;
+  }> => {
+    return await ipcRenderer.invoke('git:remotes', workspacePath);
+  },
+
+  /**
+   * Add a remote
+   */
+  gitRemoteAdd: async (
+    workspacePath: string,
+    name: string,
+    url: string
+  ): Promise<{ success: boolean; error?: string }> => {
+    return await ipcRenderer.invoke('git:remote-add', workspacePath, name, url);
+  },
+
+  /**
+   * Remove a remote
+   */
+  gitRemoteRemove: async (
+    workspacePath: string,
+    name: string
+  ): Promise<{ success: boolean; error?: string }> => {
+    return await ipcRenderer.invoke('git:remote-remove', workspacePath, name);
+  },
+
+  /**
+   * Fetch from remote
+   */
+  gitFetch: async (
+    workspacePath: string,
+    options?: { remote?: string; prune?: boolean }
+  ): Promise<{ success: boolean; error?: string }> => {
+    return await ipcRenderer.invoke('git:fetch', workspacePath, options);
+  },
+
+  /**
+   * Pull from remote
+   */
+  gitPull: async (
+    workspacePath: string,
+    options?: { remote?: string; branch?: string }
+  ): Promise<{
+    success: boolean;
+    error?: string;
+    summary?: { changes: number; insertions: number; deletions: number };
+    files?: string[];
+  }> => {
+    return await ipcRenderer.invoke('git:pull', workspacePath, options);
+  },
+
+  /**
+   * Push to remote
+   */
+  gitPush: async (
+    workspacePath: string,
+    options?: { remote?: string; branch?: string; setUpstream?: boolean; force?: boolean }
+  ): Promise<{ success: boolean; error?: string }> => {
+    return await ipcRenderer.invoke('git:push', workspacePath, options);
+  },
+
+  /**
+   * Get tracking branch info
+   */
+  gitTracking: async (
+    workspacePath: string,
+    branchName?: string
+  ): Promise<{
+    success: boolean;
+    error?: string;
+    hasUpstream: boolean;
+    remoteName: string | null;
+    remoteBranch: string | null;
+    ahead: number;
+    behind: number;
+  }> => {
+    return await ipcRenderer.invoke('git:tracking', workspacePath, branchName);
+  },
+
+  /**
+   * Set upstream tracking branch
+   */
+  gitSetUpstream: async (
+    workspacePath: string,
+    remote: string,
+    branch: string
+  ): Promise<{ success: boolean; error?: string }> => {
+    return await ipcRenderer.invoke('git:set-upstream', workspacePath, remote, branch);
   },
 });

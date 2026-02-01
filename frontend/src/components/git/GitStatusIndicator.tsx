@@ -12,7 +12,9 @@ export interface GitStatusIndicatorProps {
 }
 
 export const GitStatusIndicator: React.FC<GitStatusIndicatorProps> = ({ className = '' }) => {
-  const { status, isPanelOpen, isLoading } = useGitStore();
+  const { status, isPanelOpen, isLoading, isFetching, isPulling, isPushing } = useGitStore();
+
+  const isRemoteOperationInProgress = isFetching || isPulling || isPushing;
 
   // Don't show if git service is not available
   if (!gitService.isAvailable()) {
@@ -71,8 +73,12 @@ export const GitStatusIndicator: React.FC<GitStatusIndicatorProps> = ({ classNam
       <span className="font-medium max-w-24 truncate">{status.currentBranch || 'HEAD'}</span>
 
       {/* Loading indicator */}
-      {isLoading && (
-        <svg className="w-3 h-3 animate-spin text-gray-400" fill="none" viewBox="0 0 24 24">
+      {(isLoading || isRemoteOperationInProgress) && (
+        <svg
+          className={`w-3 h-3 animate-spin ${isRemoteOperationInProgress ? 'text-blue-500' : 'text-gray-400'}`}
+          fill="none"
+          viewBox="0 0 24 24"
+        >
           <circle
             className="opacity-25"
             cx="12"
@@ -90,7 +96,7 @@ export const GitStatusIndicator: React.FC<GitStatusIndicatorProps> = ({ classNam
       )}
 
       {/* Change count badge */}
-      {changeCount > 0 && !isLoading && (
+      {changeCount > 0 && !isLoading && !isRemoteOperationInProgress && (
         <span
           className={`px-1.5 py-0.5 text-xs font-medium rounded-full ${
             hasConflicts ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'
@@ -100,13 +106,23 @@ export const GitStatusIndicator: React.FC<GitStatusIndicatorProps> = ({ classNam
         </span>
       )}
 
-      {/* Sync status */}
-      {status.remoteName && (status.ahead > 0 || status.behind > 0) && !isLoading && (
-        <span className="flex items-center gap-0.5 text-xs">
-          {status.ahead > 0 && <span className="text-green-600">↑{status.ahead}</span>}
-          {status.behind > 0 && <span className="text-orange-600">↓{status.behind}</span>}
+      {/* Remote operation indicator */}
+      {isRemoteOperationInProgress && (
+        <span className="text-xs text-blue-600">
+          {isPulling ? 'Pulling' : isPushing ? 'Pushing' : 'Fetching'}
         </span>
       )}
+
+      {/* Sync status */}
+      {status.remoteName &&
+        (status.ahead > 0 || status.behind > 0) &&
+        !isLoading &&
+        !isRemoteOperationInProgress && (
+          <span className="flex items-center gap-0.5 text-xs">
+            {status.ahead > 0 && <span className="text-green-600">↑{status.ahead}</span>}
+            {status.behind > 0 && <span className="text-orange-600">↓{status.behind}</span>}
+          </span>
+        )}
     </button>
   );
 };

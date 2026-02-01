@@ -9,8 +9,11 @@ import { gitService } from '@/services/git/gitService';
 import { GitFileList } from './GitFileList';
 import { GitHistoryList } from './GitHistoryList';
 import { DiffViewer } from './DiffViewer';
+import { BranchSelector } from './BranchSelector';
+import { BranchCreateDialog } from './BranchCreateDialog';
+import { RemoteOperationsPanel } from './RemoteOperationsPanel';
 
-type TabType = 'changes' | 'history';
+type TabType = 'changes' | 'history' | 'remotes';
 
 export interface GitPanelProps {
   className?: string;
@@ -27,12 +30,18 @@ export const GitPanel: React.FC<GitPanelProps> = ({ className = '' }) => {
     diffContent,
     isLoadingDiff,
     selectedCommit,
+    showBranchSelector,
+    isFetching,
+    isPulling,
+    isPushing,
   } = useGitStore();
 
   const [activeTab, setActiveTab] = useState<TabType>('changes');
   const [commitMessage, setCommitMessage] = useState('');
   const [isCommitting, setIsCommitting] = useState(false);
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
+
+  const isRemoteOperationInProgress = isFetching || isPulling || isPushing;
 
   // Load history when switching to history tab
   useEffect(() => {
@@ -74,10 +83,21 @@ export const GitPanel: React.FC<GitPanelProps> = ({ className = '' }) => {
     if (activeTab === 'history') {
       gitService.loadHistory();
     }
+    if (activeTab === 'remotes') {
+      gitService.loadRemotes();
+    }
   }, [activeTab]);
 
   const handleInitRepo = useCallback(async () => {
     await gitService.initRepository();
+  }, []);
+
+  const handleToggleBranchSelector = useCallback(() => {
+    useGitStore.getState().setShowBranchSelector(!showBranchSelector);
+  }, [showBranchSelector]);
+
+  const handleCreateBranch = useCallback(() => {
+    useGitStore.getState().setShowCreateBranchDialog(true);
   }, []);
 
   if (!isPanelOpen) {
@@ -188,36 +208,76 @@ export const GitPanel: React.FC<GitPanelProps> = ({ className = '' }) => {
       </div>
 
       {/* Branch Info */}
-      <div className="px-4 py-2 bg-gray-50 border-b border-gray-200">
-        <div className="flex items-center gap-2 text-sm">
-          <svg
-            className="w-4 h-4 text-gray-500"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
+      <div className="px-4 py-2 bg-gray-50 border-b border-gray-200 relative">
+        <div className="flex items-center justify-between">
+          <button
+            onClick={handleToggleBranchSelector}
+            className="flex items-center gap-2 text-sm hover:bg-gray-100 rounded px-2 py-1 -ml-2"
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M13 10V3L4 14h7v7l9-11h-7z"
-            />
-          </svg>
-          <span className="font-medium text-gray-700">{status.currentBranch || 'HEAD'}</span>
-          {status.remoteName && (
-            <span className="text-gray-500">
-              {status.ahead > 0 && <span className="text-green-600">↑{status.ahead}</span>}
-              {status.behind > 0 && <span className="text-orange-600 ml-1">↓{status.behind}</span>}
-            </span>
-          )}
+            <svg
+              className="w-4 h-4 text-gray-500"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M13 10V3L4 14h7v7l9-11h-7z"
+              />
+            </svg>
+            <span className="font-medium text-gray-700">{status.currentBranch || 'HEAD'}</span>
+            <svg
+              className="w-4 h-4 text-gray-400"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M19 9l-7 7-7-7"
+              />
+            </svg>
+          </button>
+          <div className="flex items-center gap-2">
+            {status.remoteName && (
+              <span className="text-xs text-gray-500">
+                {status.ahead > 0 && <span className="text-green-600">↑{status.ahead}</span>}
+                {status.behind > 0 && (
+                  <span className="text-orange-600 ml-1">↓{status.behind}</span>
+                )}
+              </span>
+            )}
+            {isRemoteOperationInProgress && (
+              <svg className="w-4 h-4 text-blue-500 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                />
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                />
+              </svg>
+            )}
+          </div>
         </div>
+        <BranchSelector onCreateBranch={handleCreateBranch} />
       </div>
 
       {/* Tabs */}
       <div className="flex border-b border-gray-200">
         <button
           onClick={() => setActiveTab('changes')}
-          className={`flex-1 px-4 py-2 text-sm font-medium ${
+          className={`flex-1 px-3 py-2 text-sm font-medium ${
             activeTab === 'changes'
               ? 'text-blue-600 border-b-2 border-blue-600'
               : 'text-gray-500 hover:text-gray-700'
@@ -232,13 +292,23 @@ export const GitPanel: React.FC<GitPanelProps> = ({ className = '' }) => {
         </button>
         <button
           onClick={() => setActiveTab('history')}
-          className={`flex-1 px-4 py-2 text-sm font-medium ${
+          className={`flex-1 px-3 py-2 text-sm font-medium ${
             activeTab === 'history'
               ? 'text-blue-600 border-b-2 border-blue-600'
               : 'text-gray-500 hover:text-gray-700'
           }`}
         >
           History
+        </button>
+        <button
+          onClick={() => setActiveTab('remotes')}
+          className={`flex-1 px-3 py-2 text-sm font-medium ${
+            activeTab === 'remotes'
+              ? 'text-blue-600 border-b-2 border-blue-600'
+              : 'text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          Sync
         </button>
       </div>
 
@@ -321,7 +391,7 @@ export const GitPanel: React.FC<GitPanelProps> = ({ className = '' }) => {
               </div>
             )}
           </>
-        ) : (
+        ) : activeTab === 'history' ? (
           /* History tab */
           <div className="flex-1 overflow-y-auto">
             {isLoadingHistory ? (
@@ -367,8 +437,16 @@ export const GitPanel: React.FC<GitPanelProps> = ({ className = '' }) => {
               />
             )}
           </div>
+        ) : (
+          /* Remotes/Sync tab */
+          <div className="flex-1 overflow-y-auto">
+            <RemoteOperationsPanel />
+          </div>
         )}
       </div>
+
+      {/* Branch Create Dialog */}
+      <BranchCreateDialog />
     </div>
   );
 };

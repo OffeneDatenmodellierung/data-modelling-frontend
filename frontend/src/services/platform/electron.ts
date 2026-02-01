@@ -92,6 +92,7 @@ export interface GitStatusResult {
   remoteUrl: string | null;
   hasConflicts: boolean;
   conflictFiles: string[];
+  gitRoot: string | null; // The root of the git repo (may be parent of workspace)
 }
 
 export interface GitCommitResult {
@@ -122,6 +123,89 @@ export interface GitDiffOptions {
 
 export interface GitDiscardOptions {
   files?: string[]; // If empty, discard all changes
+}
+
+// Phase 3: Branch Management Types
+export interface GitBranchInfo {
+  name: string;
+  commit: string;
+  label: string;
+  current: boolean;
+}
+
+export interface GitRemoteBranchInfo {
+  name: string;
+  commit: string;
+  remoteName: string;
+  branchName: string;
+}
+
+export interface GitBranchesResult {
+  success: boolean;
+  error?: string;
+  current: string;
+  local: GitBranchInfo[];
+  remote: GitRemoteBranchInfo[];
+}
+
+export interface GitBranchCreateOptions {
+  checkout?: boolean;
+  startPoint?: string;
+}
+
+export interface GitBranchDeleteOptions {
+  force?: boolean;
+}
+
+// Phase 4: Remote Operations Types
+export interface GitRemoteInfo {
+  name: string;
+  fetchUrl: string | null;
+  pushUrl: string | null;
+}
+
+export interface GitRemotesResult {
+  success: boolean;
+  error?: string;
+  remotes: GitRemoteInfo[];
+}
+
+export interface GitFetchOptions {
+  remote?: string;
+  prune?: boolean;
+}
+
+export interface GitPullOptions {
+  remote?: string;
+  branch?: string;
+}
+
+export interface GitPullResult {
+  success: boolean;
+  error?: string;
+  summary?: {
+    changes: number;
+    insertions: number;
+    deletions: number;
+  };
+  files?: string[];
+}
+
+export interface GitPushOptions {
+  remote?: string;
+  branch?: string;
+  setUpstream?: boolean;
+  force?: boolean;
+}
+
+export interface GitTrackingResult {
+  success: boolean;
+  error?: string;
+  hasUpstream: boolean;
+  remoteName: string | null;
+  remoteBranch: string | null;
+  ahead: number;
+  behind: number;
 }
 
 declare global {
@@ -160,6 +244,53 @@ declare global {
         options?: GitDiscardOptions
       ) => Promise<{ success: boolean; error?: string }>;
       gitInit: (workspacePath: string) => Promise<{ success: boolean; error?: string }>;
+      // Phase 3: Branch Management
+      gitBranches: (workspacePath: string) => Promise<GitBranchesResult>;
+      gitBranchCreate: (
+        workspacePath: string,
+        branchName: string,
+        options?: GitBranchCreateOptions
+      ) => Promise<{ success: boolean; error?: string }>;
+      gitBranchCheckout: (
+        workspacePath: string,
+        branchName: string
+      ) => Promise<{ success: boolean; error?: string }>;
+      gitBranchDelete: (
+        workspacePath: string,
+        branchName: string,
+        options?: GitBranchDeleteOptions
+      ) => Promise<{ success: boolean; error?: string }>;
+      gitBranchRename: (
+        workspacePath: string,
+        oldName: string,
+        newName: string
+      ) => Promise<{ success: boolean; error?: string }>;
+      // Phase 4: Remote Operations
+      gitRemotes: (workspacePath: string) => Promise<GitRemotesResult>;
+      gitRemoteAdd: (
+        workspacePath: string,
+        name: string,
+        url: string
+      ) => Promise<{ success: boolean; error?: string }>;
+      gitRemoteRemove: (
+        workspacePath: string,
+        name: string
+      ) => Promise<{ success: boolean; error?: string }>;
+      gitFetch: (
+        workspacePath: string,
+        options?: GitFetchOptions
+      ) => Promise<{ success: boolean; error?: string }>;
+      gitPull: (workspacePath: string, options?: GitPullOptions) => Promise<GitPullResult>;
+      gitPush: (
+        workspacePath: string,
+        options?: GitPushOptions
+      ) => Promise<{ success: boolean; error?: string }>;
+      gitTracking: (workspacePath: string, branchName?: string) => Promise<GitTrackingResult>;
+      gitSetUpstream: (
+        workspacePath: string,
+        remote: string,
+        branch: string
+      ) => Promise<{ success: boolean; error?: string }>;
     };
   }
 }

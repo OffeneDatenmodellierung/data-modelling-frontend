@@ -520,14 +520,16 @@ async function getSimpleGit() {
 
 /**
  * Get git status for a workspace
+ * Supports workspaces that are subdirectories of a git repo
  */
 ipcMain.handle('git:status', async (_event, workspacePath: string) => {
   try {
     const simpleGit = await getSimpleGit();
     const git = simpleGit(workspacePath);
 
-    // Check if this is a git repo
-    const isRepo = await git.checkIsRepo();
+    // Check if this path is inside a git repo (including parent directories)
+    // checkIsRepo('root') returns true if any parent directory contains .git
+    const isRepo = await git.checkIsRepo('root');
     if (!isRepo) {
       return {
         isGitRepo: false,
@@ -539,8 +541,12 @@ ipcMain.handle('git:status', async (_event, workspacePath: string) => {
         remoteUrl: null,
         hasConflicts: false,
         conflictFiles: [],
+        gitRoot: null,
       };
     }
+
+    // Get the git root directory (may be different from workspacePath)
+    const gitRoot = await git.revparse(['--show-toplevel']);
 
     // Get status
     const status = await git.status();
@@ -607,6 +613,7 @@ ipcMain.handle('git:status', async (_event, workspacePath: string) => {
       remoteUrl,
       hasConflicts,
       conflictFiles: status.conflicted,
+      gitRoot: gitRoot.trim(),
     };
   } catch (error) {
     console.error('[Electron] Git status failed:', error);
@@ -620,6 +627,7 @@ ipcMain.handle('git:status', async (_event, workspacePath: string) => {
       remoteUrl: null,
       hasConflicts: false,
       conflictFiles: [],
+      gitRoot: null,
     };
   }
 });
@@ -804,6 +812,399 @@ ipcMain.handle('git:init', async (_event, workspacePath: string) => {
     return { success: false, error: errorMessage };
   }
 });
+
+// ============================================================================
+// Phase 3: Branch Management
+// ============================================================================
+
+/**
+ * List all branches (local and remote)
+ */
+ipcMain.handle('git:branches', async (_event, workspacePath: string) => {
+  try {
+    const simpleGit = await getSimpleGit();
+    const git = simpleGit(workspacePath);
+
+    const branchSummary = await git.branch(['-a', '-v']);
+
+    const branches = {
+      current: branchSummary.current,
+      local: [] as Array<{
+        name: string;
+        commit: string;
+        label: string;
+        current: boolean;
+      }>,
+      remote: [] as Array<{
+        name: string;
+        commit: string;
+        remoteName: string;
+        branchName: string;
+      }>,
+    };
+
+    for (const [name, data] of Object.entries(branchSummary.branches)) {
+      if (name.startsWith('remotes/')) {
+        // Remote branch
+        const parts = name.replace('remotes/', '').split('/');
+        const remoteName = parts[0];
+        const branchName = parts.slice(1).join('/');
+        // Skip HEAD pointer
+        if (branchName !== 'HEAD') {
+          branches.remote.push({
+            name,
+            commit: data.commit,
+            remoteName: remoteName || '',
+            branchName,
+          });
+        }
+      } else {
+        // Local branch
+        branches.local.push({
+          name,
+          commit: data.commit,
+          label: data.label || '',
+          current: data.current,
+        });
+      }
+    }
+
+    return { success: true, ...branches };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('[Electron] Git branches failed:', errorMessage);
+    return { success: false, error: errorMessage, current: '', local: [], remote: [] };
+  }
+});
+
+/**
+ * Create a new branch
+ */
+ipcMain.handle(
+  'git:branch-create',
+  async (
+    _event,
+    workspacePath: string,
+    branchName: string,
+    options?: { checkout?: boolean; startPoint?: string }
+  ) => {
+    try {
+      const simpleGit = await getSimpleGit();
+      const git = simpleGit(workspacePath);
+
+      if (options?.checkout) {
+        // Create and checkout in one operation
+        const args = ['-b', branchName];
+        if (options.startPoint) {
+          args.push(options.startPoint);
+        }
+        await git.checkout(args);
+      } else {
+        // Just create the branch
+        const args = [branchName];
+        if (options?.startPoint) {
+          args.push(options.startPoint);
+        }
+        await git.branch(args);
+      }
+
+      return { success: true };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('[Electron] Git branch create failed:', errorMessage);
+      return { success: false, error: errorMessage };
+    }
+  }
+);
+
+/**
+ * Switch to a branch
+ */
+ipcMain.handle('git:branch-checkout', async (_event, workspacePath: string, branchName: string) => {
+  try {
+    const simpleGit = await getSimpleGit();
+    const git = simpleGit(workspacePath);
+    await git.checkout(branchName);
+    return { success: true };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('[Electron] Git checkout failed:', errorMessage);
+    return { success: false, error: errorMessage };
+  }
+});
+
+/**
+ * Delete a branch
+ */
+ipcMain.handle(
+  'git:branch-delete',
+  async (_event, workspacePath: string, branchName: string, options?: { force?: boolean }) => {
+    try {
+      const simpleGit = await getSimpleGit();
+      const git = simpleGit(workspacePath);
+
+      const args = options?.force ? ['-D', branchName] : ['-d', branchName];
+      await git.branch(args);
+
+      return { success: true };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('[Electron] Git branch delete failed:', errorMessage);
+      return { success: false, error: errorMessage };
+    }
+  }
+);
+
+/**
+ * Rename a branch
+ */
+ipcMain.handle(
+  'git:branch-rename',
+  async (_event, workspacePath: string, oldName: string, newName: string) => {
+    try {
+      const simpleGit = await getSimpleGit();
+      const git = simpleGit(workspacePath);
+      await git.branch(['-m', oldName, newName]);
+      return { success: true };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('[Electron] Git branch rename failed:', errorMessage);
+      return { success: false, error: errorMessage };
+    }
+  }
+);
+
+// ============================================================================
+// Phase 4: Remote Operations
+// ============================================================================
+
+/**
+ * List remotes
+ */
+ipcMain.handle('git:remotes', async (_event, workspacePath: string) => {
+  try {
+    const simpleGit = await getSimpleGit();
+    const git = simpleGit(workspacePath);
+    const remotes = await git.getRemotes(true);
+
+    return {
+      success: true,
+      remotes: remotes.map((r) => ({
+        name: r.name,
+        fetchUrl: r.refs?.fetch || null,
+        pushUrl: r.refs?.push || null,
+      })),
+    };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('[Electron] Git remotes failed:', errorMessage);
+    return { success: false, error: errorMessage, remotes: [] };
+  }
+});
+
+/**
+ * Add a remote
+ */
+ipcMain.handle(
+  'git:remote-add',
+  async (_event, workspacePath: string, name: string, url: string) => {
+    try {
+      const simpleGit = await getSimpleGit();
+      const git = simpleGit(workspacePath);
+      await git.addRemote(name, url);
+      return { success: true };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('[Electron] Git remote add failed:', errorMessage);
+      return { success: false, error: errorMessage };
+    }
+  }
+);
+
+/**
+ * Remove a remote
+ */
+ipcMain.handle('git:remote-remove', async (_event, workspacePath: string, name: string) => {
+  try {
+    const simpleGit = await getSimpleGit();
+    const git = simpleGit(workspacePath);
+    await git.removeRemote(name);
+    return { success: true };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('[Electron] Git remote remove failed:', errorMessage);
+    return { success: false, error: errorMessage };
+  }
+});
+
+/**
+ * Fetch from remote
+ */
+ipcMain.handle(
+  'git:fetch',
+  async (_event, workspacePath: string, options?: { remote?: string; prune?: boolean }) => {
+    try {
+      const simpleGit = await getSimpleGit();
+      const git = simpleGit(workspacePath);
+
+      const fetchOptions: string[] = [];
+      if (options?.prune) {
+        fetchOptions.push('--prune');
+      }
+
+      if (options?.remote) {
+        await git.fetch(options.remote, undefined, fetchOptions);
+      } else {
+        await git.fetch(fetchOptions);
+      }
+
+      return { success: true };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('[Electron] Git fetch failed:', errorMessage);
+      return { success: false, error: errorMessage };
+    }
+  }
+);
+
+/**
+ * Pull from remote
+ */
+ipcMain.handle(
+  'git:pull',
+  async (_event, workspacePath: string, options?: { remote?: string; branch?: string }) => {
+    try {
+      const simpleGit = await getSimpleGit();
+      const git = simpleGit(workspacePath);
+
+      const pullResult = await git.pull(options?.remote, options?.branch);
+
+      return {
+        success: true,
+        summary: {
+          changes: pullResult.summary.changes,
+          insertions: pullResult.summary.insertions,
+          deletions: pullResult.summary.deletions,
+        },
+        files: pullResult.files,
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('[Electron] Git pull failed:', errorMessage);
+      return { success: false, error: errorMessage };
+    }
+  }
+);
+
+/**
+ * Push to remote
+ */
+ipcMain.handle(
+  'git:push',
+  async (
+    _event,
+    workspacePath: string,
+    options?: { remote?: string; branch?: string; setUpstream?: boolean; force?: boolean }
+  ) => {
+    try {
+      const simpleGit = await getSimpleGit();
+      const git = simpleGit(workspacePath);
+
+      const pushOptions: string[] = [];
+      if (options?.setUpstream) {
+        pushOptions.push('-u');
+      }
+      if (options?.force) {
+        pushOptions.push('--force');
+      }
+
+      if (options?.remote && options?.branch) {
+        await git.push(options.remote, options.branch, pushOptions);
+      } else if (options?.remote) {
+        await git.push(options.remote, undefined, pushOptions);
+      } else {
+        await git.push(pushOptions);
+      }
+
+      return { success: true };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('[Electron] Git push failed:', errorMessage);
+      return { success: false, error: errorMessage };
+    }
+  }
+);
+
+/**
+ * Get tracking branch info
+ */
+ipcMain.handle('git:tracking', async (_event, workspacePath: string, branchName?: string) => {
+  try {
+    const simpleGit = await getSimpleGit();
+    const git = simpleGit(workspacePath);
+
+    // Get current branch if not specified
+    const status = await git.status();
+    const branch = branchName || status.current;
+
+    // Get tracking info using rev-parse
+    try {
+      const upstream = await git.revparse([`${branch}@{upstream}`, '--abbrev-ref']);
+      const parts = upstream.trim().split('/');
+      const remoteName = parts[0];
+      const remoteBranch = parts.slice(1).join('/');
+
+      return {
+        success: true,
+        hasUpstream: true,
+        remoteName: remoteName || null,
+        remoteBranch: remoteBranch || null,
+        ahead: status.ahead,
+        behind: status.behind,
+      };
+    } catch {
+      // No upstream configured
+      return {
+        success: true,
+        hasUpstream: false,
+        remoteName: null,
+        remoteBranch: null,
+        ahead: 0,
+        behind: 0,
+      };
+    }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('[Electron] Git tracking failed:', errorMessage);
+    return { success: false, error: errorMessage, hasUpstream: false };
+  }
+});
+
+/**
+ * Set upstream tracking branch
+ */
+ipcMain.handle(
+  'git:set-upstream',
+  async (_event, workspacePath: string, remote: string, branch: string) => {
+    try {
+      const simpleGit = await getSimpleGit();
+      const git = simpleGit(workspacePath);
+
+      // Get current branch
+      const status = await git.status();
+      const currentBranch = status.current;
+
+      // Set upstream
+      await git.branch(['--set-upstream-to', `${remote}/${branch}`, currentBranch || 'HEAD']);
+
+      return { success: true };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('[Electron] Git set upstream failed:', errorMessage);
+      return { success: false, error: errorMessage };
+    }
+  }
+);
 
 // Quit when all windows are closed, except on macOS
 app.on('window-all-closed', () => {
