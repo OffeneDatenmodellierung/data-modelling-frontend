@@ -53,7 +53,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Test Count**: Increased from 657 to 744 tests
 
 ### Dependencies
-- Added `@excalidraw/excalidraw: ^0.17.6` for freeform diagramming
+- Added `@excalidraw/excalidraw: ^0.18.0` for freeform diagramming
 
 ## [2.4.3] - 2026-01-28
 

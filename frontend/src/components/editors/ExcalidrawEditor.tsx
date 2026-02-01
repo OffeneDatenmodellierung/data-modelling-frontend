@@ -7,7 +7,7 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useUIStore } from '@/stores/uiStore';
 import { sketchService } from '@/services/sdk/sketchService';
-import type { ExcalidrawImperativeAPI } from '@excalidraw/excalidraw/types/types';
+import type { ExcalidrawImperativeAPI } from '@excalidraw/excalidraw/types';
 
 export interface ExcalidrawEditorProps {
   data?: string; // JSON string of Excalidraw data

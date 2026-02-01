@@ -51,7 +51,7 @@
     "axios": "^1.13.2",
     "bpmn-js": "^18.9.1",
     "dmn-js": "^17.5.0",
-    "@excalidraw/excalidraw": "^0.17.6",
+    "@excalidraw/excalidraw": "^0.18.0",
     "html-to-image": "^1.11.13",
     "js-yaml": "^4.1.1",
     "jszip": "^3.10.1",
