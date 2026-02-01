@@ -26,7 +26,8 @@ export type ViewMode =
   | 'analytical'
   | 'products'
   | 'decisions'
-  | 'knowledge';
+  | 'knowledge'
+  | 'sketch';
 // Valid selectable data levels for tables
 export type DataLevel = 'operational' | 'bronze' | 'silver' | 'gold';
 // Display-only level when dm_level tag is not set

@@ -11,6 +11,7 @@ import { bpmnService } from '@/services/sdk/bpmnService';
 import { dmnService } from '@/services/sdk/dmnService';
 import { knowledgeService } from '@/services/sdk/knowledgeService';
 import { decisionService } from '@/services/sdk/decisionService';
+import { sketchService } from '@/services/sdk/sketchService';
 import * as yaml from 'js-yaml';
 import { FileMigration } from '@/utils/fileMigration';
 import type {
@@ -32,6 +33,7 @@ import type { BPMNProcess } from '@/types/bpmn';
 import type { DMNDecision } from '@/types/dmn';
 import type { KnowledgeArticle } from '@/types/knowledge';
 import type { Decision } from '@/types/decision';
+import type { Sketch } from '@/types/sketch';
 
 /**
  * Result of loading a domain with all its resources
@@ -46,6 +48,7 @@ interface DomainLoadResult {
   systems: System[];
   knowledgeArticles: KnowledgeArticle[];
   decisionRecords: Decision[];
+  sketches: Sketch[];
 }
 
 export class WorkspaceV2Loader {
@@ -106,6 +109,7 @@ export class WorkspaceV2Loader {
       dmn: categorized.dmn.length,
       kb: categorized.kb.length,
       adr: categorized.adr.length,
+      sketch: categorized.sketch.length,
     });
 
     // 3. Load each domain's resources - collect all resources
@@ -132,6 +136,7 @@ export class WorkspaceV2Loader {
     const allSystems: System[] = [];
     const allKnowledgeArticles: KnowledgeArticle[] = [];
     const allDecisionRecords: Decision[] = [];
+    const allSketches: Sketch[] = [];
 
     for (const result of domainResults) {
       domains.push(result.domain);
@@ -143,6 +148,7 @@ export class WorkspaceV2Loader {
       allSystems.push(...result.systems);
       allKnowledgeArticles.push(...result.knowledgeArticles);
       allDecisionRecords.push(...result.decisionRecords);
+      allSketches.push(...result.sketches);
     }
 
     // 4.5 Load ALL KB articles and ADRs at workspace level
@@ -172,6 +178,22 @@ export class WorkspaceV2Loader {
         name: 'workspace',
       } as DomainV2);
       allDecisionRecords.push(...adrRecords);
+    }
+
+    // 4.6 Load ALL sketch files at workspace level
+    // Domain is determined by domain_id in the file content, not filename
+    const allSketchFiles = fileArray.filter((f) => {
+      const fileName = ((f as any).webkitRelativePath || f.name).split('/').pop() || '';
+      return fileName.endsWith('.sketch.json');
+    });
+
+    if (allSketchFiles.length > 0) {
+      console.log(`[WorkspaceV2Loader] Loading ${allSketchFiles.length} sketch(es)`);
+      const sketches = await this.loadSketches(allSketchFiles, {
+        id: 'workspace',
+        name: 'workspace',
+      } as DomainV2);
+      allSketches.push(...sketches);
     }
 
     // 5. Load relationships from workspace.yaml (SDK schema stores them at workspace level)
@@ -239,6 +261,7 @@ export class WorkspaceV2Loader {
       dmnDecisions?: DMNDecision[];
       knowledgeArticles?: KnowledgeArticle[];
       decisionRecords?: Decision[];
+      sketches?: Sketch[];
     } = {
       id: workspaceId,
       name: workspaceName,
@@ -292,6 +315,10 @@ export class WorkspaceV2Loader {
         `[WorkspaceV2Loader] Added ${allDecisionRecords.length} decision record(s) to workspace`
       );
     }
+    if (allSketches.length > 0) {
+      workspace.sketches = allSketches;
+      console.log(`[WorkspaceV2Loader] Added ${allSketches.length} sketch(es) to workspace`);
+    }
 
     console.log('[WorkspaceV2Loader] Loaded workspace with', domains.length, 'domains');
     console.log('[WorkspaceV2Loader] Workspace summary:', {
@@ -305,6 +332,7 @@ export class WorkspaceV2Loader {
       dmnDecisions: allDecisions.length,
       knowledgeArticles: allKnowledgeArticles.length,
       decisionRecords: allDecisionRecords.length,
+      sketches: allSketches.length,
     });
 
     return workspace;
@@ -342,6 +370,7 @@ export class WorkspaceV2Loader {
       dmn: categorized.dmn.length,
       kb: categorized.kb.length,
       adr: categorized.adr.length,
+      sketch: categorized.sketch.length,
     });
 
     // 3. Load each domain's resources
@@ -368,6 +397,7 @@ export class WorkspaceV2Loader {
     const allSystems: System[] = [];
     const allKnowledgeArticles: KnowledgeArticle[] = [];
     const allDecisionRecords: Decision[] = [];
+    const allSketches: Sketch[] = [];
 
     for (const result of domainResults) {
       domains.push(result.domain);
@@ -379,12 +409,14 @@ export class WorkspaceV2Loader {
       allSystems.push(...result.systems);
       allKnowledgeArticles.push(...result.knowledgeArticles);
       allDecisionRecords.push(...result.decisionRecords);
+      allSketches.push(...result.sketches);
     }
 
     // 4.5 Load ALL KB articles and ADRs at workspace level
     // Domain is determined by domain_id in the file content, not filename
     const allKBFiles = files.filter((f) => f.name.endsWith('.kb.yaml'));
     const allADRFiles = files.filter((f) => f.name.endsWith('.adr.yaml'));
+    const allSketchFiles = files.filter((f) => f.name.endsWith('.sketch.json'));
 
     if (allKBFiles.length > 0) {
       console.log(`[WorkspaceV2Loader] Loading ${allKBFiles.length} KB article(s) from strings`);
@@ -402,6 +434,15 @@ export class WorkspaceV2Loader {
         name: 'workspace',
       } as DomainV2);
       allDecisionRecords.push(...adrRecords);
+    }
+
+    if (allSketchFiles.length > 0) {
+      console.log(`[WorkspaceV2Loader] Loading ${allSketchFiles.length} sketch(es) from strings`);
+      const sketches = await this.loadSketchesFromStrings(allSketchFiles, {
+        id: 'workspace',
+        name: 'workspace',
+      } as DomainV2);
+      allSketches.push(...sketches);
     }
 
     // 5. Load relationships
@@ -449,6 +490,7 @@ export class WorkspaceV2Loader {
       dmnDecisions?: DMNDecision[];
       knowledgeArticles?: KnowledgeArticle[];
       decisionRecords?: Decision[];
+      sketches?: Sketch[];
     } = {
       id: workspaceId,
       name: workspaceName,
@@ -469,6 +511,7 @@ export class WorkspaceV2Loader {
     if (allDecisions.length > 0) workspace.dmnDecisions = allDecisions;
     if (allKnowledgeArticles.length > 0) workspace.knowledgeArticles = allKnowledgeArticles;
     if (allDecisionRecords.length > 0) workspace.decisionRecords = allDecisionRecords;
+    if (allSketches.length > 0) workspace.sketches = allSketches;
 
     console.log('[WorkspaceV2Loader] Loaded workspace from strings:', {
       domains: domains.length,
@@ -506,6 +549,7 @@ export class WorkspaceV2Loader {
       dmn: domainFiles.dmn.length,
       kb: domainFiles.kb.length,
       adr: domainFiles.adr.length,
+      sketch: domainFiles.sketch.length,
     });
 
     // Load tables
@@ -523,10 +567,11 @@ export class WorkspaceV2Loader {
     // Load DMN decisions
     const decisions = await this.loadDecisions(domainFiles.dmn, domainSpec);
 
-    // KB articles and ADRs are loaded at the workspace level (not per-domain)
+    // KB articles, ADRs, and sketches are loaded at the workspace level (not per-domain)
     // Domain is determined by domain_id in the file content
     const knowledgeArticles: KnowledgeArticle[] = [];
     const decisionRecords: Decision[] = [];
+    const sketches: Sketch[] = [];
 
     // Convert systems from DomainV2 format to System format
     const systems = this.loadSystems(domainSpec.systems || [], domainSpec.id, workspaceId, tables);
@@ -559,6 +604,7 @@ export class WorkspaceV2Loader {
       systems,
       knowledgeArticles,
       decisionRecords,
+      sketches,
     };
   }
 
@@ -588,6 +634,7 @@ export class WorkspaceV2Loader {
       dmn: domainFiles.dmn.length,
       kb: domainFiles.kb.length,
       adr: domainFiles.adr.length,
+      sketch: domainFiles.sketch.length,
     });
 
     // Load tables
@@ -605,10 +652,11 @@ export class WorkspaceV2Loader {
     // Load DMN decisions
     const decisions = await this.loadDecisionsFromStrings(domainFiles.dmn, domainSpec);
 
-    // KB articles and ADRs are loaded at the workspace level (not per-domain)
+    // KB articles, ADRs, and sketches are loaded at the workspace level (not per-domain)
     // Domain is determined by domain_id in the file content
     const knowledgeArticles: KnowledgeArticle[] = [];
     const decisionRecords: Decision[] = [];
+    const sketches: Sketch[] = [];
 
     // Convert systems from DomainV2 format to System format
     const systems = this.loadSystems(domainSpec.systems || [], domainSpec.id, workspaceId, tables);
@@ -641,6 +689,7 @@ export class WorkspaceV2Loader {
       systems,
       knowledgeArticles,
       decisionRecords,
+      sketches,
     };
   }
 
@@ -660,6 +709,7 @@ export class WorkspaceV2Loader {
     dmn: Array<{ name: string; content: string }>;
     kb: Array<{ name: string; content: string }>;
     adr: Array<{ name: string; content: string }>;
+    sketch: Array<{ name: string; content: string }>;
   } {
     // Match files that start with {workspace}_{domain}_ OR are exactly {workspace}_{domain}.{ext}
     const prefixWithUnderscore = `${workspaceName}_${domainName}_`.toLowerCase();
@@ -696,6 +746,7 @@ export class WorkspaceV2Loader {
       dmn: filterByPrefix(categorized.dmn),
       kb: filterByPrefix(categorized.kb),
       adr: filterByPrefix(categorized.adr),
+      sketch: filterByPrefix(categorized.sketch),
     };
   }
 
@@ -893,6 +944,35 @@ export class WorkspaceV2Loader {
     }
 
     return records;
+  }
+
+  /**
+   * Load sketches from string content
+   */
+  private static async loadSketchesFromStrings(
+    files: Array<{ name: string; content: string }>,
+    _domainSpec: DomainV2
+  ): Promise<Sketch[]> {
+    const sketches: Sketch[] = [];
+
+    for (const file of files) {
+      try {
+        const sketch = await sketchService.parseJSON(file.content);
+
+        if (sketch && typeof sketch === 'object' && 'id' in sketch) {
+          // Preserve domain_id from the file content as-is
+          sketches.push(sketch as Sketch);
+          const isGlobal = !(sketch as any).domain_id;
+          console.log(
+            `[WorkspaceV2Loader] Loaded sketch: ${sketch.name}${isGlobal ? ' (global)' : ` (domain: ${(sketch as any).domain_id})`}`
+          );
+        }
+      } catch (error) {
+        console.error(`[WorkspaceV2Loader] Failed to load sketch from ${file.name}:`, error);
+      }
+    }
+
+    return sketches;
   }
 
   /**
@@ -1101,6 +1181,7 @@ export class WorkspaceV2Loader {
       dmn: filterByPrefix(categorized.dmn),
       kb: filterByPrefix(categorized.kb),
       adr: filterByPrefix(categorized.adr),
+      sketch: filterByPrefix(categorized.sketch),
     };
   }
 
@@ -1307,6 +1388,33 @@ export class WorkspaceV2Loader {
   }
 
   /**
+   * Load sketches from .sketch.json files
+   */
+  private static async loadSketches(files: File[], _domainSpec: DomainV2): Promise<Sketch[]> {
+    const sketches: Sketch[] = [];
+
+    for (const file of files) {
+      try {
+        const content = await browserFileService.readFile(file);
+        const sketch = await sketchService.parseJSON(content);
+
+        if (sketch && typeof sketch === 'object' && 'id' in sketch) {
+          // Preserve domain_id from the file content as-is
+          sketches.push(sketch as Sketch);
+          const isGlobal = !(sketch as any).domain_id;
+          console.log(
+            `[WorkspaceV2Loader] Loaded sketch: ${sketch.name}${isGlobal ? ' (global)' : ` (domain: ${(sketch as any).domain_id})`}`
+          );
+        }
+      } catch (error) {
+        console.error(`[WorkspaceV2Loader] Failed to load sketch from ${file.name}:`, error);
+      }
+    }
+
+    return sketches;
+  }
+
+  /**
    * Categorize files by type, handling both flat and subdirectory structures
    * Supports paths like "odcs/file.odcs.yaml" or just "file.odcs.yaml"
    */
@@ -1319,6 +1427,7 @@ export class WorkspaceV2Loader {
     const dmnPattern = /\.dmn$/;
     const kbPattern = /\.kb\.yaml$/;
     const adrPattern = /\.adr\.yaml$/;
+    const sketchPattern = /\.sketch\.json$/;
 
     // Extract just the filename from paths for matching
     const getFileName = (path: string): string => {
@@ -1335,6 +1444,7 @@ export class WorkspaceV2Loader {
       dmn: filePaths.filter((f) => dmnPattern.test(getFileName(f))),
       kb: filePaths.filter((f) => kbPattern.test(getFileName(f))),
       adr: filePaths.filter((f) => adrPattern.test(getFileName(f))),
+      sketch: filePaths.filter((f) => sketchPattern.test(getFileName(f))),
     };
   }
 

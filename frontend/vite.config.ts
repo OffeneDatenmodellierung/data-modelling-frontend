@@ -1,5 +1,6 @@
 import { defineConfig, Plugin } from 'vitest/config';
 import react from '@vitejs/plugin-react';
+import tailwindcss from '@tailwindcss/vite';
 import path from 'path';
 import packageJson from './package.json';
 
@@ -31,7 +32,7 @@ function wasmMimeTypePlugin(): Plugin {
 
 export default defineConfig({
   base: basePath,
-  plugins: [react(), wasmMimeTypePlugin()],
+  plugins: [react(), tailwindcss(), wasmMimeTypePlugin()],
   define: {
     __APP_VERSION__: JSON.stringify(packageJson.version),
   },

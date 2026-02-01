@@ -587,9 +587,11 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                           await import('@/services/storage/workspaceV2Saver');
                         const decisionStoreModule = await import('@/stores/decisionStore');
                         const knowledgeStoreModule = await import('@/stores/knowledgeStore');
+                        const sketchStoreModule = await import('@/stores/sketchStore');
 
                         const { articles } = knowledgeStoreModule.useKnowledgeStore.getState();
                         const { decisions } = decisionStoreModule.useDecisionStore.getState();
+                        const { sketches } = sketchStoreModule.useSketchStore.getState();
 
                         // Generate V2 files
                         const files = await WorkspaceV2Saver.generateFiles(
@@ -603,7 +605,8 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                           bpmnProcesses,
                           dmnDecisions,
                           articles,
-                          decisions
+                          decisions,
+                          sketches
                         );
 
                         // Save using File System Access API

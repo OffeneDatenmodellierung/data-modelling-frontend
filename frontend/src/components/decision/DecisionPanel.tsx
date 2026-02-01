@@ -7,6 +7,7 @@ import React, { useState } from 'react';
 import { DecisionList } from './DecisionList';
 import { DecisionEditor } from './DecisionEditor';
 import { DecisionViewer } from './DecisionViewer';
+import { CollapsibleSidebar } from '@/components/common/CollapsibleSidebar';
 import { useDecisionStore } from '@/stores/decisionStore';
 import type { Decision } from '@/types/decision';
 
@@ -64,15 +65,15 @@ export const DecisionPanel: React.FC<DecisionPanelProps> = ({
 
   return (
     <div className={`flex h-full bg-white ${className}`}>
-      {/* Left Panel - Decision List */}
-      <div className="w-80 border-r border-gray-200 flex-shrink-0">
+      {/* Left Panel - Collapsible Decision List */}
+      <CollapsibleSidebar collapsedTitle="Decisions">
         <DecisionList
           workspacePath={workspacePath}
           domainId={domainId}
           onSelectDecision={handleSelectDecision}
           onCreateDecision={handleCreateDecision}
         />
-      </div>
+      </CollapsibleSidebar>
 
       {/* Right Panel - Viewer/Editor */}
       <div className="flex-1 overflow-hidden">

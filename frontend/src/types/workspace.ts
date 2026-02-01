@@ -150,6 +150,7 @@ export interface CategorizedFiles {
   dmn: string[];
   kb: string[]; // Knowledge base articles (.kb.yaml)
   adr: string[]; // Architecture decision records (.adr.yaml)
+  sketch: string[]; // Excalidraw sketches (.sketch.json)
 }
 
 /**
@@ -163,6 +164,7 @@ export interface DomainFiles {
   dmn: File[];
   kb: File[]; // Knowledge base articles (.kb.yaml)
   adr: File[]; // Architecture decision records (.adr.yaml)
+  sketch: File[]; // Excalidraw sketches (.sketch.json)
 }
 
 // Legacy ModelType - deprecated, kept for backward compatibility

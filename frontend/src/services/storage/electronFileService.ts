@@ -1136,7 +1136,8 @@ class ElectronFileService {
     allBpmnProcesses: BPMNProcess[],
     allDmnDecisions: DMNDecision[],
     allKnowledgeArticles: import('@/types/knowledge').KnowledgeArticle[] = [],
-    allDecisionRecords: import('@/types/decision').Decision[] = []
+    allDecisionRecords: import('@/types/decision').Decision[] = [],
+    allSketches: import('@/types/sketch').Sketch[] = []
   ): Promise<void> {
     if (getPlatform() !== 'electron') {
       throw new Error('Electron file service can only be used in Electron environment');
@@ -1154,7 +1155,8 @@ class ElectronFileService {
       allBpmnProcesses,
       allDmnDecisions,
       allKnowledgeArticles,
-      allDecisionRecords
+      allDecisionRecords,
+      allSketches
     );
 
     // Build set of expected file names
@@ -1169,6 +1171,7 @@ class ElectronFileService {
       '.dmn',
       '.kb.yaml',
       '.adr.yaml',
+      '.sketch.json',
       '.workspace.yaml',
     ];
 
