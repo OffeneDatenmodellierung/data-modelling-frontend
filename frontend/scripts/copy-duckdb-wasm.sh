@@ -20,7 +20,7 @@ DUCKDB_OUT_DIR="$FRONTEND_DIR/public/duckdb"
 DUCKDB_PKG="$FRONTEND_DIR/node_modules/@duckdb/duckdb-wasm/dist"
 
 # Expected version (should match package.json)
-EXPECTED_VERSION="1.29.0"
+EXPECTED_VERSION="1.32.0"
 
 echo "Setting up DuckDB-WASM files..."
 
