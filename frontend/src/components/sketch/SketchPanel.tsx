@@ -7,6 +7,7 @@ import React, { useState, useCallback } from 'react';
 import { SketchList } from './SketchList';
 import { SketchViewer } from './SketchViewer';
 import { ExcalidrawEditor } from '@/components/editors/ExcalidrawEditor';
+import { CollapsibleSidebar } from '@/components/common/CollapsibleSidebar';
 import { useSketchStore } from '@/stores/sketchStore';
 import { useWorkspaceStore } from '@/stores/workspaceStore';
 import type { Sketch } from '@/types/sketch';
@@ -86,14 +87,14 @@ export const SketchPanel: React.FC<SketchPanelProps> = ({
 
   return (
     <div className={`flex h-full bg-white ${className}`}>
-      {/* Left Panel - List */}
-      <div className="w-80 border-r border-gray-200 flex-shrink-0 flex flex-col">
+      {/* Left Panel - Collapsible List */}
+      <CollapsibleSidebar collapsedTitle="Sketches">
         <SketchList
           domainId={domainId}
           onSelectSketch={handleSelectSketch}
           onCreateSketch={handleCreateSketch}
         />
-      </div>
+      </CollapsibleSidebar>
 
       {/* Right Panel - Viewer/Editor */}
       <div className="flex-1 overflow-hidden">

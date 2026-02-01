@@ -8,6 +8,7 @@ import { KnowledgeList } from './KnowledgeList';
 import { ArticleEditor } from './ArticleEditor';
 import { ArticleViewer } from './ArticleViewer';
 import { KnowledgeSearch } from './KnowledgeSearch';
+import { CollapsibleSidebar } from '@/components/common/CollapsibleSidebar';
 import { useKnowledgeStore } from '@/stores/knowledgeStore';
 import type { KnowledgeArticle } from '@/types/knowledge';
 
@@ -65,8 +66,8 @@ export const KnowledgePanel: React.FC<KnowledgePanelProps> = ({
 
   return (
     <div className={`flex h-full bg-white ${className}`}>
-      {/* Left Panel - List or Search */}
-      <div className="w-80 border-r border-gray-200 flex-shrink-0 flex flex-col">
+      {/* Left Panel - Collapsible List or Search */}
+      <CollapsibleSidebar collapsedTitle="Knowledge">
         {/* Toggle between List and Search */}
         <div className="flex border-b border-gray-200">
           <button
@@ -106,7 +107,7 @@ export const KnowledgePanel: React.FC<KnowledgePanelProps> = ({
             />
           )}
         </div>
-      </div>
+      </CollapsibleSidebar>
 
       {/* Right Panel - Viewer/Editor */}
       <div className="flex-1 overflow-hidden">
