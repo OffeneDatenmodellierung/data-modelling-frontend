@@ -13,13 +13,13 @@ Creates data architectures, models, and flow diagrams entirely offline.
 ## Technology Stack
 
 ### Frontend
-- React 18 with TypeScript
-- Vite build system
+- React 19 with TypeScript
+- Vite 7 build system
 - ReactFlow for infinite canvas
-- Excalidraw for freeform sketches
+- Excalidraw 0.18 for freeform sketches
 - Zustand for state management
 - TanStack Query for async state
-- TailwindCSS for styling
+- Tailwind CSS 4 for styling
 - Vitest for testing
 
 ### Desktop
@@ -29,7 +29,7 @@ Creates data architectures, models, and flow diagrams entirely offline.
 
 ### WASM Modules
 - **data-modelling-sdk 2.1.0**: YAML parsing, validation, ODCS/ODPS/CADS format support, Knowledge Base, Decision Records, Sketches, stable YAML key ordering
-- **DuckDB-WASM 1.29.0**: In-browser SQL database (DuckDB 1.4.3)
+- **DuckDB-WASM 1.32.0**: In-browser SQL database
 
 ## Key Features
 

@@ -54,6 +54,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Dependencies
 - Added `@excalidraw/excalidraw: ^0.18.0` for freeform diagramming
+- Upgraded `react` and `react-dom`: 18.2.0 → 19.2.4
+- Upgraded `tailwindcss`: 3.4.0 → 4.1.18 (CSS-based config)
+- Upgraded `@duckdb/duckdb-wasm`: 1.29.0 → 1.32.0
+- Upgraded `electron`: 39.2.7 → 40.1.0
+- Upgraded `lint-staged`: 15.5.2 → 16.2.7
+- Security vulnerabilities reduced from 15 to 6
 
 ## [2.4.3] - 2026-01-28
 
