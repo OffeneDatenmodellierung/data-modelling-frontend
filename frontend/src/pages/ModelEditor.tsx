@@ -38,6 +38,8 @@ import { SharedResourcePicker } from '@/components/domain/SharedResourcePicker';
 import { DecisionPanel } from '@/components/decision/DecisionPanel';
 import { KnowledgePanel } from '@/components/knowledge/KnowledgePanel';
 import { SketchPanel } from '@/components/sketch/SketchPanel';
+import { GitPanel, GitStatusIndicator } from '@/components/git';
+import { gitService } from '@/services/git/gitService';
 import type { SharedResourceReference } from '@/types/domain';
 
 const ModelEditor: React.FC = () => {
@@ -220,6 +222,22 @@ const ModelEditor: React.FC = () => {
       workspaceStore.stopAutoSave();
     };
   }, [workspaceId]);
+
+  // Initialize git service with workspace path
+  useEffect(() => {
+    // Get the workspace path from domains or workspaceId
+    const domain = domains.find((d) => d.id === selectedDomainId);
+    const workspacePath = domain?.workspace_path || null;
+
+    if (workspacePath && gitService.isAvailable()) {
+      gitService.setWorkspacePath(workspacePath);
+      gitService.enableAutoRefresh(10000); // Refresh every 10 seconds
+    }
+
+    return () => {
+      gitService.disableAutoRefresh();
+    };
+  }, [domains, selectedDomainId]);
 
   // Clear model store when workspace changes (not on initial mount or same workspace reload)
   // This prevents stale data from appearing when switching to a different workspace
@@ -598,8 +616,11 @@ const ModelEditor: React.FC = () => {
             </>
           )}
 
-          {/* Settings and History buttons */}
+          {/* Git Status, Settings and History buttons */}
           <div className="flex items-center gap-2 ml-auto">
+            {/* Git Status Indicator */}
+            <GitStatusIndicator />
+
             <button
               onClick={() => setShowWorkspaceSettings(!showWorkspaceSettings)}
               className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors"
@@ -677,6 +698,9 @@ const ModelEditor: React.FC = () => {
               />
             )}
         </div>
+
+        {/* Git Version Control Panel */}
+        <GitPanel />
       </div>
 
       {/* BPMN/DMN creation is now only available inside CADS nodes (AI/ML/App) */}

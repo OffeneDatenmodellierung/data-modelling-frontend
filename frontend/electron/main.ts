@@ -505,6 +505,306 @@ ipcMain.handle(
   }
 );
 
+// ============================================================================
+// Git-related IPC handlers
+// ============================================================================
+
+// Lazy-load simple-git to avoid startup penalty
+let simpleGitModule: typeof import('simple-git') | null = null;
+async function getSimpleGit() {
+  if (!simpleGitModule) {
+    simpleGitModule = await import('simple-git');
+  }
+  return simpleGitModule.default;
+}
+
+/**
+ * Get git status for a workspace
+ */
+ipcMain.handle('git:status', async (_event, workspacePath: string) => {
+  try {
+    const simpleGit = await getSimpleGit();
+    const git = simpleGit(workspacePath);
+
+    // Check if this is a git repo
+    const isRepo = await git.checkIsRepo();
+    if (!isRepo) {
+      return {
+        isGitRepo: false,
+        currentBranch: null,
+        files: [],
+        ahead: 0,
+        behind: 0,
+        remoteName: null,
+        remoteUrl: null,
+        hasConflicts: false,
+        conflictFiles: [],
+      };
+    }
+
+    // Get status
+    const status = await git.status();
+
+    // Get remote info
+    let remoteName: string | null = null;
+    let remoteUrl: string | null = null;
+    try {
+      const remotes = await git.getRemotes(true);
+      const origin = remotes.find((r) => r.name === 'origin') || remotes[0];
+      if (origin) {
+        remoteName = origin.name;
+        remoteUrl = origin.refs?.fetch || origin.refs?.push || null;
+      }
+    } catch {
+      // No remotes configured
+    }
+
+    // Parse file changes
+    const files: Array<{
+      path: string;
+      status: 'modified' | 'added' | 'deleted' | 'renamed' | 'untracked';
+      staged: boolean;
+      oldPath?: string;
+    }> = [];
+
+    // Staged files
+    for (const file of status.staged) {
+      files.push({ path: file, status: 'added', staged: true });
+    }
+    for (const file of status.modified) {
+      // Check if also staged
+      const isStaged = status.staged.includes(file);
+      if (!files.find((f) => f.path === file)) {
+        files.push({ path: file, status: 'modified', staged: isStaged });
+      }
+    }
+    for (const file of status.deleted) {
+      files.push({ path: file, status: 'deleted', staged: status.staged.includes(file) });
+    }
+    for (const file of status.renamed) {
+      files.push({ path: file.to, status: 'renamed', staged: true, oldPath: file.from });
+    }
+    for (const file of status.not_added) {
+      files.push({ path: file, status: 'untracked', staged: false });
+    }
+    // Also include created files
+    for (const file of status.created) {
+      if (!files.find((f) => f.path === file)) {
+        files.push({ path: file, status: 'added', staged: true });
+      }
+    }
+
+    // Check for conflicts
+    const hasConflicts = status.conflicted.length > 0;
+
+    return {
+      isGitRepo: true,
+      currentBranch: status.current,
+      files,
+      ahead: status.ahead,
+      behind: status.behind,
+      remoteName,
+      remoteUrl,
+      hasConflicts,
+      conflictFiles: status.conflicted,
+    };
+  } catch (error) {
+    console.error('[Electron] Git status failed:', error);
+    return {
+      isGitRepo: false,
+      currentBranch: null,
+      files: [],
+      ahead: 0,
+      behind: 0,
+      remoteName: null,
+      remoteUrl: null,
+      hasConflicts: false,
+      conflictFiles: [],
+    };
+  }
+});
+
+/**
+ * Stage specific files
+ */
+ipcMain.handle('git:add', async (_event, workspacePath: string, files: string[]) => {
+  try {
+    const simpleGit = await getSimpleGit();
+    const git = simpleGit(workspacePath);
+    await git.add(files);
+    return { success: true };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('[Electron] Git add failed:', errorMessage);
+    return { success: false, error: errorMessage };
+  }
+});
+
+/**
+ * Stage all changes
+ */
+ipcMain.handle('git:add-all', async (_event, workspacePath: string) => {
+  try {
+    const simpleGit = await getSimpleGit();
+    const git = simpleGit(workspacePath);
+    await git.add('-A');
+    return { success: true };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('[Electron] Git add all failed:', errorMessage);
+    return { success: false, error: errorMessage };
+  }
+});
+
+/**
+ * Create a commit
+ */
+ipcMain.handle('git:commit', async (_event, workspacePath: string, message: string) => {
+  try {
+    const simpleGit = await getSimpleGit();
+    const git = simpleGit(workspacePath);
+    const result = await git.commit(message);
+    return { success: true, hash: result.commit };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('[Electron] Git commit failed:', errorMessage);
+    return { success: false, error: errorMessage };
+  }
+});
+
+/**
+ * Get commit history
+ */
+ipcMain.handle(
+  'git:log',
+  async (_event, workspacePath: string, options?: { maxCount?: number; file?: string }) => {
+    try {
+      const simpleGit = await getSimpleGit();
+      const git = simpleGit(workspacePath);
+
+      const logOptions: Record<string, string | number> = {};
+      if (options?.maxCount) {
+        logOptions['--max-count'] = options.maxCount;
+      }
+      if (options?.file) {
+        logOptions['--follow'] = '';
+      }
+
+      const log = options?.file
+        ? await git.log({ file: options.file, maxCount: options.maxCount || 50 })
+        : await git.log({ maxCount: options?.maxCount || 50 });
+
+      return log.all.map((entry) => ({
+        hash: entry.hash,
+        hashShort: entry.hash.substring(0, 7),
+        message: entry.message,
+        author: entry.author_name,
+        authorEmail: entry.author_email,
+        date: entry.date,
+      }));
+    } catch (error) {
+      console.error('[Electron] Git log failed:', error);
+      return [];
+    }
+  }
+);
+
+/**
+ * Get diff output
+ */
+ipcMain.handle(
+  'git:diff',
+  async (
+    _event,
+    workspacePath: string,
+    options?: { staged?: boolean; file?: string; commit?: string }
+  ) => {
+    try {
+      const simpleGit = await getSimpleGit();
+      const git = simpleGit(workspacePath);
+
+      const args: string[] = [];
+
+      if (options?.commit) {
+        // Diff for a specific commit
+        args.push(`${options.commit}^`, options.commit);
+      } else if (options?.staged) {
+        args.push('--cached');
+      }
+
+      if (options?.file) {
+        args.push('--', options.file);
+      }
+
+      const diff = await git.diff(args);
+      return diff;
+    } catch (error) {
+      console.error('[Electron] Git diff failed:', error);
+      return '';
+    }
+  }
+);
+
+/**
+ * Get diff for a specific file
+ */
+ipcMain.handle('git:diff-file', async (_event, workspacePath: string, filePath: string) => {
+  try {
+    const simpleGit = await getSimpleGit();
+    const git = simpleGit(workspacePath);
+    const diff = await git.diff(['--', filePath]);
+    return diff;
+  } catch (error) {
+    console.error('[Electron] Git diff file failed:', error);
+    return '';
+  }
+});
+
+/**
+ * Discard changes (checkout/clean)
+ */
+ipcMain.handle(
+  'git:discard',
+  async (_event, workspacePath: string, options?: { files?: string[] }) => {
+    try {
+      const simpleGit = await getSimpleGit();
+      const git = simpleGit(workspacePath);
+
+      if (options?.files && options.files.length > 0) {
+        // Discard specific files
+        await git.checkout(['--', ...options.files]);
+      } else {
+        // Discard all changes
+        await git.checkout(['--', '.']);
+        // Also clean untracked files
+        await git.clean('fd');
+      }
+
+      return { success: true };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('[Electron] Git discard failed:', errorMessage);
+      return { success: false, error: errorMessage };
+    }
+  }
+);
+
+/**
+ * Initialize a new git repository
+ */
+ipcMain.handle('git:init', async (_event, workspacePath: string) => {
+  try {
+    const simpleGit = await getSimpleGit();
+    const git = simpleGit(workspacePath);
+    await git.init();
+    return { success: true };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('[Electron] Git init failed:', errorMessage);
+    return { success: false, error: errorMessage };
+  }
+});
+
 // Quit when all windows are closed, except on macOS
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {

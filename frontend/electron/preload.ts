@@ -114,4 +114,112 @@ contextBridge.exposeInMainWorld('electronAPI', {
   }): Promise<{ success: boolean; backupPath?: string; error?: string }> => {
     return await ipcRenderer.invoke('duckdb:backup', options);
   },
+
+  // ============================================================================
+  // Git-related operations
+  // ============================================================================
+
+  /**
+   * Get git status for a workspace
+   */
+  gitStatus: async (
+    workspacePath: string
+  ): Promise<{
+    isGitRepo: boolean;
+    currentBranch: string | null;
+    files: Array<{
+      path: string;
+      status: 'modified' | 'added' | 'deleted' | 'renamed' | 'untracked';
+      staged: boolean;
+      oldPath?: string;
+    }>;
+    ahead: number;
+    behind: number;
+    remoteName: string | null;
+    remoteUrl: string | null;
+    hasConflicts: boolean;
+    conflictFiles: string[];
+  }> => {
+    return await ipcRenderer.invoke('git:status', workspacePath);
+  },
+
+  /**
+   * Stage specific files
+   */
+  gitAdd: async (
+    workspacePath: string,
+    files: string[]
+  ): Promise<{ success: boolean; error?: string }> => {
+    return await ipcRenderer.invoke('git:add', workspacePath, files);
+  },
+
+  /**
+   * Stage all changes
+   */
+  gitAddAll: async (workspacePath: string): Promise<{ success: boolean; error?: string }> => {
+    return await ipcRenderer.invoke('git:add-all', workspacePath);
+  },
+
+  /**
+   * Create a commit
+   */
+  gitCommit: async (
+    workspacePath: string,
+    message: string
+  ): Promise<{ success: boolean; hash?: string; error?: string }> => {
+    return await ipcRenderer.invoke('git:commit', workspacePath, message);
+  },
+
+  /**
+   * Get commit history
+   */
+  gitLog: async (
+    workspacePath: string,
+    options?: { maxCount?: number; file?: string }
+  ): Promise<
+    Array<{
+      hash: string;
+      hashShort: string;
+      message: string;
+      author: string;
+      authorEmail: string;
+      date: string;
+    }>
+  > => {
+    return await ipcRenderer.invoke('git:log', workspacePath, options);
+  },
+
+  /**
+   * Get diff output
+   */
+  gitDiff: async (
+    workspacePath: string,
+    options?: { staged?: boolean; file?: string; commit?: string }
+  ): Promise<string> => {
+    return await ipcRenderer.invoke('git:diff', workspacePath, options);
+  },
+
+  /**
+   * Get diff for a specific file
+   */
+  gitDiffFile: async (workspacePath: string, filePath: string): Promise<string> => {
+    return await ipcRenderer.invoke('git:diff-file', workspacePath, filePath);
+  },
+
+  /**
+   * Discard changes
+   */
+  gitDiscard: async (
+    workspacePath: string,
+    options?: { files?: string[] }
+  ): Promise<{ success: boolean; error?: string }> => {
+    return await ipcRenderer.invoke('git:discard', workspacePath, options);
+  },
+
+  /**
+   * Initialize a new git repository
+   */
+  gitInit: async (workspacePath: string): Promise<{ success: boolean; error?: string }> => {
+    return await ipcRenderer.invoke('git:init', workspacePath);
+  },
 });

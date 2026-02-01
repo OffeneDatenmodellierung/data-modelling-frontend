@@ -76,6 +76,54 @@ export interface DuckDBBackupResult {
   error?: string;
 }
 
+// Git IPC types
+export interface GitStatusResult {
+  isGitRepo: boolean;
+  currentBranch: string | null;
+  files: Array<{
+    path: string;
+    status: 'modified' | 'added' | 'deleted' | 'renamed' | 'untracked';
+    staged: boolean;
+    oldPath?: string;
+  }>;
+  ahead: number;
+  behind: number;
+  remoteName: string | null;
+  remoteUrl: string | null;
+  hasConflicts: boolean;
+  conflictFiles: string[];
+}
+
+export interface GitCommitResult {
+  success: boolean;
+  hash?: string;
+  error?: string;
+}
+
+export interface GitLogOptions {
+  maxCount?: number;
+  file?: string;
+}
+
+export interface GitLogEntry {
+  hash: string;
+  hashShort: string;
+  message: string;
+  author: string;
+  authorEmail: string;
+  date: string;
+}
+
+export interface GitDiffOptions {
+  staged?: boolean;
+  file?: string;
+  commit?: string;
+}
+
+export interface GitDiscardOptions {
+  files?: string[]; // If empty, discard all changes
+}
+
 declare global {
   interface Window {
     electronAPI?: {
@@ -96,6 +144,22 @@ declare global {
       duckdbFileExists: (filePath: string) => Promise<boolean>;
       duckdbDeleteFile: (filePath: string) => Promise<{ success: boolean; error?: string }>;
       duckdbBackup: (options: DuckDBBackupOptions) => Promise<DuckDBBackupResult>;
+      // Git operations
+      gitStatus: (workspacePath: string) => Promise<GitStatusResult>;
+      gitAdd: (
+        workspacePath: string,
+        files: string[]
+      ) => Promise<{ success: boolean; error?: string }>;
+      gitAddAll: (workspacePath: string) => Promise<{ success: boolean; error?: string }>;
+      gitCommit: (workspacePath: string, message: string) => Promise<GitCommitResult>;
+      gitLog: (workspacePath: string, options?: GitLogOptions) => Promise<GitLogEntry[]>;
+      gitDiff: (workspacePath: string, options?: GitDiffOptions) => Promise<string>;
+      gitDiffFile: (workspacePath: string, filePath: string) => Promise<string>;
+      gitDiscard: (
+        workspacePath: string,
+        options?: GitDiscardOptions
+      ) => Promise<{ success: boolean; error?: string }>;
+      gitInit: (workspacePath: string) => Promise<{ success: boolean; error?: string }>;
     };
   }
 }
