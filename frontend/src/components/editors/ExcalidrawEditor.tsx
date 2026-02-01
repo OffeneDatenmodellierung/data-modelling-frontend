@@ -9,6 +9,9 @@ import { useUIStore } from '@/stores/uiStore';
 import { sketchService } from '@/services/sdk/sketchService';
 import type { ExcalidrawImperativeAPI } from '@excalidraw/excalidraw/types';
 
+// Import Excalidraw CSS - required for proper rendering
+import '@excalidraw/excalidraw/index.css';
+
 export interface ExcalidrawEditorProps {
   data?: string; // JSON string of Excalidraw data
   name?: string;
