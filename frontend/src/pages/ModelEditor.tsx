@@ -50,7 +50,11 @@ import { HelpButton, HelpPanel } from '@/components/help';
 import { useHelpPanel } from '@/hooks/useHelpPanel';
 
 const ModelEditor: React.FC = () => {
-  const { workspaceId, domainId } = useParams<{ workspaceId: string; domainId?: string }>();
+  const params = useParams<{ workspaceId: string; domainId?: string; '*': string }>();
+  // Handle both regular workspace routes (/workspace/:workspaceId) and
+  // GitHub repo routes (/workspace/github/*) where the path contains encoded slashes
+  const workspaceId = params['*'] ? `github/${params['*']}` : params.workspaceId;
+  const domainId = params.domainId;
   const { fetchWorkspace, workspaces, setCurrentWorkspace } = useWorkspaceStore();
   const {
     selectedDomainId,

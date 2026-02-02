@@ -177,6 +177,8 @@ function App() {
               <Routes>
                 <Route path="/" element={<Home />} />
                 <Route path="/workspace/:workspaceId" element={<ModelEditor />} />
+                {/* GitHub repo workspace URLs have encoded slashes that expand to multiple segments */}
+                <Route path="/workspace/github/*" element={<ModelEditor />} />
                 <Route path="/auth/complete" element={<AuthCallback />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
