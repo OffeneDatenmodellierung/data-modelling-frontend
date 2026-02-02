@@ -18,3 +18,8 @@ export {
   setAuthMethodPreference,
 } from './GitHubAuthSettings';
 export type { AuthMethodPreference } from './GitHubAuthSettings';
+
+// Advanced features - Tags, Blame, PR Conflicts
+export { GitHubTagPanel } from './GitHubTagPanel';
+export { GitHubBlameViewer, GitHubBlameDialog } from './GitHubBlameViewer';
+export { GitHubPRConflictPanel, GitHubPRConflictBadge } from './GitHubPRConflictPanel';

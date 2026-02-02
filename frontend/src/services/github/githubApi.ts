@@ -15,9 +15,17 @@ import type {
   GitHubContent,
   GitHubPullRequest,
   GitHubUser,
+  GitHubTag,
+  GitHubAnnotatedTag,
   CreateBranchParams,
   CreatePullRequestParams,
+  CreateTagParams,
   UpdateFileParams,
+  GitHubBlameResult,
+  GitHubBlameLine,
+  GitHubBlameHunk,
+  GitHubPRConflictInfo,
+  GitHubUpdateBranchResult,
 } from '@/types/github';
 
 const API_BASE = 'https://api.github.com';
@@ -507,6 +515,321 @@ export async function compareBranches(
 }
 
 // ============================================================================
+// Tag API
+// ============================================================================
+
+export async function listTags(
+  owner: string,
+  repo: string,
+  options?: { per_page?: number; page?: number }
+): Promise<GitHubTag[]> {
+  const params = new URLSearchParams();
+  if (options?.per_page) params.set('per_page', String(options.per_page));
+  if (options?.page) params.set('page', String(options.page));
+
+  const query = params.toString();
+  const path = `/repos/${owner}/${repo}/tags${query ? `?${query}` : ''}`;
+
+  const response = await apiRequest<GitHubTag[]>('GET', path);
+  return response.data;
+}
+
+export async function getTag(
+  owner: string,
+  repo: string,
+  tagSha: string
+): Promise<GitHubAnnotatedTag> {
+  const response = await apiRequest<GitHubAnnotatedTag>(
+    'GET',
+    `/repos/${owner}/${repo}/git/tags/${tagSha}`
+  );
+  return response.data;
+}
+
+export async function createAnnotatedTag(
+  owner: string,
+  repo: string,
+  params: CreateTagParams
+): Promise<GitHubAnnotatedTag> {
+  // First create the tag object
+  const tagResponse = await apiRequest<GitHubAnnotatedTag>(
+    'POST',
+    `/repos/${owner}/${repo}/git/tags`,
+    params
+  );
+
+  // Then create the reference pointing to the tag
+  await apiRequest<{ ref: string; object: { sha: string } }>(
+    'POST',
+    `/repos/${owner}/${repo}/git/refs`,
+    {
+      ref: `refs/tags/${params.tag}`,
+      sha: tagResponse.data.sha,
+    }
+  );
+
+  return tagResponse.data;
+}
+
+export async function createLightweightTag(
+  owner: string,
+  repo: string,
+  tagName: string,
+  commitSha: string
+): Promise<{ ref: string; object: { sha: string } }> {
+  const response = await apiRequest<{ ref: string; object: { sha: string } }>(
+    'POST',
+    `/repos/${owner}/${repo}/git/refs`,
+    {
+      ref: `refs/tags/${tagName}`,
+      sha: commitSha,
+    }
+  );
+  return response.data;
+}
+
+export async function deleteTag(owner: string, repo: string, tagName: string): Promise<void> {
+  await apiRequest<void>(
+    'DELETE',
+    `/repos/${owner}/${repo}/git/refs/tags/${encodeURIComponent(tagName)}`
+  );
+}
+
+// ============================================================================
+// Blame API (via GraphQL)
+// ============================================================================
+
+/**
+ * Get blame information for a file using GitHub's GraphQL API
+ * The REST API doesn't support blame, so we use GraphQL
+ */
+export async function getBlame(
+  owner: string,
+  repo: string,
+  path: string,
+  ref?: string
+): Promise<GitHubBlameResult> {
+  const query = `
+    query GetBlame($owner: String!, $repo: String!, $path: String!, $ref: String!) {
+      repository(owner: $owner, name: $repo) {
+        object(expression: $ref) {
+          ... on Commit {
+            blame(path: $path) {
+              ranges {
+                startingLine
+                endingLine
+                commit {
+                  oid
+                  abbreviatedOid
+                  message
+                  author {
+                    name
+                    email
+                    date
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  `;
+
+  const variables = {
+    owner,
+    repo,
+    path,
+    ref: ref || 'HEAD',
+  };
+
+  const response = await graphqlRequest<{
+    repository: {
+      object: {
+        blame: {
+          ranges: Array<{
+            startingLine: number;
+            endingLine: number;
+            commit: {
+              oid: string;
+              abbreviatedOid: string;
+              message: string;
+              author: {
+                name: string;
+                email: string;
+                date: string;
+              };
+            };
+          }>;
+        };
+      } | null;
+    };
+  }>(query, variables);
+
+  const blameData = response.data?.repository?.object?.blame;
+  if (!blameData) {
+    throw new Error(`Could not get blame for ${path}`);
+  }
+
+  const hunks: GitHubBlameHunk[] = blameData.ranges.map((range) => ({
+    startLine: range.startingLine,
+    endLine: range.endingLine,
+    commit: {
+      sha: range.commit.oid,
+      shortSha: range.commit.abbreviatedOid,
+      author: range.commit.author.name,
+      authorEmail: range.commit.author.email,
+      date: range.commit.author.date,
+      message: range.commit.message,
+    },
+    lines: [], // Will be populated when we fetch file content
+  }));
+
+  // To get actual line content, we need to fetch the file
+  const fileContent = await getContent(owner, repo, path, ref);
+  const lines: string[] = [];
+
+  if (!Array.isArray(fileContent) && fileContent.type === 'file' && fileContent.content) {
+    const decodedContent = atob(fileContent.content.replace(/\n/g, ''));
+    lines.push(...decodedContent.split('\n'));
+  }
+
+  // Map lines to blame info
+  const blameLines: GitHubBlameLine[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    const lineNumber = i + 1;
+    const hunk = hunks.find((h) => lineNumber >= h.startLine && lineNumber <= h.endLine);
+    if (hunk) {
+      const blameLine: GitHubBlameLine = {
+        lineNumber,
+        content: lines[i] ?? '',
+        commit: hunk.commit,
+      };
+      blameLines.push(blameLine);
+      hunk.lines.push(blameLine);
+    }
+  }
+
+  return {
+    path,
+    hunks,
+    lines: blameLines,
+  };
+}
+
+/**
+ * GraphQL request helper
+ */
+async function graphqlRequest<T>(
+  query: string,
+  variables: Record<string, unknown>
+): Promise<{ data: T }> {
+  if (isRateLimited()) {
+    const resetTime = new Date(rateLimit.reset * 1000).toLocaleTimeString();
+    throw new Error(`Rate limited. Resets at ${resetTime}`);
+  }
+
+  if (!githubAuth.isAuthenticated()) {
+    throw new Error('Not authenticated with GitHub');
+  }
+
+  const token = githubAuth.getToken();
+  const response = await fetch('https://api.github.com/graphql', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ query, variables }),
+  });
+
+  updateRateLimit(response.headers);
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || `GraphQL request failed: ${response.status}`);
+  }
+
+  const result = await response.json();
+  if (result.errors) {
+    throw new Error(result.errors[0]?.message || 'GraphQL request failed');
+  }
+
+  return result;
+}
+
+// ============================================================================
+// PR Conflict Detection & Update
+// ============================================================================
+
+/**
+ * Get detailed conflict information for a pull request
+ */
+export async function getPRConflictInfo(
+  owner: string,
+  repo: string,
+  pullNumber: number
+): Promise<GitHubPRConflictInfo> {
+  // Get the PR details
+  const pr = await getPullRequest(owner, repo, pullNumber);
+
+  // Compare base and head to get ahead/behind info
+  let aheadBy = 0;
+  let behindBy = 0;
+
+  try {
+    const comparison = await compareBranches(owner, repo, pr.base.ref, pr.head.ref);
+    aheadBy = comparison.ahead_by;
+    behindBy = comparison.behind_by;
+  } catch {
+    // Comparison might fail if branches are unrelated
+  }
+
+  const hasConflicts = pr.mergeable === false || pr.mergeable_state === 'dirty';
+
+  // Get conflicting files if there are conflicts
+  let conflictingFiles: string[] | undefined;
+  if (hasConflicts) {
+    // GitHub doesn't directly expose conflicting files via API
+    // We can try to get them via the merge status check
+    // For now, we'll leave this undefined as GitHub doesn't expose this easily
+    conflictingFiles = undefined;
+  }
+
+  return {
+    hasConflicts,
+    mergeable: pr.mergeable,
+    mergeableState: pr.mergeable_state,
+    conflictingFiles,
+    behindBy,
+    aheadBy,
+  };
+}
+
+/**
+ * Update a pull request branch with the latest changes from base
+ * This uses the "Update branch" button functionality
+ */
+export async function updatePullRequestBranch(
+  owner: string,
+  repo: string,
+  pullNumber: number,
+  expectedHeadSha?: string
+): Promise<GitHubUpdateBranchResult> {
+  const body: { expected_head_sha?: string } = {};
+  if (expectedHeadSha) {
+    body.expected_head_sha = expectedHeadSha;
+  }
+
+  const response = await apiRequest<GitHubUpdateBranchResult>(
+    'PUT',
+    `/repos/${owner}/${repo}/pulls/${pullNumber}/update-branch`,
+    body
+  );
+  return response.data;
+}
+
+// ============================================================================
 // Export API object
 // ============================================================================
 
@@ -537,6 +860,17 @@ export const githubApi = {
   mergePullRequest,
   // Comparison
   compareBranches,
+  // Tags
+  listTags,
+  getTag,
+  createAnnotatedTag,
+  createLightweightTag,
+  deleteTag,
+  // Blame
+  getBlame,
+  // PR Conflicts
+  getPRConflictInfo,
+  updatePullRequestBranch,
   // Rate Limit
   getRateLimit,
   isRateLimited,

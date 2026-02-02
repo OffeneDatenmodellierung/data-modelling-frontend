@@ -11,6 +11,9 @@ import type {
   GitHubRepository,
   GitHubRepositoryConnection,
   GitHubRateLimit,
+  GitHubTag,
+  GitHubBlameResult,
+  GitHubPRConflictInfo,
 } from '@/types/github';
 import { githubAuth } from '@/services/github/githubAuth';
 import { getRateLimit } from '@/services/github/githubApi';
@@ -38,6 +41,22 @@ export interface GitHubState {
   // Rate limiting
   rateLimit: GitHubRateLimit;
 
+  // Tags
+  tags: GitHubTag[];
+  isLoadingTags: boolean;
+  selectedTag: GitHubTag | null;
+  tagError: string | null;
+
+  // Blame
+  blameResult: GitHubBlameResult | null;
+  blameFilePath: string | null;
+  isLoadingBlame: boolean;
+  blameError: string | null;
+
+  // PR Conflict Info
+  prConflictInfo: Map<number, GitHubPRConflictInfo>;
+  isLoadingConflictInfo: boolean;
+
   // UI State
   showConnectDialog: boolean;
   showAuthDialog: boolean;
@@ -61,6 +80,25 @@ export interface GitHubState {
 
   // Actions - Rate Limit
   updateRateLimit: () => void;
+
+  // Actions - Tags
+  setTags: (tags: GitHubTag[]) => void;
+  setLoadingTags: (isLoading: boolean) => void;
+  setSelectedTag: (tag: GitHubTag | null) => void;
+  setTagError: (error: string | null) => void;
+  addTag: (tag: GitHubTag) => void;
+  removeTag: (tagName: string) => void;
+
+  // Actions - Blame
+  setBlameResult: (result: GitHubBlameResult | null, filePath: string | null) => void;
+  setLoadingBlame: (isLoading: boolean) => void;
+  setBlameError: (error: string | null) => void;
+  clearBlame: () => void;
+
+  // Actions - PR Conflicts
+  setPRConflictInfo: (prNumber: number, info: GitHubPRConflictInfo) => void;
+  setLoadingConflictInfo: (isLoading: boolean) => void;
+  clearPRConflictInfo: (prNumber: number) => void;
 
   // Actions - UI
   setShowConnectDialog: (show: boolean) => void;
@@ -108,6 +146,22 @@ const initialState = {
 
   // Rate limiting
   rateLimit: initialRateLimit,
+
+  // Tags
+  tags: [] as GitHubTag[],
+  isLoadingTags: false,
+  selectedTag: null as GitHubTag | null,
+  tagError: null as string | null,
+
+  // Blame
+  blameResult: null as GitHubBlameResult | null,
+  blameFilePath: null as string | null,
+  isLoadingBlame: false,
+  blameError: null as string | null,
+
+  // PR Conflict Info
+  prConflictInfo: new Map<number, GitHubPRConflictInfo>(),
+  isLoadingConflictInfo: false,
 
   // UI State
   showConnectDialog: false,
@@ -187,6 +241,68 @@ export const useGitHubStore = create<GitHubState>()(
           set({ rateLimit });
         },
 
+        // Tag Actions
+        setTags: (tags) => set({ tags, isLoadingTags: false, tagError: null }),
+
+        setLoadingTags: (isLoadingTags) => set({ isLoadingTags }),
+
+        setSelectedTag: (selectedTag) => set({ selectedTag }),
+
+        setTagError: (tagError) => set({ tagError, isLoadingTags: false }),
+
+        addTag: (tag) =>
+          set((state) => ({
+            tags: [tag, ...state.tags],
+            tagError: null,
+          })),
+
+        removeTag: (tagName) =>
+          set((state) => ({
+            tags: state.tags.filter((t) => t.name !== tagName),
+            selectedTag: state.selectedTag?.name === tagName ? null : state.selectedTag,
+          })),
+
+        // Blame Actions
+        setBlameResult: (blameResult, blameFilePath) =>
+          set({
+            blameResult,
+            blameFilePath,
+            isLoadingBlame: false,
+            blameError: null,
+          }),
+
+        setLoadingBlame: (isLoadingBlame) => set({ isLoadingBlame }),
+
+        setBlameError: (blameError) =>
+          set({
+            blameError,
+            isLoadingBlame: false,
+          }),
+
+        clearBlame: () =>
+          set({
+            blameResult: null,
+            blameFilePath: null,
+            blameError: null,
+          }),
+
+        // PR Conflict Actions
+        setPRConflictInfo: (prNumber, info) =>
+          set((state) => {
+            const newMap = new Map(state.prConflictInfo);
+            newMap.set(prNumber, info);
+            return { prConflictInfo: newMap, isLoadingConflictInfo: false };
+          }),
+
+        setLoadingConflictInfo: (isLoadingConflictInfo) => set({ isLoadingConflictInfo }),
+
+        clearPRConflictInfo: (prNumber) =>
+          set((state) => {
+            const newMap = new Map(state.prConflictInfo);
+            newMap.delete(prNumber);
+            return { prConflictInfo: newMap };
+          }),
+
         // UI Actions
         setShowConnectDialog: (showConnectDialog) => set({ showConnectDialog }),
 
@@ -239,6 +355,30 @@ export const selectIsRateLimitLow = (state: GitHubState) => {
 export const selectCanUseGitHub = (state: GitHubState) => {
   return state.auth.isAuthenticated && state.rateLimit.remaining > 0;
 };
+
+// Tag selectors
+export const selectTags = (state: GitHubState) => state.tags;
+
+export const selectSelectedTag = (state: GitHubState) => state.selectedTag;
+
+export const selectIsLoadingTags = (state: GitHubState) => state.isLoadingTags;
+
+export const selectTagError = (state: GitHubState) => state.tagError;
+
+// Blame selectors
+export const selectBlameResult = (state: GitHubState) => state.blameResult;
+
+export const selectBlameFilePath = (state: GitHubState) => state.blameFilePath;
+
+export const selectIsLoadingBlame = (state: GitHubState) => state.isLoadingBlame;
+
+export const selectBlameError = (state: GitHubState) => state.blameError;
+
+// PR Conflict selectors
+export const selectPRConflictInfo = (prNumber: number) => (state: GitHubState) =>
+  state.prConflictInfo.get(prNumber);
+
+export const selectIsLoadingConflictInfo = (state: GitHubState) => state.isLoadingConflictInfo;
 
 // ============================================================================
 // Initialize from stored auth

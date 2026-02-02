@@ -343,6 +343,105 @@ export interface UpdateFileParams {
 }
 
 // ============================================================================
+// Tag
+// ============================================================================
+
+export interface GitHubTag {
+  name: string;
+  commit: {
+    sha: string;
+    url: string;
+  };
+  zipball_url: string;
+  tarball_url: string;
+  node_id: string;
+}
+
+export interface GitHubAnnotatedTag {
+  tag: string;
+  sha: string;
+  url: string;
+  message: string;
+  tagger: {
+    name: string;
+    email: string;
+    date: string;
+  };
+  object: {
+    type: string;
+    sha: string;
+    url: string;
+  };
+}
+
+export interface CreateTagParams {
+  tag: string;
+  message: string;
+  object: string; // SHA of commit to tag
+  type: 'commit' | 'tree' | 'blob';
+  tagger?: {
+    name: string;
+    email: string;
+    date?: string;
+  };
+}
+
+// ============================================================================
+// Blame
+// ============================================================================
+
+export interface GitHubBlameLine {
+  lineNumber: number;
+  content: string;
+  commit: {
+    sha: string;
+    shortSha: string;
+    author: string;
+    authorEmail: string;
+    date: string;
+    message: string;
+  };
+}
+
+export interface GitHubBlameHunk {
+  lines: GitHubBlameLine[];
+  commit: {
+    sha: string;
+    shortSha: string;
+    author: string;
+    authorEmail: string;
+    date: string;
+    message: string;
+  };
+  startLine: number;
+  endLine: number;
+}
+
+export interface GitHubBlameResult {
+  path: string;
+  hunks: GitHubBlameHunk[];
+  lines: GitHubBlameLine[];
+}
+
+// ============================================================================
+// PR Conflict / Update
+// ============================================================================
+
+export interface GitHubPRConflictInfo {
+  hasConflicts: boolean;
+  mergeable: boolean | null;
+  mergeableState: 'unknown' | 'clean' | 'unstable' | 'dirty' | 'blocked';
+  conflictingFiles?: string[];
+  behindBy: number;
+  aheadBy: number;
+}
+
+export interface GitHubUpdateBranchResult {
+  message: string;
+  url: string;
+}
+
+// ============================================================================
 // Workspace Integration
 // ============================================================================
 
