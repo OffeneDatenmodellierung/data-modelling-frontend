@@ -27,6 +27,38 @@ export interface GitHubAuthState {
 }
 
 // ============================================================================
+// GitHub App Configuration
+// ============================================================================
+
+export interface GitHubAppConfig {
+  clientId: string;
+  appName: string;
+  description?: string;
+  // The URL where the app was installed (for reference)
+  installationUrl?: string;
+}
+
+export interface GitHubAppAuthMethod {
+  type: 'github_app';
+  config: GitHubAppConfig;
+}
+
+export interface GitHubPATAuthMethod {
+  type: 'pat';
+}
+
+export type GitHubAuthMethod = GitHubAppAuthMethod | GitHubPATAuthMethod;
+
+export interface GitHubAuthConfig {
+  // The preferred auth method (can be overridden by user)
+  preferredMethod: 'pat' | 'github_app';
+  // Available GitHub App configurations (org admins can configure these)
+  availableApps: GitHubAppConfig[];
+  // Whether to allow PAT as fallback when no app is configured
+  allowPATFallback: boolean;
+}
+
+// ============================================================================
 // Repository
 // ============================================================================
 
