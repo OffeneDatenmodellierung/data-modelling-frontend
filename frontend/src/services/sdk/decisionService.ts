@@ -40,6 +40,7 @@ import {
   formatDecisionNumber,
   generateDecisionNumber,
 } from '@/types/decision';
+import { useValidationStore, parseValidationError } from '@/stores/validationStore';
 
 /**
  * PDF Export Result from SDK
@@ -104,8 +105,12 @@ class DecisionService {
 
   /**
    * Parse a decision from YAML string
+   * Returns the decision even if validation fails, using fallback parser
+   * Validation errors are logged to the validation store
    */
-  async parseDecisionYaml(yaml: string): Promise<Decision | null> {
+  async parseDecisionYaml(yaml: string, filePath?: string): Promise<Decision | null> {
+    let validationError: unknown = null;
+
     // Try SDK first if supported
     if (this.isSupported()) {
       const sdk = await sdkLoader.load();
@@ -115,19 +120,42 @@ class DecisionService {
           const sdkDecision = JSON.parse(resultJson);
 
           if (sdkDecision.error) {
-            throw new Error(sdkDecision.error);
+            throw sdkDecision;
           }
 
           // Convert from SDK camelCase to frontend snake_case
           return sdkDecisionToFrontend(sdkDecision);
         } catch (error) {
+          // Capture the validation error but continue to fallback
+          validationError = error;
           console.warn('[DecisionService] SDK parse failed, trying fallback:', error);
         }
       }
     }
 
-    // Fallback: Parse YAML directly using js-yaml
-    return this.parseDecisionYamlFallback(yaml);
+    // Fallback: Parse YAML directly using js-yaml (more lenient)
+    const decision = await this.parseDecisionYamlFallback(yaml);
+
+    // If we got a decision via fallback but had a validation error, log it
+    if (decision && validationError) {
+      const issues = parseValidationError(
+        validationError,
+        'decision_record',
+        decision.id,
+        decision.title || filePath || 'Unknown Decision',
+        filePath
+      );
+      if (issues.length > 0) {
+        useValidationStore
+          .getState()
+          .addIssues(issues.map(({ id, createdAt, isActive, ...rest }) => rest));
+        console.log(
+          `[DecisionService] Added ${issues.length} validation issue(s) for decision: ${decision.title}`
+        );
+      }
+    }
+
+    return decision;
   }
 
   /**

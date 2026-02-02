@@ -14,6 +14,11 @@ import { decisionService } from '@/services/sdk/decisionService';
 import { sketchService } from '@/services/sdk/sketchService';
 import * as yaml from 'js-yaml';
 import { FileMigration } from '@/utils/fileMigration';
+import {
+  useValidationStore,
+  parseValidationError,
+  type ResourceType,
+} from '@/stores/validationStore';
 import type {
   Workspace,
   WorkspaceV2,
@@ -784,10 +789,33 @@ export class WorkspaceV2Loader {
         }
       } catch (error) {
         console.error(`[WorkspaceV2Loader] Failed to load table from ${file.name}:`, error);
+        // Record validation issue for the failed file
+        this.recordValidationIssue(error, 'table', file.name, file.name);
       }
     }
 
     return tables;
+  }
+
+  /**
+   * Helper to record validation issues to the validation store
+   */
+  private static recordValidationIssue(
+    error: unknown,
+    resourceType: ResourceType,
+    resourceId: string,
+    resourceName: string,
+    filePath?: string
+  ): void {
+    const issues = parseValidationError(error, resourceType, resourceId, resourceName, filePath);
+    if (issues.length > 0) {
+      useValidationStore
+        .getState()
+        .addIssues(issues.map(({ id, createdAt, isActive, ...rest }) => rest));
+      console.log(
+        `[WorkspaceV2Loader] Recorded ${issues.length} validation issue(s) for ${resourceType}: ${resourceName}`
+      );
+    }
   }
 
   /**
@@ -901,7 +929,8 @@ export class WorkspaceV2Loader {
 
     for (const file of files) {
       try {
-        const article = await knowledgeService.parseKnowledgeYaml(file.content);
+        // Pass file path for better validation error reporting
+        const article = await knowledgeService.parseKnowledgeYaml(file.content, file.name);
 
         if (article && typeof article === 'object' && 'id' in article) {
           // Preserve domain_id from the file content as-is
@@ -912,6 +941,7 @@ export class WorkspaceV2Loader {
           `[WorkspaceV2Loader] Failed to load knowledge article from ${file.name}:`,
           error
         );
+        this.recordValidationIssue(error, 'knowledge_article', file.name, file.name, file.name);
       }
     }
 
@@ -929,7 +959,8 @@ export class WorkspaceV2Loader {
 
     for (const file of files) {
       try {
-        const record = await decisionService.parseDecisionYaml(file.content);
+        // Pass file path for better validation error reporting
+        const record = await decisionService.parseDecisionYaml(file.content, file.name);
 
         if (record && typeof record === 'object' && 'id' in record) {
           // Preserve domain_id from the file content as-is
@@ -940,6 +971,7 @@ export class WorkspaceV2Loader {
           `[WorkspaceV2Loader] Failed to load decision record from ${file.name}:`,
           error
         );
+        this.recordValidationIssue(error, 'decision_record', file.name, file.name, file.name);
       }
     }
 

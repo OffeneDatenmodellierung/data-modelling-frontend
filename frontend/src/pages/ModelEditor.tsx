@@ -48,6 +48,7 @@ import { useGitHubRepoStore } from '@/stores/githubRepoStore';
 import { isElectron } from '@/services/platform/platform';
 import type { SharedResourceReference } from '@/types/domain';
 import { HelpButton, HelpPanel } from '@/components/help';
+import { ValidationWarnings } from '@/components/common/ValidationWarnings';
 import { useHelpPanel } from '@/hooks/useHelpPanel';
 
 const ModelEditor: React.FC = () => {
@@ -910,6 +911,9 @@ const ModelEditor: React.FC = () => {
                 <GitHubUserMenu />
               </>
             )}
+
+            {/* Validation Warnings */}
+            <ValidationWarnings />
 
             {/* Help Button */}
             <HelpButton />

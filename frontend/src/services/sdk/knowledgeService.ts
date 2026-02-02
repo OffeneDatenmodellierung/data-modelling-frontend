@@ -41,6 +41,15 @@ import {
   formatArticleNumber,
   generateArticleNumber,
 } from '@/types/knowledge';
+import { useValidationStore, parseValidationError } from '@/stores/validationStore';
+
+/**
+ * Result of parsing with validation info
+ */
+export interface ParseResult<T> {
+  data: T | null;
+  validationErrors: string[];
+}
 
 /**
  * Knowledge Service for SDK 1.14.0+ knowledge base management
@@ -72,8 +81,12 @@ class KnowledgeService {
 
   /**
    * Parse a knowledge article from YAML string
+   * Returns the article even if validation fails, using fallback parser
+   * Validation errors are logged to the validation store
    */
-  async parseKnowledgeYaml(yaml: string): Promise<KnowledgeArticle | null> {
+  async parseKnowledgeYaml(yaml: string, filePath?: string): Promise<KnowledgeArticle | null> {
+    let validationError: unknown = null;
+
     // Try SDK first if supported
     if (this.isSupported()) {
       const sdk = await sdkLoader.load();
@@ -83,19 +96,42 @@ class KnowledgeService {
           const sdkArticle = JSON.parse(resultJson);
 
           if (sdkArticle.error) {
-            throw new Error(sdkArticle.error);
+            throw sdkArticle;
           }
 
           // Convert from SDK camelCase to frontend snake_case
           return sdkKnowledgeToFrontend(sdkArticle);
         } catch (error) {
+          // Capture the validation error but continue to fallback
+          validationError = error;
           console.warn('[KnowledgeService] SDK parse failed, trying fallback:', error);
         }
       }
     }
 
-    // Fallback: Parse YAML directly using js-yaml
-    return this.parseKnowledgeYamlFallback(yaml);
+    // Fallback: Parse YAML directly using js-yaml (more lenient)
+    const article = await this.parseKnowledgeYamlFallback(yaml);
+
+    // If we got an article via fallback but had a validation error, log it
+    if (article && validationError) {
+      const issues = parseValidationError(
+        validationError,
+        'knowledge_article',
+        article.id,
+        article.title || filePath || 'Unknown Article',
+        filePath
+      );
+      if (issues.length > 0) {
+        useValidationStore
+          .getState()
+          .addIssues(issues.map(({ id, createdAt, isActive, ...rest }) => rest));
+        console.log(
+          `[KnowledgeService] Added ${issues.length} validation issue(s) for article: ${article.title}`
+        );
+      }
+    }
+
+    return article;
   }
 
   /**
