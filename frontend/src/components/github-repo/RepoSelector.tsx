@@ -3,9 +3,12 @@
  *
  * Allows users to browse their GitHub repositories or enter a URL
  * to select a repository to open in GitHub repo mode.
+ *
+ * Supports type-ahead search - when user types 4+ characters, searches
+ * GitHub API for matching repositories (useful for large orgs with 1000s of repos).
  */
 
-import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useGitHubStore, selectIsAuthenticated } from '@/stores/githubStore';
 import { githubApi } from '@/services/github/githubApi';
 import type { GitHubRepository } from '@/types/github';
@@ -15,6 +18,9 @@ export interface RepoSelectorProps {
   onCancel: () => void;
   className?: string;
 }
+
+const MIN_SEARCH_LENGTH = 4;
+const SEARCH_DEBOUNCE_MS = 300;
 
 export const RepoSelector: React.FC<RepoSelectorProps> = ({
   onSelect,
@@ -30,12 +36,27 @@ export const RepoSelector: React.FC<RepoSelectorProps> = ({
   const [urlError, setUrlError] = useState<string | null>(null);
   const [isLoadingUrl, setIsLoadingUrl] = useState(false);
 
+  // Type-ahead search state
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchResults, setSearchResults] = useState<GitHubRepository[]>([]);
+  const [hasSearched, setHasSearched] = useState(false);
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   // Load repos on mount if authenticated
   useEffect(() => {
     if (isAuthenticated && repositories.length === 0) {
       loadRepositories();
     }
   }, [isAuthenticated]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const loadRepositories = useCallback(async () => {
     useGitHubStore.getState().setLoadingRepos(true);
@@ -52,6 +73,59 @@ export const RepoSelector: React.FC<RepoSelectorProps> = ({
       useGitHubStore.getState().setLoadingRepos(false);
     }
   }, []);
+
+  // Type-ahead search function
+  const searchRepositories = useCallback(async (query: string) => {
+    if (query.length < MIN_SEARCH_LENGTH) {
+      setSearchResults([]);
+      setHasSearched(false);
+      return;
+    }
+
+    setIsSearching(true);
+    setHasSearched(true);
+
+    try {
+      // Search for repositories matching the query
+      // Include user's repos and repos they have access to
+      const result = await githubApi.searchRepositories(`${query} in:name`, {
+        sort: 'updated',
+        order: 'desc',
+        per_page: 30,
+      });
+      setSearchResults(result.items);
+    } catch (error) {
+      console.error('Failed to search repositories:', error);
+      setSearchResults([]);
+    } finally {
+      setIsSearching(false);
+    }
+  }, []);
+
+  // Handle search input with debounce
+  const handleSearchChange = useCallback(
+    (value: string) => {
+      setSearchQuery(value);
+
+      // Clear previous timeout
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+
+      // If query is short, just filter locally
+      if (value.length < MIN_SEARCH_LENGTH) {
+        setSearchResults([]);
+        setHasSearched(false);
+        return;
+      }
+
+      // Debounce the API search
+      searchTimeoutRef.current = setTimeout(() => {
+        searchRepositories(value);
+      }, SEARCH_DEBOUNCE_MS);
+    },
+    [searchRepositories]
+  );
 
   const handleRepoSelect = useCallback(
     (repo: GitHubRepository) => {
@@ -103,8 +177,14 @@ export const RepoSelector: React.FC<RepoSelectorProps> = ({
     }
   }, [repoUrl, parseGitHubUrl, onSelect]);
 
-  // Filter repos by search query
-  const filteredRepos = useMemo(() => {
+  // Determine which repos to display
+  const displayedRepos = useMemo(() => {
+    // If we have search results from API, show those
+    if (hasSearched && searchQuery.length >= MIN_SEARCH_LENGTH) {
+      return searchResults;
+    }
+
+    // Otherwise filter local repos
     if (!searchQuery.trim()) return repositories;
     const query = searchQuery.toLowerCase();
     return repositories.filter(
@@ -113,7 +193,16 @@ export const RepoSelector: React.FC<RepoSelectorProps> = ({
         repo.full_name.toLowerCase().includes(query) ||
         repo.description?.toLowerCase().includes(query)
     );
-  }, [repositories, searchQuery]);
+  }, [repositories, searchQuery, searchResults, hasSearched]);
+
+  // Check if we should show "search hint" message
+  const showSearchHint = useMemo(() => {
+    return (
+      searchQuery.length > 0 &&
+      searchQuery.length < MIN_SEARCH_LENGTH &&
+      displayedRepos.length === 0
+    );
+  }, [searchQuery, displayedRepos]);
 
   if (!isAuthenticated) {
     return (
@@ -179,17 +268,47 @@ export const RepoSelector: React.FC<RepoSelectorProps> = ({
           <>
             {/* Search */}
             <div className="mb-4">
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search repositories..."
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+              <div className="relative">
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => handleSearchChange(e.target.value)}
+                  placeholder="Search repositories... (type 4+ chars to search GitHub)"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                {isSearching && (
+                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                    <svg
+                      className="w-4 h-4 animate-spin text-gray-400"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      />
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      />
+                    </svg>
+                  </div>
+                )}
+              </div>
+              {searchQuery.length >= MIN_SEARCH_LENGTH && hasSearched && !isSearching && (
+                <p className="mt-1 text-xs text-gray-500">
+                  Showing results from GitHub search ({searchResults.length} found)
+                </p>
+              )}
             </div>
 
-            {/* Loading */}
-            {isLoadingRepos && (
+            {/* Loading initial repos */}
+            {isLoadingRepos && !searchQuery && (
               <div className="flex items-center justify-center py-8">
                 <svg className="w-6 h-6 animate-spin text-gray-400" fill="none" viewBox="0 0 24 24">
                   <circle
@@ -210,16 +329,28 @@ export const RepoSelector: React.FC<RepoSelectorProps> = ({
               </div>
             )}
 
-            {/* Repository list */}
-            {!isLoadingRepos && filteredRepos.length === 0 && (
+            {/* Search hint */}
+            {showSearchHint && (
+              <div className="text-center py-8 text-gray-500">
+                <p>No local repositories match your search.</p>
+                <p className="text-sm mt-1">
+                  Type {MIN_SEARCH_LENGTH - searchQuery.length} more character
+                  {MIN_SEARCH_LENGTH - searchQuery.length !== 1 ? 's' : ''} to search GitHub.
+                </p>
+              </div>
+            )}
+
+            {/* No results */}
+            {!isLoadingRepos && !isSearching && !showSearchHint && displayedRepos.length === 0 && (
               <div className="text-center py-8 text-gray-500">
                 {searchQuery ? 'No repositories match your search' : 'No repositories found'}
               </div>
             )}
 
-            {!isLoadingRepos && filteredRepos.length > 0 && (
+            {/* Repository list */}
+            {!isLoadingRepos && displayedRepos.length > 0 && (
               <div className="space-y-2">
-                {filteredRepos.map((repo) => (
+                {displayedRepos.map((repo) => (
                   <button
                     key={repo.id}
                     onClick={() => handleRepoSelect(repo)}

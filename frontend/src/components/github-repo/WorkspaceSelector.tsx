@@ -2,11 +2,12 @@
  * Workspace Selector Component
  *
  * Shows detected workspaces in a repository and allows the user
- * to select which one to open, or create a new workspace.
+ * to select which one to open, or browse folders to find one manually.
  */
 
 import React, { useState, useCallback, useEffect } from 'react';
 import { useGitHubRepoStore } from '@/stores/githubRepoStore';
+import { githubApi } from '@/services/github/githubApi';
 import type { DetectedWorkspace } from '@/types/github-repo';
 
 export interface WorkspaceSelectorProps {
@@ -17,6 +18,13 @@ export interface WorkspaceSelectorProps {
   onBack: () => void;
   onCancel: () => void;
   className?: string;
+}
+
+interface FolderEntry {
+  name: string;
+  path: string;
+  type: 'file' | 'dir';
+  hasWorkspace?: boolean;
 }
 
 export const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = ({
@@ -36,6 +44,13 @@ export const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = ({
   const [newWorkspacePath, setNewWorkspacePath] = useState('');
   const [newWorkspaceName, setNewWorkspaceName] = useState('');
 
+  // Folder browser state
+  const [showFolderBrowser, setShowFolderBrowser] = useState(false);
+  const [currentPath, setCurrentPath] = useState('');
+  const [folderContents, setFolderContents] = useState<FolderEntry[]>([]);
+  const [isLoadingFolder, setIsLoadingFolder] = useState(false);
+  const [folderError, setFolderError] = useState<string | null>(null);
+
   // Detect workspaces on mount
   useEffect(() => {
     detectWorkspaces(owner, repo, branch);
@@ -47,6 +62,93 @@ export const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = ({
       setSelectedWorkspace(detectedWorkspaces[0] || null);
     }
   }, [detectedWorkspaces, selectedWorkspace]);
+
+  // Load folder contents
+  const loadFolderContents = useCallback(
+    async (path: string) => {
+      setIsLoadingFolder(true);
+      setFolderError(null);
+
+      try {
+        const contents = await githubApi.getContent(owner, repo, path || '', branch);
+
+        // Handle single file response (shouldn't happen for directories)
+        if (!Array.isArray(contents)) {
+          setFolderContents([]);
+          return;
+        }
+
+        // Map to our format and check for workspace files
+        const entries: FolderEntry[] = contents
+          .filter((item) => item.type === 'dir' || item.name.endsWith('.workspace.yaml'))
+          .map((item) => ({
+            name: item.name,
+            path: item.path,
+            type: item.type as 'file' | 'dir',
+            hasWorkspace: item.name.endsWith('.workspace.yaml'),
+          }))
+          .sort((a, b) => {
+            // Workspace files first, then directories
+            if (a.hasWorkspace && !b.hasWorkspace) return -1;
+            if (!a.hasWorkspace && b.hasWorkspace) return 1;
+            // Then sort alphabetically
+            return a.name.localeCompare(b.name);
+          });
+
+        setFolderContents(entries);
+      } catch (error) {
+        console.error('Failed to load folder contents:', error);
+        setFolderError(error instanceof Error ? error.message : 'Failed to load folder contents');
+        setFolderContents([]);
+      } finally {
+        setIsLoadingFolder(false);
+      }
+    },
+    [owner, repo, branch]
+  );
+
+  // Load root folder when browser opens
+  useEffect(() => {
+    if (showFolderBrowser) {
+      loadFolderContents(currentPath);
+    }
+  }, [showFolderBrowser, currentPath, loadFolderContents]);
+
+  const handleFolderClick = useCallback(
+    (entry: FolderEntry) => {
+      if (entry.type === 'dir') {
+        setCurrentPath(entry.path);
+      } else if (entry.hasWorkspace) {
+        // It's a workspace file - extract path and select it
+        const pathParts = entry.path.split('/');
+        const workspacePath = pathParts.length > 1 ? pathParts.slice(0, -1).join('/') : '';
+        const workspaceName = entry.name.replace('.workspace.yaml', '');
+        onSelect(workspacePath, workspaceName);
+      }
+    },
+    [onSelect]
+  );
+
+  const handleNavigateUp = useCallback(() => {
+    if (currentPath) {
+      const parts = currentPath.split('/');
+      parts.pop();
+      setCurrentPath(parts.join('/'));
+    }
+  }, [currentPath]);
+
+  const handleSelectCurrentFolder = useCallback(() => {
+    // Check if current folder has a workspace file
+    const workspaceFile = folderContents.find((f) => f.hasWorkspace);
+    if (workspaceFile) {
+      const workspaceName = workspaceFile.name.replace('.workspace.yaml', '');
+      onSelect(currentPath, workspaceName);
+    } else {
+      // No workspace file, use folder name
+      const folderName = currentPath.split('/').pop() || repo;
+      onSelect(currentPath, folderName);
+    }
+  }, [currentPath, folderContents, onSelect, repo]);
 
   const handleSelect = useCallback(() => {
     if (selectedWorkspace) {
@@ -69,6 +171,183 @@ export const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = ({
       }
     }
   }, [detectedWorkspaces, onSelect]);
+
+  // Show folder browser
+  if (showFolderBrowser) {
+    return (
+      <div className={`bg-white rounded-lg shadow-lg max-h-[70vh] flex flex-col ${className}`}>
+        {/* Header */}
+        <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-200">
+          <button
+            onClick={() => {
+              setShowFolderBrowser(false);
+              setCurrentPath('');
+            }}
+            className="p-1 text-gray-400 hover:text-gray-600 rounded"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M15 19l-7-7 7-7"
+              />
+            </svg>
+          </button>
+          <h3 className="text-lg font-semibold text-gray-900">Browse Folders</h3>
+        </div>
+
+        {/* Repo and path info */}
+        <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
+          <div className="font-medium text-gray-900">
+            {owner}/{repo}
+          </div>
+          <div className="text-sm text-gray-500 flex items-center gap-2">
+            <span>Branch: {branch}</span>
+            <span className="text-gray-300">|</span>
+            <span className="font-mono text-xs">/{currentPath || '(root)'}</span>
+          </div>
+        </div>
+
+        {/* Navigation */}
+        {currentPath && (
+          <div className="px-4 py-2 border-b border-gray-100">
+            <button
+              onClick={handleNavigateUp}
+              className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M7 16l-4-4m0 0l4-4m-4 4h18"
+                />
+              </svg>
+              Go up to parent folder
+            </button>
+          </div>
+        )}
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto p-4">
+          {isLoadingFolder && (
+            <div className="flex items-center justify-center py-8">
+              <svg className="w-6 h-6 animate-spin text-gray-400" fill="none" viewBox="0 0 24 24">
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                />
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                />
+              </svg>
+              <span className="ml-2 text-gray-600">Loading...</span>
+            </div>
+          )}
+
+          {folderError && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-md">
+              <p className="text-sm text-red-600">{folderError}</p>
+            </div>
+          )}
+
+          {!isLoadingFolder && !folderError && folderContents.length === 0 && (
+            <div className="text-center py-8 text-gray-500">
+              <p>This folder is empty or contains no subfolders.</p>
+            </div>
+          )}
+
+          {!isLoadingFolder && folderContents.length > 0 && (
+            <div className="space-y-1">
+              {folderContents.map((entry) => (
+                <button
+                  key={entry.path}
+                  onClick={() => handleFolderClick(entry)}
+                  className={`w-full text-left px-3 py-2 rounded-md flex items-center gap-3 transition-colors ${
+                    entry.hasWorkspace
+                      ? 'bg-green-50 hover:bg-green-100 border border-green-200'
+                      : 'hover:bg-gray-100'
+                  }`}
+                >
+                  {entry.type === 'dir' ? (
+                    <svg
+                      className="w-5 h-5 text-yellow-500"
+                      fill="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                    </svg>
+                  ) : (
+                    <svg
+                      className="w-5 h-5 text-green-600"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
+                    </svg>
+                  )}
+                  <span
+                    className={`flex-1 truncate ${entry.hasWorkspace ? 'font-medium text-green-800' : 'text-gray-700'}`}
+                  >
+                    {entry.name}
+                  </span>
+                  {entry.hasWorkspace && (
+                    <span className="px-2 py-0.5 text-xs bg-green-100 text-green-700 rounded">
+                      Workspace
+                    </span>
+                  )}
+                  {entry.type === 'dir' && (
+                    <svg
+                      className="w-4 h-4 text-gray-400"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 5l7 7-7 7"
+                      />
+                    </svg>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="px-4 py-3 border-t border-gray-200 flex justify-between">
+          <button
+            onClick={handleSelectCurrentFolder}
+            className="px-4 py-2 text-sm font-medium text-blue-600 hover:text-blue-700"
+          >
+            Use this folder
+          </button>
+          <button
+            onClick={onCancel}
+            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   // Show loading state
   if (isDetectingWorkspaces) {
@@ -132,32 +411,57 @@ export const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = ({
             </p>
           </div>
 
-          <p className="text-sm text-gray-600 mb-4">
-            You can create a new workspace or open the repository root:
-          </p>
+          <div className="space-y-4">
+            {/* Browse folders button */}
+            <button
+              onClick={() => setShowFolderBrowser(true)}
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
+                />
+              </svg>
+              Browse Folders to Find Workspace
+            </button>
 
-          <div className="space-y-3">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Workspace folder (leave empty for root)
-              </label>
-              <input
-                type="text"
-                value={newWorkspacePath}
-                onChange={(e) => setNewWorkspacePath(e.target.value)}
-                placeholder="e.g., my-workspace"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-200" />
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className="px-2 bg-white text-gray-500">or create new</span>
+              </div>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Workspace name</label>
-              <input
-                type="text"
-                value={newWorkspaceName}
-                onChange={(e) => setNewWorkspaceName(e.target.value)}
-                placeholder="My Workspace"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Workspace folder (leave empty for root)
+                </label>
+                <input
+                  type="text"
+                  value={newWorkspacePath}
+                  onChange={(e) => setNewWorkspacePath(e.target.value)}
+                  placeholder="e.g., my-workspace"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Workspace name
+                </label>
+                <input
+                  type="text"
+                  value={newWorkspaceName}
+                  onChange={(e) => setNewWorkspaceName(e.target.value)}
+                  placeholder="My Workspace"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -237,6 +541,22 @@ export const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = ({
               </div>
             </div>
           </div>
+
+          {/* Browse folders option */}
+          <button
+            onClick={() => setShowFolderBrowser(true)}
+            className="mt-4 w-full flex items-center justify-center gap-2 px-4 py-2 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-50 rounded-md transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
+              />
+            </svg>
+            Browse folders for a different workspace
+          </button>
         </div>
 
         {/* Footer */}
@@ -330,6 +650,22 @@ export const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = ({
             </label>
           ))}
         </div>
+
+        {/* Browse folders option */}
+        <button
+          onClick={() => setShowFolderBrowser(true)}
+          className="mt-4 w-full flex items-center justify-center gap-2 px-4 py-2 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-50 rounded-md transition-colors border border-gray-200"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
+            />
+          </svg>
+          Browse folders for a different workspace
+        </button>
 
         {/* Create new workspace option */}
         <div className="mt-4 pt-4 border-t border-gray-200">
