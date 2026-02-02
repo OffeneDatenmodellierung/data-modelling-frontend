@@ -335,6 +335,24 @@ const ModelEditor: React.FC = () => {
         return;
       }
 
+      // Wait for GitHub authentication to complete
+      const githubState = useGitHubStore.getState();
+      if (!githubState.auth.isAuthenticated) {
+        console.log('[ModelEditor] Waiting for GitHub authentication...');
+        // Give auth a moment to complete (it runs on app init)
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+
+        // Check again after waiting
+        const updatedState = useGitHubStore.getState();
+        if (!updatedState.auth.isAuthenticated) {
+          console.log('[ModelEditor] GitHub not authenticated, showing auth dialog');
+          updatedState.setShowAuthDialog(true);
+          setError('Please connect to GitHub to access this workspace');
+          setIsLoading(false);
+          return;
+        }
+      }
+
       // Parse the GitHub URL: github/owner/repo/branch/workspacePath
       const parts = workspaceId.substring(7).split('/');
       if (parts.length < 3) {
