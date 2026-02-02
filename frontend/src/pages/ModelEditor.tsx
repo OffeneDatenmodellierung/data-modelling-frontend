@@ -40,6 +40,8 @@ import { KnowledgePanel } from '@/components/knowledge/KnowledgePanel';
 import { SketchPanel } from '@/components/sketch/SketchPanel';
 import { GitPanel, GitStatusIndicator } from '@/components/git';
 import { gitService } from '@/services/git/gitService';
+import { GitHubUserMenu, GitHubAuthDialog, GitHubRepoSelector } from '@/components/github';
+import { isElectron } from '@/services/platform/platform';
 import type { SharedResourceReference } from '@/types/domain';
 
 const ModelEditor: React.FC = () => {
@@ -616,10 +618,13 @@ const ModelEditor: React.FC = () => {
             </>
           )}
 
-          {/* Git Status, Settings and History buttons */}
+          {/* Git Status, GitHub, Settings and History buttons */}
           <div className="flex items-center gap-2 ml-auto">
-            {/* Git Status Indicator */}
-            <GitStatusIndicator />
+            {/* Git Status Indicator (Electron only) */}
+            {isElectron() && <GitStatusIndicator />}
+
+            {/* GitHub User Menu (Browser mode) */}
+            {!isElectron() && <GitHubUserMenu />}
 
             <button
               onClick={() => setShowWorkspaceSettings(!showWorkspaceSettings)}
@@ -768,6 +773,14 @@ const ModelEditor: React.FC = () => {
         isOpen={showImportExportDialog}
         onClose={() => setShowImportExportDialog(false)}
       />
+
+      {/* GitHub Dialogs (Browser mode only) */}
+      {!isElectron() && (
+        <>
+          <GitHubAuthDialog />
+          <GitHubRepoSelector />
+        </>
+      )}
 
       {/* Multi-Table Editor Modals - up to 3 editors side by side */}
       {openTableEditorIds.map((tableId, index) => {

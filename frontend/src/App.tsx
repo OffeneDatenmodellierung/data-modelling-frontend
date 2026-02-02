@@ -12,6 +12,7 @@ import { sdkLoader, SDKLoadError } from './services/sdk/sdkLoader';
 import { getDuckDBService } from './services/database';
 import { DUCKDB_CDN_URL } from './types/duckdb';
 import { getPlatform } from './services/platform/platform';
+import { initializeGitHubStore } from './stores/githubStore';
 import Home from './pages/Home';
 import ModelEditor from './pages/ModelEditor';
 import AuthCallback from './pages/AuthCallback';
@@ -60,6 +61,15 @@ function App() {
       try {
         await sdkLoader.load();
         console.log('[App] SDK WASM loaded successfully');
+
+        // Initialize GitHub store for browser mode (revalidate stored token)
+        const isElectron = getPlatform() === 'electron';
+        if (!isElectron) {
+          initializeGitHubStore().catch((err) => {
+            console.warn('[App] GitHub auth initialization failed:', err);
+          });
+        }
+
         setSdkLoaded(true);
       } catch (error) {
         console.error('[App] Failed to load SDK WASM:', error);
