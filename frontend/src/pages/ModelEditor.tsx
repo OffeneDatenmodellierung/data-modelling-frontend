@@ -503,15 +503,22 @@ const ModelEditor: React.FC = () => {
             setDMNDecisions(loadedWorkspace.dmnDecisions);
           }
 
-          // Set domains
+          // Set domains - ensure we always have at least one domain
+          let domainToSelect: string | null = null;
+
           if (loadedWorkspace.domains && loadedWorkspace.domains.length > 0) {
+            console.log(
+              '[ModelEditor] Setting domains from loaded workspace:',
+              loadedWorkspace.domains.map((d: any) => ({ id: d.id, name: d.name }))
+            );
             setDomains(loadedWorkspace.domains);
             const firstDomain = loadedWorkspace.domains[0];
             if (firstDomain) {
-              setSelectedDomain(firstDomain.id);
+              domainToSelect = firstDomain.id;
             }
           } else {
-            // Create default domain
+            // Create default domain when none exist in workspace
+            console.log('[ModelEditor] No domains in workspace, creating default domain');
             const { generateUUID } = await import('@/utils/validation');
             const defaultDomain = {
               id: generateUUID(),
@@ -523,8 +530,22 @@ const ModelEditor: React.FC = () => {
               last_modified_at: new Date().toISOString(),
             };
             setDomains([defaultDomain]);
-            setSelectedDomain(defaultDomain.id);
+            domainToSelect = defaultDomain.id;
           }
+
+          // Set selected domain AFTER setting domains to ensure state is consistent
+          if (domainToSelect) {
+            console.log('[ModelEditor] Setting selected domain:', domainToSelect);
+            setSelectedDomain(domainToSelect);
+          }
+
+          // Verify the state was set correctly
+          const finalState = useModelStore.getState();
+          console.log('[ModelEditor] Final state after loading GitHub workspace:', {
+            domainsCount: finalState.domains.length,
+            selectedDomainId: finalState.selectedDomainId,
+            tablesCount: finalState.tables.length,
+          });
 
           addToast({
             type: 'success',
