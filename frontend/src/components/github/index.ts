@@ -9,3 +9,5 @@ export { GitHubRepoSelector } from './GitHubRepoSelector';
 export { GitHubConnectionStatus } from './GitHubConnectionStatus';
 export { GitHubFileBrowser } from './GitHubFileBrowser';
 export { GitHubCommitHistory } from './GitHubCommitHistory';
+export { GitHubPullRequestList } from './GitHubPullRequestList';
+export { GitHubCreatePRDialog } from './GitHubCreatePRDialog';
