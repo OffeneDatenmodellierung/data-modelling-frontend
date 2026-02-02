@@ -45,6 +45,26 @@ export interface GitRemote {
   pushUrl: string | null;
 }
 
+// Phase 5: Stash types
+export interface GitStashEntry {
+  index: number;
+  hash: string;
+  message: string;
+  date: string;
+  branch: string;
+}
+
+// Phase 5: Rebase status
+export interface GitRebaseStatus {
+  isRebasing: boolean;
+  currentCommit?: string;
+  headName?: string;
+  onto?: string;
+  done?: number;
+  remaining?: number;
+  conflictFiles?: string[];
+}
+
 export interface GitStatus {
   isGitRepo: boolean;
   currentBranch: string | null;
@@ -82,6 +102,21 @@ export interface GitState {
   isPulling: boolean;
   isPushing: boolean;
 
+  // Phase 5: Stash
+  stashes: GitStashEntry[];
+  isLoadingStashes: boolean;
+  isStashing: boolean;
+  selectedStash: GitStashEntry | null;
+  stashDiff: string | null;
+
+  // Phase 5: Rebase
+  rebaseStatus: GitRebaseStatus;
+  isRebasing: boolean;
+
+  // Phase 5: Cherry-pick
+  isCherryPicking: boolean;
+  cherryPickConflicts: string[];
+
   // UI State
   isPanelOpen: boolean;
   selectedCommit: GitCommit | null;
@@ -111,6 +146,18 @@ export interface GitState {
   setFetching: (fetching: boolean) => void;
   setPulling: (pulling: boolean) => void;
   setPushing: (pushing: boolean) => void;
+  // Phase 5: Stash actions
+  setStashes: (stashes: GitStashEntry[]) => void;
+  setLoadingStashes: (loading: boolean) => void;
+  setStashing: (stashing: boolean) => void;
+  setSelectedStash: (stash: GitStashEntry | null) => void;
+  setStashDiff: (diff: string | null) => void;
+  // Phase 5: Rebase actions
+  setRebaseStatus: (status: GitRebaseStatus) => void;
+  setRebasing: (rebasing: boolean) => void;
+  // Phase 5: Cherry-pick actions
+  setCherryPicking: (cherryPicking: boolean) => void;
+  setCherryPickConflicts: (conflicts: string[]) => void;
   // UI actions
   setPanelOpen: (open: boolean) => void;
   togglePanel: () => void;
@@ -134,6 +181,10 @@ const initialStatus: GitStatus = {
   gitRoot: null,
 };
 
+const initialRebaseStatus: GitRebaseStatus = {
+  isRebasing: false,
+};
+
 const initialState = {
   status: initialStatus,
   isLoading: false,
@@ -151,6 +202,18 @@ const initialState = {
   isFetching: false,
   isPulling: false,
   isPushing: false,
+  // Phase 5: Stash
+  stashes: [] as GitStashEntry[],
+  isLoadingStashes: false,
+  isStashing: false,
+  selectedStash: null as GitStashEntry | null,
+  stashDiff: null as string | null,
+  // Phase 5: Rebase
+  rebaseStatus: initialRebaseStatus,
+  isRebasing: false,
+  // Phase 5: Cherry-pick
+  isCherryPicking: false,
+  cherryPickConflicts: [] as string[],
   // UI State
   isPanelOpen: false,
   selectedCommit: null,
@@ -204,6 +267,27 @@ export const useGitStore = create<GitState>()(
 
       setPushing: (isPushing) => set({ isPushing }),
 
+      // Phase 5: Stash actions
+      setStashes: (stashes) => set({ stashes, isLoadingStashes: false }),
+
+      setLoadingStashes: (isLoadingStashes) => set({ isLoadingStashes }),
+
+      setStashing: (isStashing) => set({ isStashing }),
+
+      setSelectedStash: (selectedStash) => set({ selectedStash }),
+
+      setStashDiff: (stashDiff) => set({ stashDiff }),
+
+      // Phase 5: Rebase actions
+      setRebaseStatus: (rebaseStatus) => set({ rebaseStatus }),
+
+      setRebasing: (isRebasing) => set({ isRebasing }),
+
+      // Phase 5: Cherry-pick actions
+      setCherryPicking: (isCherryPicking) => set({ isCherryPicking }),
+
+      setCherryPickConflicts: (cherryPickConflicts) => set({ cherryPickConflicts }),
+
       // UI actions
       setPanelOpen: (isPanelOpen) => set({ isPanelOpen }),
 
@@ -250,3 +334,26 @@ export const selectOriginRemote = (state: GitState) =>
 
 export const selectIsRemoteOperationInProgress = (state: GitState) =>
   state.isFetching || state.isPulling || state.isPushing;
+
+// Phase 5: Stash selectors
+export const selectHasStashes = (state: GitState) => state.stashes.length > 0;
+
+export const selectStashCount = (state: GitState) => state.stashes.length;
+
+// Phase 5: Rebase selectors
+export const selectIsInRebase = (state: GitState) => state.rebaseStatus.isRebasing;
+
+export const selectRebaseProgress = (state: GitState) => {
+  const { done, remaining } = state.rebaseStatus;
+  if (done === undefined || remaining === undefined) return null;
+  return { done, remaining, total: done + remaining };
+};
+
+// Phase 5: Advanced operation status
+export const selectIsAdvancedOperationInProgress = (state: GitState) =>
+  state.isRebasing || state.isCherryPicking || state.isStashing;
+
+export const selectHasConflicts = (state: GitState) =>
+  state.status.hasConflicts ||
+  (state.rebaseStatus.conflictFiles && state.rebaseStatus.conflictFiles.length > 0) ||
+  state.cherryPickConflicts.length > 0;

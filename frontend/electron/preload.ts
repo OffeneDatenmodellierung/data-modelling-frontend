@@ -388,4 +388,220 @@ contextBridge.exposeInMainWorld('electronAPI', {
   ): Promise<{ success: boolean; error?: string }> => {
     return await ipcRenderer.invoke('git:set-upstream', workspacePath, remote, branch);
   },
+
+  // ============================================================================
+  // Phase 5: Advanced Operations - Stash
+  // ============================================================================
+
+  /**
+   * List all stashes
+   */
+  gitStashList: async (
+    workspacePath: string
+  ): Promise<{
+    success: boolean;
+    error?: string;
+    stashes: Array<{
+      index: number;
+      hash: string;
+      message: string;
+      date: string;
+      branch: string;
+    }>;
+  }> => {
+    return await ipcRenderer.invoke('git:stash-list', workspacePath);
+  },
+
+  /**
+   * Save changes to stash
+   */
+  gitStashSave: async (
+    workspacePath: string,
+    options?: { message?: string; includeUntracked?: boolean; keepIndex?: boolean }
+  ): Promise<{ success: boolean; error?: string }> => {
+    return await ipcRenderer.invoke('git:stash-save', workspacePath, options);
+  },
+
+  /**
+   * Apply a stash (keeps the stash)
+   */
+  gitStashApply: async (
+    workspacePath: string,
+    stashIndex?: number
+  ): Promise<{ success: boolean; error?: string; hasConflicts?: boolean }> => {
+    return await ipcRenderer.invoke('git:stash-apply', workspacePath, stashIndex);
+  },
+
+  /**
+   * Pop a stash (removes from stash list)
+   */
+  gitStashPop: async (
+    workspacePath: string,
+    stashIndex?: number
+  ): Promise<{ success: boolean; error?: string; hasConflicts?: boolean }> => {
+    return await ipcRenderer.invoke('git:stash-pop', workspacePath, stashIndex);
+  },
+
+  /**
+   * Drop a specific stash
+   */
+  gitStashDrop: async (
+    workspacePath: string,
+    stashIndex: number
+  ): Promise<{ success: boolean; error?: string }> => {
+    return await ipcRenderer.invoke('git:stash-drop', workspacePath, stashIndex);
+  },
+
+  /**
+   * Clear all stashes
+   */
+  gitStashClear: async (workspacePath: string): Promise<{ success: boolean; error?: string }> => {
+    return await ipcRenderer.invoke('git:stash-clear', workspacePath);
+  },
+
+  /**
+   * Show stash contents
+   */
+  gitStashShow: async (
+    workspacePath: string,
+    stashIndex?: number
+  ): Promise<{ success: boolean; error?: string; diff: string; files: string[] }> => {
+    return await ipcRenderer.invoke('git:stash-show', workspacePath, stashIndex);
+  },
+
+  // ============================================================================
+  // Phase 5: Advanced Operations - Cherry-pick
+  // ============================================================================
+
+  /**
+   * Cherry-pick a commit
+   */
+  gitCherryPick: async (
+    workspacePath: string,
+    commitHash: string,
+    options?: { noCommit?: boolean; mainline?: number }
+  ): Promise<{
+    success: boolean;
+    error?: string;
+    hash?: string;
+    hasConflicts?: boolean;
+    conflictFiles?: string[];
+  }> => {
+    return await ipcRenderer.invoke('git:cherry-pick', workspacePath, commitHash, options);
+  },
+
+  /**
+   * Abort cherry-pick
+   */
+  gitCherryPickAbort: async (
+    workspacePath: string
+  ): Promise<{ success: boolean; error?: string }> => {
+    return await ipcRenderer.invoke('git:cherry-pick-abort', workspacePath);
+  },
+
+  /**
+   * Continue cherry-pick after resolving conflicts
+   */
+  gitCherryPickContinue: async (
+    workspacePath: string
+  ): Promise<{
+    success: boolean;
+    error?: string;
+    hash?: string;
+    hasConflicts?: boolean;
+    conflictFiles?: string[];
+  }> => {
+    return await ipcRenderer.invoke('git:cherry-pick-continue', workspacePath);
+  },
+
+  // ============================================================================
+  // Phase 5: Advanced Operations - Rebase
+  // ============================================================================
+
+  /**
+   * Start a rebase
+   */
+  gitRebaseStart: async (
+    workspacePath: string,
+    upstream: string,
+    options?: { interactive?: boolean; autosquash?: boolean; autostash?: boolean }
+  ): Promise<{ success: boolean; error?: string; hasConflicts?: boolean }> => {
+    return await ipcRenderer.invoke('git:rebase-start', workspacePath, upstream, options);
+  },
+
+  /**
+   * Continue rebase after resolving conflicts
+   */
+  gitRebaseContinue: async (
+    workspacePath: string
+  ): Promise<{ success: boolean; error?: string; hasConflicts?: boolean }> => {
+    return await ipcRenderer.invoke('git:rebase-continue', workspacePath);
+  },
+
+  /**
+   * Abort rebase
+   */
+  gitRebaseAbort: async (workspacePath: string): Promise<{ success: boolean; error?: string }> => {
+    return await ipcRenderer.invoke('git:rebase-abort', workspacePath);
+  },
+
+  /**
+   * Skip current commit during rebase
+   */
+  gitRebaseSkip: async (
+    workspacePath: string
+  ): Promise<{ success: boolean; error?: string; hasConflicts?: boolean }> => {
+    return await ipcRenderer.invoke('git:rebase-skip', workspacePath);
+  },
+
+  /**
+   * Get rebase status
+   */
+  gitRebaseStatus: async (
+    workspacePath: string
+  ): Promise<{
+    success: boolean;
+    error?: string;
+    isRebasing: boolean;
+    currentCommit?: string;
+    headName?: string;
+    onto?: string;
+    done?: number;
+    remaining?: number;
+    conflictFiles?: string[];
+  }> => {
+    return await ipcRenderer.invoke('git:rebase-status', workspacePath);
+  },
+
+  // ============================================================================
+  // Phase 5: Advanced Operations - Reset & Revert
+  // ============================================================================
+
+  /**
+   * Reset to a specific commit
+   */
+  gitReset: async (
+    workspacePath: string,
+    commitHash: string,
+    options?: { mode: 'soft' | 'mixed' | 'hard' }
+  ): Promise<{ success: boolean; error?: string }> => {
+    return await ipcRenderer.invoke('git:reset', workspacePath, commitHash, options);
+  },
+
+  /**
+   * Revert a commit (creates a new commit that undoes the changes)
+   */
+  gitRevert: async (
+    workspacePath: string,
+    commitHash: string,
+    options?: { noCommit?: boolean; mainline?: number }
+  ): Promise<{
+    success: boolean;
+    error?: string;
+    hash?: string;
+    hasConflicts?: boolean;
+    conflictFiles?: string[];
+  }> => {
+    return await ipcRenderer.invoke('git:revert', workspacePath, commitHash, options);
+  },
 });

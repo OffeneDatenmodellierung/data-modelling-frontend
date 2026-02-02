@@ -12,8 +12,11 @@ import { DiffViewer } from './DiffViewer';
 import { BranchSelector } from './BranchSelector';
 import { BranchCreateDialog } from './BranchCreateDialog';
 import { RemoteOperationsPanel } from './RemoteOperationsPanel';
+import { StashPanel } from './StashPanel';
+import { CherryPickDialog, CherryPickConflictPanel } from './CherryPickDialog';
+import { RebasePanel, RebaseStatusIndicator } from './RebasePanel';
 
-type TabType = 'changes' | 'history' | 'remotes';
+type TabType = 'changes' | 'history' | 'remotes' | 'advanced';
 
 export interface GitPanelProps {
   className?: string;
@@ -34,9 +37,14 @@ export const GitPanel: React.FC<GitPanelProps> = ({ className = '' }) => {
     isFetching,
     isPulling,
     isPushing,
+    isRebasing,
+    isCherryPicking,
+    stashes,
   } = useGitStore();
 
   const [activeTab, setActiveTab] = useState<TabType>('changes');
+  const [cherryPickCommit, setCherryPickCommit] = useState<typeof selectedCommit>(null);
+  const [showCherryPickDialog, setShowCherryPickDialog] = useState(false);
   const [commitMessage, setCommitMessage] = useState('');
   const [isCommitting, setIsCommitting] = useState(false);
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
@@ -86,7 +94,16 @@ export const GitPanel: React.FC<GitPanelProps> = ({ className = '' }) => {
     if (activeTab === 'remotes') {
       gitService.loadRemotes();
     }
+    if (activeTab === 'advanced') {
+      gitService.loadStashes();
+      gitService.loadRebaseStatus();
+    }
   }, [activeTab]);
+
+  const handleCherryPick = useCallback((commit: typeof selectedCommit) => {
+    setCherryPickCommit(commit);
+    setShowCherryPickDialog(true);
+  }, []);
 
   const handleInitRepo = useCallback(async () => {
     await gitService.initRepository();
@@ -270,6 +287,7 @@ export const GitPanel: React.FC<GitPanelProps> = ({ className = '' }) => {
             )}
           </div>
         </div>
+        <RebaseStatusIndicator className="mt-1" />
         <BranchSelector onCreateBranch={handleCreateBranch} />
       </div>
 
@@ -309,6 +327,19 @@ export const GitPanel: React.FC<GitPanelProps> = ({ className = '' }) => {
           }`}
         >
           Sync
+        </button>
+        <button
+          onClick={() => setActiveTab('advanced')}
+          className={`flex-1 px-3 py-2 text-sm font-medium ${
+            activeTab === 'advanced'
+              ? 'text-blue-600 border-b-2 border-blue-600'
+              : 'text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          Advanced
+          {(stashes.length > 0 || isRebasing || isCherryPicking) && (
+            <span className="ml-1 w-2 h-2 bg-amber-500 rounded-full inline-block" />
+          )}
         </button>
       </div>
 
@@ -434,8 +465,37 @@ export const GitPanel: React.FC<GitPanelProps> = ({ className = '' }) => {
                 commits={commits}
                 selectedCommit={selectedCommit}
                 onSelectCommit={(commit) => useGitStore.getState().setSelectedCommit(commit)}
+                onCherryPick={handleCherryPick}
+                onRevert={async (commit) => {
+                  if (
+                    window.confirm(
+                      `Revert commit "${commit.message}"? This will create a new commit undoing the changes.`
+                    )
+                  ) {
+                    await gitService.revert(commit.hash);
+                  }
+                }}
               />
             )}
+          </div>
+        ) : activeTab === 'advanced' ? (
+          /* Advanced tab - Stash, Rebase, Cherry-pick */
+          <div className="flex-1 overflow-y-auto">
+            {/* Cherry-pick conflict panel */}
+            <CherryPickConflictPanel className="px-3 pt-3" />
+
+            {/* Stash Panel */}
+            <div className="border-b">
+              <StashPanel />
+            </div>
+
+            {/* Rebase Panel */}
+            <div>
+              <div className="px-3 py-2 border-b bg-gray-50">
+                <span className="text-sm font-medium text-gray-700">Rebase</span>
+              </div>
+              <RebasePanel />
+            </div>
           </div>
         ) : (
           /* Remotes/Sync tab */
@@ -447,6 +507,13 @@ export const GitPanel: React.FC<GitPanelProps> = ({ className = '' }) => {
 
       {/* Branch Create Dialog */}
       <BranchCreateDialog />
+
+      {/* Cherry-pick Dialog */}
+      <CherryPickDialog
+        open={showCherryPickDialog}
+        onOpenChange={setShowCherryPickDialog}
+        commit={cherryPickCommit}
+      />
     </div>
   );
 };

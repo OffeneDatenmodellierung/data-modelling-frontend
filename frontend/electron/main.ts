@@ -1206,6 +1206,455 @@ ipcMain.handle(
   }
 );
 
+// ============================================================================
+// Phase 5: Advanced Features - Stash, Cherry-pick, Rebase
+// ============================================================================
+
+/**
+ * List all stashes
+ */
+ipcMain.handle('git:stash-list', async (_event, workspacePath: string) => {
+  try {
+    const simpleGit = await getSimpleGit();
+    const git = simpleGit(workspacePath);
+
+    const stashList = await git.stashList();
+
+    return {
+      success: true,
+      stashes: stashList.all.map((stash, index) => ({
+        index,
+        hash: stash.hash,
+        message: stash.message,
+        date: stash.date,
+      })),
+    };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('[Electron] Git stash list failed:', errorMessage);
+    return { success: false, error: errorMessage, stashes: [] };
+  }
+});
+
+/**
+ * Save changes to stash
+ */
+ipcMain.handle(
+  'git:stash-save',
+  async (
+    _event,
+    workspacePath: string,
+    options?: { message?: string; includeUntracked?: boolean; keepIndex?: boolean }
+  ) => {
+    try {
+      const simpleGit = await getSimpleGit();
+      const git = simpleGit(workspacePath);
+
+      const args: string[] = ['push'];
+
+      if (options?.includeUntracked) {
+        args.push('--include-untracked');
+      }
+      if (options?.keepIndex) {
+        args.push('--keep-index');
+      }
+      if (options?.message) {
+        args.push('-m', options.message);
+      }
+
+      await git.stash(args);
+
+      return { success: true };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('[Electron] Git stash save failed:', errorMessage);
+      return { success: false, error: errorMessage };
+    }
+  }
+);
+
+/**
+ * Apply a stash (keep it in stash list)
+ */
+ipcMain.handle('git:stash-apply', async (_event, workspacePath: string, stashIndex?: number) => {
+  try {
+    const simpleGit = await getSimpleGit();
+    const git = simpleGit(workspacePath);
+
+    const stashRef = stashIndex !== undefined ? `stash@{${stashIndex}}` : undefined;
+    const args: string[] = ['apply'];
+    if (stashRef) {
+      args.push(stashRef);
+    }
+
+    await git.stash(args);
+
+    return { success: true };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('[Electron] Git stash apply failed:', errorMessage);
+    return { success: false, error: errorMessage };
+  }
+});
+
+/**
+ * Pop a stash (apply and remove from stash list)
+ */
+ipcMain.handle('git:stash-pop', async (_event, workspacePath: string, stashIndex?: number) => {
+  try {
+    const simpleGit = await getSimpleGit();
+    const git = simpleGit(workspacePath);
+
+    const stashRef = stashIndex !== undefined ? `stash@{${stashIndex}}` : undefined;
+    const args: string[] = ['pop'];
+    if (stashRef) {
+      args.push(stashRef);
+    }
+
+    await git.stash(args);
+
+    return { success: true };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('[Electron] Git stash pop failed:', errorMessage);
+    return { success: false, error: errorMessage };
+  }
+});
+
+/**
+ * Drop a stash
+ */
+ipcMain.handle('git:stash-drop', async (_event, workspacePath: string, stashIndex?: number) => {
+  try {
+    const simpleGit = await getSimpleGit();
+    const git = simpleGit(workspacePath);
+
+    const stashRef = stashIndex !== undefined ? `stash@{${stashIndex}}` : undefined;
+    const args: string[] = ['drop'];
+    if (stashRef) {
+      args.push(stashRef);
+    }
+
+    await git.stash(args);
+
+    return { success: true };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('[Electron] Git stash drop failed:', errorMessage);
+    return { success: false, error: errorMessage };
+  }
+});
+
+/**
+ * Clear all stashes
+ */
+ipcMain.handle('git:stash-clear', async (_event, workspacePath: string) => {
+  try {
+    const simpleGit = await getSimpleGit();
+    const git = simpleGit(workspacePath);
+
+    await git.stash(['clear']);
+
+    return { success: true };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('[Electron] Git stash clear failed:', errorMessage);
+    return { success: false, error: errorMessage };
+  }
+});
+
+/**
+ * Show stash diff
+ */
+ipcMain.handle('git:stash-show', async (_event, workspacePath: string, stashIndex?: number) => {
+  try {
+    const simpleGit = await getSimpleGit();
+    const git = simpleGit(workspacePath);
+
+    const stashRef = stashIndex !== undefined ? `stash@{${stashIndex}}` : 'stash@{0}';
+
+    // Get the diff for the stash
+    const diff = await git.diff([stashRef + '^', stashRef]);
+
+    return { success: true, diff };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('[Electron] Git stash show failed:', errorMessage);
+    return { success: false, error: errorMessage, diff: '' };
+  }
+});
+
+/**
+ * Cherry-pick a commit
+ */
+ipcMain.handle(
+  'git:cherry-pick',
+  async (_event, workspacePath: string, commitHash: string, options?: { noCommit?: boolean }) => {
+    try {
+      const simpleGit = await getSimpleGit();
+      const git = simpleGit(workspacePath);
+
+      const args: string[] = [commitHash];
+      if (options?.noCommit) {
+        args.unshift('-n');
+      }
+
+      await git.raw(['cherry-pick', ...args]);
+
+      return { success: true };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('[Electron] Git cherry-pick failed:', errorMessage);
+      return { success: false, error: errorMessage };
+    }
+  }
+);
+
+/**
+ * Abort cherry-pick
+ */
+ipcMain.handle('git:cherry-pick-abort', async (_event, workspacePath: string) => {
+  try {
+    const simpleGit = await getSimpleGit();
+    const git = simpleGit(workspacePath);
+
+    await git.raw(['cherry-pick', '--abort']);
+
+    return { success: true };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('[Electron] Git cherry-pick abort failed:', errorMessage);
+    return { success: false, error: errorMessage };
+  }
+});
+
+/**
+ * Continue cherry-pick after resolving conflicts
+ */
+ipcMain.handle('git:cherry-pick-continue', async (_event, workspacePath: string) => {
+  try {
+    const simpleGit = await getSimpleGit();
+    const git = simpleGit(workspacePath);
+
+    await git.raw(['cherry-pick', '--continue']);
+
+    return { success: true };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('[Electron] Git cherry-pick continue failed:', errorMessage);
+    return { success: false, error: errorMessage };
+  }
+});
+
+/**
+ * Start interactive rebase
+ */
+ipcMain.handle(
+  'git:rebase-start',
+  async (
+    _event,
+    workspacePath: string,
+    options: { onto?: string; branch?: string; interactive?: boolean; commits?: number }
+  ) => {
+    try {
+      const simpleGit = await getSimpleGit();
+      const git = simpleGit(workspacePath);
+
+      const args: string[] = [];
+
+      if (options.interactive) {
+        args.push('-i');
+      }
+
+      if (options.onto) {
+        args.push('--onto', options.onto);
+      }
+
+      if (options.commits) {
+        // Rebase last N commits
+        args.push(`HEAD~${options.commits}`);
+      } else if (options.branch) {
+        args.push(options.branch);
+      }
+
+      // For interactive rebase in non-interactive mode, we need to set the editor
+      // to a no-op command so it doesn't hang waiting for user input
+      if (options.interactive) {
+        // Set GIT_SEQUENCE_EDITOR to cat so it uses the default todo list
+        await git.env('GIT_SEQUENCE_EDITOR', 'cat');
+      }
+
+      await git.rebase(args);
+
+      return { success: true };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('[Electron] Git rebase start failed:', errorMessage);
+      return { success: false, error: errorMessage };
+    }
+  }
+);
+
+/**
+ * Continue rebase after resolving conflicts
+ */
+ipcMain.handle('git:rebase-continue', async (_event, workspacePath: string) => {
+  try {
+    const simpleGit = await getSimpleGit();
+    const git = simpleGit(workspacePath);
+
+    await git.rebase(['--continue']);
+
+    return { success: true };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('[Electron] Git rebase continue failed:', errorMessage);
+    return { success: false, error: errorMessage };
+  }
+});
+
+/**
+ * Abort rebase
+ */
+ipcMain.handle('git:rebase-abort', async (_event, workspacePath: string) => {
+  try {
+    const simpleGit = await getSimpleGit();
+    const git = simpleGit(workspacePath);
+
+    await git.rebase(['--abort']);
+
+    return { success: true };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('[Electron] Git rebase abort failed:', errorMessage);
+    return { success: false, error: errorMessage };
+  }
+});
+
+/**
+ * Skip current commit during rebase
+ */
+ipcMain.handle('git:rebase-skip', async (_event, workspacePath: string) => {
+  try {
+    const simpleGit = await getSimpleGit();
+    const git = simpleGit(workspacePath);
+
+    await git.rebase(['--skip']);
+
+    return { success: true };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('[Electron] Git rebase skip failed:', errorMessage);
+    return { success: false, error: errorMessage };
+  }
+});
+
+/**
+ * Get rebase status (check if rebase is in progress)
+ */
+ipcMain.handle('git:rebase-status', async (_event, workspacePath: string) => {
+  try {
+    const simpleGit = await getSimpleGit();
+    const git = simpleGit(workspacePath);
+
+    // Check for rebase-merge or rebase-apply directories
+    const gitDir = await git.revparse(['--git-dir']);
+    const { existsSync } = await import('fs');
+    const rebaseMerge = existsSync(path.join(workspacePath, gitDir.trim(), 'rebase-merge'));
+    const rebaseApply = existsSync(path.join(workspacePath, gitDir.trim(), 'rebase-apply'));
+
+    const isRebasing = rebaseMerge || rebaseApply;
+
+    let currentStep = 0;
+    let totalSteps = 0;
+
+    if (isRebasing) {
+      try {
+        const { readFile } = await import('fs/promises');
+        const baseDir = rebaseMerge
+          ? path.join(workspacePath, gitDir.trim(), 'rebase-merge')
+          : path.join(workspacePath, gitDir.trim(), 'rebase-apply');
+
+        const msgNumFile = path.join(baseDir, 'msgnum');
+        const endFile = path.join(baseDir, 'end');
+
+        if (existsSync(msgNumFile)) {
+          currentStep = parseInt(await readFile(msgNumFile, 'utf-8'), 10);
+        }
+        if (existsSync(endFile)) {
+          totalSteps = parseInt(await readFile(endFile, 'utf-8'), 10);
+        }
+      } catch {
+        // Ignore errors reading progress files
+      }
+    }
+
+    return {
+      success: true,
+      isRebasing,
+      currentStep,
+      totalSteps,
+    };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('[Electron] Git rebase status failed:', errorMessage);
+    return { success: false, error: errorMessage, isRebasing: false };
+  }
+});
+
+/**
+ * Reset to a specific commit
+ */
+ipcMain.handle(
+  'git:reset',
+  async (
+    _event,
+    workspacePath: string,
+    commitHash: string,
+    options?: { mode?: 'soft' | 'mixed' | 'hard' }
+  ) => {
+    try {
+      const simpleGit = await getSimpleGit();
+      const git = simpleGit(workspacePath);
+
+      const mode = options?.mode || 'mixed';
+      await git.reset([`--${mode}`, commitHash]);
+
+      return { success: true };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('[Electron] Git reset failed:', errorMessage);
+      return { success: false, error: errorMessage };
+    }
+  }
+);
+
+/**
+ * Revert a commit (create a new commit that undoes the changes)
+ */
+ipcMain.handle(
+  'git:revert',
+  async (_event, workspacePath: string, commitHash: string, options?: { noCommit?: boolean }) => {
+    try {
+      const simpleGit = await getSimpleGit();
+      const git = simpleGit(workspacePath);
+
+      const args: string[] = [commitHash];
+      if (options?.noCommit) {
+        args.unshift('-n');
+      }
+
+      await git.revert(args);
+
+      return { success: true };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('[Electron] Git revert failed:', errorMessage);
+      return { success: false, error: errorMessage };
+    }
+  }
+);
+
 // Quit when all windows are closed, except on macOS
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {

@@ -208,6 +208,93 @@ export interface GitTrackingResult {
   behind: number;
 }
 
+// Phase 5: Advanced Git Operations Types
+
+// Stash Types
+export interface GitStashEntry {
+  index: number;
+  hash: string;
+  message: string;
+  date: string;
+  branch: string;
+}
+
+export interface GitStashListResult {
+  success: boolean;
+  error?: string;
+  stashes: GitStashEntry[];
+}
+
+export interface GitStashSaveOptions {
+  message?: string;
+  includeUntracked?: boolean;
+  keepIndex?: boolean;
+}
+
+export interface GitStashShowResult {
+  success: boolean;
+  error?: string;
+  diff: string;
+  files: string[];
+}
+
+// Cherry-pick Types
+export interface GitCherryPickOptions {
+  noCommit?: boolean;
+  mainline?: number; // For merge commits
+}
+
+export interface GitCherryPickResult {
+  success: boolean;
+  error?: string;
+  hash?: string;
+  hasConflicts?: boolean;
+  conflictFiles?: string[];
+}
+
+// Rebase Types
+export interface GitRebaseOptions {
+  interactive?: boolean;
+  autosquash?: boolean;
+  autostash?: boolean;
+}
+
+export interface GitRebaseStatusResult {
+  success: boolean;
+  error?: string;
+  isRebasing: boolean;
+  currentCommit?: string;
+  headName?: string;
+  onto?: string;
+  done?: number;
+  remaining?: number;
+  conflictFiles?: string[];
+}
+
+// Reset Types
+export interface GitResetOptions {
+  mode: 'soft' | 'mixed' | 'hard';
+}
+
+export interface GitResetResult {
+  success: boolean;
+  error?: string;
+}
+
+// Revert Types
+export interface GitRevertOptions {
+  noCommit?: boolean;
+  mainline?: number; // For merge commits
+}
+
+export interface GitRevertResult {
+  success: boolean;
+  error?: string;
+  hash?: string;
+  hasConflicts?: boolean;
+  conflictFiles?: string[];
+}
+
 declare global {
   interface Window {
     electronAPI?: {
@@ -291,6 +378,59 @@ declare global {
         remote: string,
         branch: string
       ) => Promise<{ success: boolean; error?: string }>;
+      // Phase 5: Advanced Operations - Stash
+      gitStashList: (workspacePath: string) => Promise<GitStashListResult>;
+      gitStashSave: (
+        workspacePath: string,
+        options?: GitStashSaveOptions
+      ) => Promise<{ success: boolean; error?: string }>;
+      gitStashApply: (
+        workspacePath: string,
+        stashIndex?: number
+      ) => Promise<{ success: boolean; error?: string; hasConflicts?: boolean }>;
+      gitStashPop: (
+        workspacePath: string,
+        stashIndex?: number
+      ) => Promise<{ success: boolean; error?: string; hasConflicts?: boolean }>;
+      gitStashDrop: (
+        workspacePath: string,
+        stashIndex: number
+      ) => Promise<{ success: boolean; error?: string }>;
+      gitStashClear: (workspacePath: string) => Promise<{ success: boolean; error?: string }>;
+      gitStashShow: (workspacePath: string, stashIndex?: number) => Promise<GitStashShowResult>;
+      // Phase 5: Advanced Operations - Cherry-pick
+      gitCherryPick: (
+        workspacePath: string,
+        commitHash: string,
+        options?: GitCherryPickOptions
+      ) => Promise<GitCherryPickResult>;
+      gitCherryPickAbort: (workspacePath: string) => Promise<{ success: boolean; error?: string }>;
+      gitCherryPickContinue: (workspacePath: string) => Promise<GitCherryPickResult>;
+      // Phase 5: Advanced Operations - Rebase
+      gitRebaseStart: (
+        workspacePath: string,
+        upstream: string,
+        options?: GitRebaseOptions
+      ) => Promise<{ success: boolean; error?: string; hasConflicts?: boolean }>;
+      gitRebaseContinue: (
+        workspacePath: string
+      ) => Promise<{ success: boolean; error?: string; hasConflicts?: boolean }>;
+      gitRebaseAbort: (workspacePath: string) => Promise<{ success: boolean; error?: string }>;
+      gitRebaseSkip: (
+        workspacePath: string
+      ) => Promise<{ success: boolean; error?: string; hasConflicts?: boolean }>;
+      gitRebaseStatus: (workspacePath: string) => Promise<GitRebaseStatusResult>;
+      // Phase 5: Advanced Operations - Reset & Revert
+      gitReset: (
+        workspacePath: string,
+        commitHash: string,
+        options?: GitResetOptions
+      ) => Promise<GitResetResult>;
+      gitRevert: (
+        workspacePath: string,
+        commitHash: string,
+        options?: GitRevertOptions
+      ) => Promise<GitRevertResult>;
     };
   }
 }

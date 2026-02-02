@@ -11,6 +11,8 @@ import {
   GitBranch,
   GitRemoteBranch,
   GitRemote,
+  GitStashEntry,
+  GitRebaseStatus,
 } from '@/stores/gitStore';
 import { getPlatform } from '@/services/platform/platform';
 import type {
@@ -22,6 +24,11 @@ import type {
   GitFetchOptions,
   GitPullOptions,
   GitPushOptions,
+  GitStashSaveOptions,
+  GitCherryPickOptions,
+  GitRebaseOptions,
+  GitResetOptions,
+  GitRevertOptions,
 } from '@/services/platform/electron';
 
 class GitService {
@@ -695,6 +702,623 @@ class GitService {
       const message = error instanceof Error ? error.message : 'Failed to set upstream';
       store.setError(message);
       return false;
+    }
+  }
+
+  // ============================================================================
+  // Phase 5: Stash Operations
+  // ============================================================================
+
+  /**
+   * Load stash list
+   */
+  async loadStashes(): Promise<void> {
+    const store = useGitStore.getState();
+    const workspacePath = store.workspacePath;
+
+    if (!workspacePath || !this.isAvailable()) {
+      return;
+    }
+
+    store.setLoadingStashes(true);
+
+    try {
+      const result = await window.electronAPI!.gitStashList(workspacePath);
+
+      if (result.success) {
+        const stashes: GitStashEntry[] = result.stashes.map((s) => ({
+          index: s.index,
+          hash: s.hash,
+          message: s.message,
+          date: s.date,
+          branch: s.branch,
+        }));
+        store.setStashes(stashes);
+      } else {
+        store.setLoadingStashes(false);
+        console.error('[GitService] loadStashes failed:', result.error);
+      }
+    } catch (error) {
+      console.error('[GitService] loadStashes failed:', error);
+      store.setLoadingStashes(false);
+    }
+  }
+
+  /**
+   * Save changes to stash
+   */
+  async stashSave(options?: GitStashSaveOptions): Promise<boolean> {
+    const store = useGitStore.getState();
+    const workspacePath = store.workspacePath;
+
+    if (!workspacePath || !this.isAvailable()) {
+      return false;
+    }
+
+    store.setStashing(true);
+
+    try {
+      const result = await window.electronAPI!.gitStashSave(workspacePath, options);
+
+      store.setStashing(false);
+
+      if (result.success) {
+        await this.refreshStatus();
+        await this.loadStashes();
+        return true;
+      }
+
+      store.setError(result.error || 'Failed to stash changes');
+      return false;
+    } catch (error) {
+      store.setStashing(false);
+      const message = error instanceof Error ? error.message : 'Failed to stash changes';
+      store.setError(message);
+      return false;
+    }
+  }
+
+  /**
+   * Apply a stash (keeps the stash)
+   */
+  async stashApply(stashIndex?: number): Promise<{ success: boolean; hasConflicts?: boolean }> {
+    const store = useGitStore.getState();
+    const workspacePath = store.workspacePath;
+
+    if (!workspacePath || !this.isAvailable()) {
+      return { success: false };
+    }
+
+    store.setStashing(true);
+
+    try {
+      const result = await window.electronAPI!.gitStashApply(workspacePath, stashIndex);
+
+      store.setStashing(false);
+
+      if (result.success) {
+        await this.refreshStatus();
+        return { success: true, hasConflicts: result.hasConflicts };
+      }
+
+      store.setError(result.error || 'Failed to apply stash');
+      return { success: false };
+    } catch (error) {
+      store.setStashing(false);
+      const message = error instanceof Error ? error.message : 'Failed to apply stash';
+      store.setError(message);
+      return { success: false };
+    }
+  }
+
+  /**
+   * Pop a stash (removes from stash list)
+   */
+  async stashPop(stashIndex?: number): Promise<{ success: boolean; hasConflicts?: boolean }> {
+    const store = useGitStore.getState();
+    const workspacePath = store.workspacePath;
+
+    if (!workspacePath || !this.isAvailable()) {
+      return { success: false };
+    }
+
+    store.setStashing(true);
+
+    try {
+      const result = await window.electronAPI!.gitStashPop(workspacePath, stashIndex);
+
+      store.setStashing(false);
+
+      if (result.success) {
+        await this.refreshStatus();
+        await this.loadStashes();
+        return { success: true, hasConflicts: result.hasConflicts };
+      }
+
+      store.setError(result.error || 'Failed to pop stash');
+      return { success: false };
+    } catch (error) {
+      store.setStashing(false);
+      const message = error instanceof Error ? error.message : 'Failed to pop stash';
+      store.setError(message);
+      return { success: false };
+    }
+  }
+
+  /**
+   * Drop a specific stash
+   */
+  async stashDrop(stashIndex: number): Promise<boolean> {
+    const store = useGitStore.getState();
+    const workspacePath = store.workspacePath;
+
+    if (!workspacePath || !this.isAvailable()) {
+      return false;
+    }
+
+    try {
+      const result = await window.electronAPI!.gitStashDrop(workspacePath, stashIndex);
+
+      if (result.success) {
+        await this.loadStashes();
+        return true;
+      }
+
+      store.setError(result.error || 'Failed to drop stash');
+      return false;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to drop stash';
+      store.setError(message);
+      return false;
+    }
+  }
+
+  /**
+   * Clear all stashes
+   */
+  async stashClear(): Promise<boolean> {
+    const store = useGitStore.getState();
+    const workspacePath = store.workspacePath;
+
+    if (!workspacePath || !this.isAvailable()) {
+      return false;
+    }
+
+    try {
+      const result = await window.electronAPI!.gitStashClear(workspacePath);
+
+      if (result.success) {
+        await this.loadStashes();
+        return true;
+      }
+
+      store.setError(result.error || 'Failed to clear stashes');
+      return false;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to clear stashes';
+      store.setError(message);
+      return false;
+    }
+  }
+
+  /**
+   * Show stash contents (diff)
+   */
+  async stashShow(stashIndex?: number): Promise<{ diff: string; files: string[] } | null> {
+    const store = useGitStore.getState();
+    const workspacePath = store.workspacePath;
+
+    if (!workspacePath || !this.isAvailable()) {
+      return null;
+    }
+
+    try {
+      const result = await window.electronAPI!.gitStashShow(workspacePath, stashIndex);
+
+      if (result.success) {
+        store.setStashDiff(result.diff);
+        return { diff: result.diff, files: result.files };
+      }
+
+      return null;
+    } catch (error) {
+      console.error('[GitService] stashShow failed:', error);
+      return null;
+    }
+  }
+
+  // ============================================================================
+  // Phase 5: Cherry-pick Operations
+  // ============================================================================
+
+  /**
+   * Cherry-pick a commit
+   */
+  async cherryPick(
+    commitHash: string,
+    options?: GitCherryPickOptions
+  ): Promise<{
+    success: boolean;
+    hash?: string;
+    hasConflicts?: boolean;
+    conflictFiles?: string[];
+  }> {
+    const store = useGitStore.getState();
+    const workspacePath = store.workspacePath;
+
+    if (!workspacePath || !this.isAvailable()) {
+      return { success: false };
+    }
+
+    store.setCherryPicking(true);
+
+    try {
+      const result = await window.electronAPI!.gitCherryPick(workspacePath, commitHash, options);
+
+      if (result.hasConflicts && result.conflictFiles) {
+        store.setCherryPickConflicts(result.conflictFiles);
+      } else {
+        store.setCherryPicking(false);
+        store.setCherryPickConflicts([]);
+      }
+
+      if (result.success || result.hasConflicts) {
+        await this.refreshStatus();
+        if (!result.hasConflicts) {
+          await this.loadHistory();
+        }
+        return {
+          success: result.success,
+          hash: result.hash,
+          hasConflicts: result.hasConflicts,
+          conflictFiles: result.conflictFiles,
+        };
+      }
+
+      store.setCherryPicking(false);
+      store.setError(result.error || 'Failed to cherry-pick commit');
+      return { success: false };
+    } catch (error) {
+      store.setCherryPicking(false);
+      const message = error instanceof Error ? error.message : 'Failed to cherry-pick commit';
+      store.setError(message);
+      return { success: false };
+    }
+  }
+
+  /**
+   * Abort cherry-pick
+   */
+  async cherryPickAbort(): Promise<boolean> {
+    const store = useGitStore.getState();
+    const workspacePath = store.workspacePath;
+
+    if (!workspacePath || !this.isAvailable()) {
+      return false;
+    }
+
+    try {
+      const result = await window.electronAPI!.gitCherryPickAbort(workspacePath);
+
+      store.setCherryPicking(false);
+      store.setCherryPickConflicts([]);
+
+      if (result.success) {
+        await this.refreshStatus();
+        return true;
+      }
+
+      store.setError(result.error || 'Failed to abort cherry-pick');
+      return false;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to abort cherry-pick';
+      store.setError(message);
+      return false;
+    }
+  }
+
+  /**
+   * Continue cherry-pick after resolving conflicts
+   */
+  async cherryPickContinue(): Promise<{
+    success: boolean;
+    hash?: string;
+    hasConflicts?: boolean;
+    conflictFiles?: string[];
+  }> {
+    const store = useGitStore.getState();
+    const workspacePath = store.workspacePath;
+
+    if (!workspacePath || !this.isAvailable()) {
+      return { success: false };
+    }
+
+    try {
+      const result = await window.electronAPI!.gitCherryPickContinue(workspacePath);
+
+      if (result.success) {
+        store.setCherryPicking(false);
+        store.setCherryPickConflicts([]);
+        await this.refreshStatus();
+        await this.loadHistory();
+        return { success: true, hash: result.hash };
+      }
+
+      if (result.hasConflicts && result.conflictFiles) {
+        store.setCherryPickConflicts(result.conflictFiles);
+        return {
+          success: false,
+          hasConflicts: true,
+          conflictFiles: result.conflictFiles,
+        };
+      }
+
+      store.setError(result.error || 'Failed to continue cherry-pick');
+      return { success: false };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to continue cherry-pick';
+      store.setError(message);
+      return { success: false };
+    }
+  }
+
+  // ============================================================================
+  // Phase 5: Rebase Operations
+  // ============================================================================
+
+  /**
+   * Start a rebase
+   */
+  async rebaseStart(
+    upstream: string,
+    options?: GitRebaseOptions
+  ): Promise<{ success: boolean; hasConflicts?: boolean }> {
+    const store = useGitStore.getState();
+    const workspacePath = store.workspacePath;
+
+    if (!workspacePath || !this.isAvailable()) {
+      return { success: false };
+    }
+
+    store.setRebasing(true);
+
+    try {
+      const result = await window.electronAPI!.gitRebaseStart(workspacePath, upstream, options);
+
+      if (result.success || result.hasConflicts) {
+        await this.refreshStatus();
+        await this.loadRebaseStatus();
+
+        if (!result.hasConflicts) {
+          store.setRebasing(false);
+          await this.loadHistory();
+        }
+
+        return { success: result.success, hasConflicts: result.hasConflicts };
+      }
+
+      store.setRebasing(false);
+      store.setError(result.error || 'Failed to start rebase');
+      return { success: false };
+    } catch (error) {
+      store.setRebasing(false);
+      const message = error instanceof Error ? error.message : 'Failed to start rebase';
+      store.setError(message);
+      return { success: false };
+    }
+  }
+
+  /**
+   * Continue rebase after resolving conflicts
+   */
+  async rebaseContinue(): Promise<{ success: boolean; hasConflicts?: boolean }> {
+    const store = useGitStore.getState();
+    const workspacePath = store.workspacePath;
+
+    if (!workspacePath || !this.isAvailable()) {
+      return { success: false };
+    }
+
+    try {
+      const result = await window.electronAPI!.gitRebaseContinue(workspacePath);
+
+      if (result.success) {
+        store.setRebasing(false);
+        store.setRebaseStatus({ isRebasing: false });
+        await this.refreshStatus();
+        await this.loadHistory();
+        return { success: true };
+      }
+
+      if (result.hasConflicts) {
+        await this.loadRebaseStatus();
+        return { success: false, hasConflicts: true };
+      }
+
+      store.setError(result.error || 'Failed to continue rebase');
+      return { success: false };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to continue rebase';
+      store.setError(message);
+      return { success: false };
+    }
+  }
+
+  /**
+   * Abort rebase
+   */
+  async rebaseAbort(): Promise<boolean> {
+    const store = useGitStore.getState();
+    const workspacePath = store.workspacePath;
+
+    if (!workspacePath || !this.isAvailable()) {
+      return false;
+    }
+
+    try {
+      const result = await window.electronAPI!.gitRebaseAbort(workspacePath);
+
+      store.setRebasing(false);
+      store.setRebaseStatus({ isRebasing: false });
+
+      if (result.success) {
+        await this.refreshStatus();
+        return true;
+      }
+
+      store.setError(result.error || 'Failed to abort rebase');
+      return false;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to abort rebase';
+      store.setError(message);
+      return false;
+    }
+  }
+
+  /**
+   * Skip current commit during rebase
+   */
+  async rebaseSkip(): Promise<{ success: boolean; hasConflicts?: boolean }> {
+    const store = useGitStore.getState();
+    const workspacePath = store.workspacePath;
+
+    if (!workspacePath || !this.isAvailable()) {
+      return { success: false };
+    }
+
+    try {
+      const result = await window.electronAPI!.gitRebaseSkip(workspacePath);
+
+      if (result.success) {
+        store.setRebasing(false);
+        store.setRebaseStatus({ isRebasing: false });
+        await this.refreshStatus();
+        await this.loadHistory();
+        return { success: true };
+      }
+
+      if (result.hasConflicts) {
+        await this.loadRebaseStatus();
+        return { success: false, hasConflicts: true };
+      }
+
+      store.setError(result.error || 'Failed to skip commit');
+      return { success: false };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to skip commit';
+      store.setError(message);
+      return { success: false };
+    }
+  }
+
+  /**
+   * Load rebase status
+   */
+  async loadRebaseStatus(): Promise<void> {
+    const store = useGitStore.getState();
+    const workspacePath = store.workspacePath;
+
+    if (!workspacePath || !this.isAvailable()) {
+      return;
+    }
+
+    try {
+      const result = await window.electronAPI!.gitRebaseStatus(workspacePath);
+
+      if (result.success) {
+        const status: GitRebaseStatus = {
+          isRebasing: result.isRebasing,
+          currentCommit: result.currentCommit,
+          headName: result.headName,
+          onto: result.onto,
+          done: result.done,
+          remaining: result.remaining,
+          conflictFiles: result.conflictFiles,
+        };
+        store.setRebaseStatus(status);
+        store.setRebasing(result.isRebasing);
+      }
+    } catch (error) {
+      console.error('[GitService] loadRebaseStatus failed:', error);
+    }
+  }
+
+  // ============================================================================
+  // Phase 5: Reset & Revert Operations
+  // ============================================================================
+
+  /**
+   * Reset to a specific commit
+   */
+  async reset(commitHash: string, options?: GitResetOptions): Promise<boolean> {
+    const store = useGitStore.getState();
+    const workspacePath = store.workspacePath;
+
+    if (!workspacePath || !this.isAvailable()) {
+      return false;
+    }
+
+    try {
+      const result = await window.electronAPI!.gitReset(workspacePath, commitHash, options);
+
+      if (result.success) {
+        await this.refreshStatus();
+        await this.loadHistory();
+        return true;
+      }
+
+      store.setError(result.error || 'Failed to reset');
+      return false;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to reset';
+      store.setError(message);
+      return false;
+    }
+  }
+
+  /**
+   * Revert a commit (creates a new commit that undoes the changes)
+   */
+  async revert(
+    commitHash: string,
+    options?: GitRevertOptions
+  ): Promise<{
+    success: boolean;
+    hash?: string;
+    hasConflicts?: boolean;
+    conflictFiles?: string[];
+  }> {
+    const store = useGitStore.getState();
+    const workspacePath = store.workspacePath;
+
+    if (!workspacePath || !this.isAvailable()) {
+      return { success: false };
+    }
+
+    try {
+      const result = await window.electronAPI!.gitRevert(workspacePath, commitHash, options);
+
+      if (result.success) {
+        await this.refreshStatus();
+        await this.loadHistory();
+        return { success: true, hash: result.hash };
+      }
+
+      if (result.hasConflicts) {
+        await this.refreshStatus();
+        return {
+          success: false,
+          hasConflicts: true,
+          conflictFiles: result.conflictFiles,
+        };
+      }
+
+      store.setError(result.error || 'Failed to revert commit');
+      return { success: false };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to revert commit';
+      store.setError(message);
+      return { success: false };
     }
   }
 
