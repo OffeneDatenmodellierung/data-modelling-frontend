@@ -44,6 +44,7 @@ import { GitHubUserMenu, GitHubAuthDialog, GitHubRepoSelector } from '@/componen
 import { PRListPanel } from '@/components/github/PRListPanel';
 import { GitHubPRDetailPanel } from '@/components/github/GitHubPRDetailPanel';
 import { useGitHubStore, selectShowPRListPanel, selectSelectedPR } from '@/stores/githubStore';
+import { useGitHubRepoStore } from '@/stores/githubRepoStore';
 import { isElectron } from '@/services/platform/platform';
 import type { SharedResourceReference } from '@/types/domain';
 import { HelpButton, HelpPanel } from '@/components/help';
@@ -314,12 +315,84 @@ const ModelEditor: React.FC = () => {
     };
   }, [workspaceId]);
 
+  // State for tracking GitHub repo initialization
+  const [isGitHubRepoInitialized, setIsGitHubRepoInitialized] = useState(false);
+  const [isInitializingGitHubRepo, setIsInitializingGitHubRepo] = useState(false);
+
+  // Initialize GitHub repo mode when URL starts with 'github/'
+  // This handles direct navigation to GitHub workspace URLs
+  useEffect(() => {
+    const initGitHubRepo = async () => {
+      if (!workspaceId || !workspaceId.startsWith('github/')) {
+        setIsGitHubRepoInitialized(true);
+        return;
+      }
+
+      // Check if GitHub repo is already open with this workspace
+      const existingWorkspace = useGitHubRepoStore.getState().workspace;
+      if (existingWorkspace && existingWorkspace.id === workspaceId.substring(7)) {
+        setIsGitHubRepoInitialized(true);
+        return;
+      }
+
+      // Parse the GitHub URL: github/owner/repo/branch/workspacePath
+      const parts = workspaceId.substring(7).split('/');
+      if (parts.length < 3) {
+        setError('Invalid GitHub workspace URL');
+        setIsLoading(false);
+        return;
+      }
+
+      const owner = parts[0]!;
+      const repo = parts[1]!;
+      const branch = parts[2]!;
+      const pathParts = parts.slice(3);
+      const workspacePath = pathParts.join('/') || '_root_';
+      const workspaceName =
+        workspacePath === '_root_' ? repo : pathParts[pathParts.length - 1] || repo;
+
+      console.log('[ModelEditor] Initializing GitHub repo from URL:', {
+        owner,
+        repo,
+        branch,
+        workspacePath,
+      });
+
+      setIsInitializingGitHubRepo(true);
+      try {
+        await useGitHubRepoStore
+          .getState()
+          .openWorkspace(
+            owner,
+            repo,
+            branch,
+            workspacePath === '_root_' ? '' : workspacePath,
+            workspaceName
+          );
+        setIsGitHubRepoInitialized(true);
+      } catch (error) {
+        console.error('[ModelEditor] Failed to initialize GitHub repo:', error);
+        setError(error instanceof Error ? error.message : 'Failed to open GitHub repository');
+        setIsLoading(false);
+      } finally {
+        setIsInitializingGitHubRepo(false);
+      }
+    };
+
+    initGitHubRepo();
+  }, [workspaceId]);
+
   // Load workspace and domain on mount
   useEffect(() => {
     const loadWorkspace = async () => {
       if (!workspaceId) {
         setError('Workspace ID is required');
         setIsLoading(false);
+        return;
+      }
+
+      // Wait for GitHub repo initialization if needed
+      if (workspaceId.startsWith('github/') && !isGitHubRepoInitialized) {
         return;
       }
 
@@ -540,12 +613,18 @@ const ModelEditor: React.FC = () => {
     fetchRelationships,
     loadDomainAssets,
     setSelectedDomain,
+    isGitHubRepoInitialized,
   ]);
 
-  if (isLoading) {
+  if (isLoading || isInitializingGitHubRepo) {
     return (
       <div className="flex items-center justify-center h-screen">
-        <Loading />
+        <div className="text-center">
+          <Loading />
+          {isInitializingGitHubRepo && (
+            <p className="mt-4 text-gray-600">Connecting to GitHub repository...</p>
+          )}
+        </div>
       </div>
     );
   }
