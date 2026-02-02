@@ -5,3 +5,5 @@
 
 export { GitHubAuthDialog } from './GitHubAuthDialog';
 export { GitHubUserMenu } from './GitHubUserMenu';
+export { GitHubRepoSelector } from './GitHubRepoSelector';
+export { GitHubConnectionStatus } from './GitHubConnectionStatus';
