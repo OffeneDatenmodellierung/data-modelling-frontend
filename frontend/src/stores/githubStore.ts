@@ -16,8 +16,13 @@ import type {
   GitHubPRConflictInfo,
   GitHubPullRequest,
   GitHubPullRequestReview,
+  GitHubPullRequestComment,
   GitHubIssueComment,
   GitHubPRFile,
+  PendingReviewComment,
+  ReviewThread,
+  PendingReview,
+  BranchComparison,
 } from '@/types/github';
 import { githubAuth } from '@/services/github/githubAuth';
 import { getRateLimit } from '@/services/github/githubApi';
@@ -78,6 +83,27 @@ export interface GitHubState {
   showConnectDialog: boolean;
   showAuthDialog: boolean;
   showPRDetailPanel: boolean;
+  showPRListPanel: boolean;
+  showBranchComparePanel: boolean;
+
+  // Branch switching
+  currentBranch: string | null;
+  previousBranch: string | null;
+  isSwitchingBranch: boolean;
+  branchSwitchError: string | null;
+
+  // Pending review (for inline comments before submission)
+  pendingReview: PendingReview | null;
+
+  // Review comments (inline code comments with threads)
+  prReviewComments: GitHubPullRequestComment[];
+  reviewThreads: ReviewThread[];
+  isLoadingReviewComments: boolean;
+
+  // Branch comparison
+  branchComparison: BranchComparison | null;
+  isLoadingComparison: boolean;
+  comparisonError: string | null;
 
   // Actions - Auth
   setAuth: (auth: GitHubAuthState) => void;
@@ -142,6 +168,33 @@ export interface GitHubState {
   setShowConnectDialog: (show: boolean) => void;
   setShowAuthDialog: (show: boolean) => void;
   setShowPRDetailPanel: (show: boolean) => void;
+  setShowPRListPanel: (show: boolean) => void;
+  setShowBranchComparePanel: (show: boolean) => void;
+
+  // Actions - Branch switching
+  setCurrentBranch: (branch: string | null) => void;
+  switchToBranch: (branch: string) => Promise<void>;
+  switchToPRBranch: (pr: GitHubPullRequest) => Promise<void>;
+  switchBack: () => Promise<void>;
+  setBranchSwitchError: (error: string | null) => void;
+
+  // Actions - Pending review
+  startPendingReview: (prNumber: number) => void;
+  addPendingComment: (comment: Omit<PendingReviewComment, 'id'>) => void;
+  updatePendingComment: (id: string, body: string) => void;
+  removePendingComment: (id: string) => void;
+  discardPendingReview: () => void;
+
+  // Actions - Review comments
+  setPRReviewComments: (comments: GitHubPullRequestComment[]) => void;
+  setReviewThreads: (threads: ReviewThread[]) => void;
+  setLoadingReviewComments: (loading: boolean) => void;
+
+  // Actions - Branch comparison
+  setBranchComparison: (comparison: BranchComparison | null) => void;
+  setLoadingComparison: (loading: boolean) => void;
+  setComparisonError: (error: string | null) => void;
+  clearBranchComparison: () => void;
 
   // Actions - Reset
   reset: () => void;
@@ -219,6 +272,27 @@ const initialState = {
   showConnectDialog: false,
   showAuthDialog: false,
   showPRDetailPanel: false,
+  showPRListPanel: false,
+  showBranchComparePanel: false,
+
+  // Branch switching
+  currentBranch: null as string | null,
+  previousBranch: null as string | null,
+  isSwitchingBranch: false,
+  branchSwitchError: null as string | null,
+
+  // Pending review
+  pendingReview: null as PendingReview | null,
+
+  // Review comments
+  prReviewComments: [] as GitHubPullRequestComment[],
+  reviewThreads: [] as ReviewThread[],
+  isLoadingReviewComments: false,
+
+  // Branch comparison
+  branchComparison: null as BranchComparison | null,
+  isLoadingComparison: false,
+  comparisonError: null as string | null,
 };
 
 // ============================================================================
@@ -439,6 +513,174 @@ export const useGitHubStore = create<GitHubState>()(
 
         setShowPRDetailPanel: (showPRDetailPanel) => set({ showPRDetailPanel }),
 
+        setShowPRListPanel: (showPRListPanel) => set({ showPRListPanel }),
+
+        setShowBranchComparePanel: (showBranchComparePanel) => set({ showBranchComparePanel }),
+
+        // Branch switching actions
+        setCurrentBranch: (currentBranch) => set({ currentBranch }),
+
+        switchToBranch: async (branch) => {
+          const state = useGitHubStore.getState();
+          if (!state.connection) return;
+
+          set({
+            isSwitchingBranch: true,
+            branchSwitchError: null,
+            previousBranch: state.currentBranch,
+          });
+
+          try {
+            // Update the connection with the new branch
+            set({
+              connection: {
+                ...state.connection,
+                branch,
+              },
+              currentBranch: branch,
+              isSwitchingBranch: false,
+            });
+          } catch (error) {
+            set({
+              branchSwitchError: error instanceof Error ? error.message : 'Failed to switch branch',
+              isSwitchingBranch: false,
+            });
+          }
+        },
+
+        switchToPRBranch: async (pr) => {
+          const state = useGitHubStore.getState();
+          if (!state.connection) return;
+
+          set({
+            isSwitchingBranch: true,
+            branchSwitchError: null,
+            previousBranch: state.currentBranch || state.connection.branch,
+          });
+
+          try {
+            const prBranch = pr.head.ref;
+            set({
+              connection: {
+                ...state.connection,
+                branch: prBranch,
+              },
+              currentBranch: prBranch,
+              isSwitchingBranch: false,
+            });
+          } catch (error) {
+            set({
+              branchSwitchError:
+                error instanceof Error ? error.message : 'Failed to switch to PR branch',
+              isSwitchingBranch: false,
+            });
+          }
+        },
+
+        switchBack: async () => {
+          const state = useGitHubStore.getState();
+          if (!state.connection || !state.previousBranch) return;
+
+          set({
+            isSwitchingBranch: true,
+            branchSwitchError: null,
+          });
+
+          try {
+            const targetBranch = state.previousBranch;
+            set({
+              connection: {
+                ...state.connection,
+                branch: targetBranch,
+              },
+              currentBranch: targetBranch,
+              previousBranch: null,
+              isSwitchingBranch: false,
+            });
+          } catch (error) {
+            set({
+              branchSwitchError: error instanceof Error ? error.message : 'Failed to switch back',
+              isSwitchingBranch: false,
+            });
+          }
+        },
+
+        setBranchSwitchError: (branchSwitchError) => set({ branchSwitchError }),
+
+        // Pending review actions
+        startPendingReview: (prNumber) =>
+          set({
+            pendingReview: {
+              prNumber,
+              comments: [],
+              startedAt: new Date().toISOString(),
+            },
+          }),
+
+        addPendingComment: (comment) =>
+          set((state) => {
+            if (!state.pendingReview) return state;
+            const newComment: PendingReviewComment = {
+              ...comment,
+              id: `pending-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            };
+            return {
+              pendingReview: {
+                ...state.pendingReview,
+                comments: [...state.pendingReview.comments, newComment],
+              },
+            };
+          }),
+
+        updatePendingComment: (id, body) =>
+          set((state) => {
+            if (!state.pendingReview) return state;
+            return {
+              pendingReview: {
+                ...state.pendingReview,
+                comments: state.pendingReview.comments.map((c) =>
+                  c.id === id ? { ...c, body } : c
+                ),
+              },
+            };
+          }),
+
+        removePendingComment: (id) =>
+          set((state) => {
+            if (!state.pendingReview) return state;
+            return {
+              pendingReview: {
+                ...state.pendingReview,
+                comments: state.pendingReview.comments.filter((c) => c.id !== id),
+              },
+            };
+          }),
+
+        discardPendingReview: () => set({ pendingReview: null }),
+
+        // Review comments actions
+        setPRReviewComments: (prReviewComments) =>
+          set({ prReviewComments, isLoadingReviewComments: false }),
+
+        setReviewThreads: (reviewThreads) => set({ reviewThreads }),
+
+        setLoadingReviewComments: (isLoadingReviewComments) => set({ isLoadingReviewComments }),
+
+        // Branch comparison actions
+        setBranchComparison: (branchComparison) =>
+          set({ branchComparison, isLoadingComparison: false, comparisonError: null }),
+
+        setLoadingComparison: (isLoadingComparison) => set({ isLoadingComparison }),
+
+        setComparisonError: (comparisonError) =>
+          set({ comparisonError, isLoadingComparison: false }),
+
+        clearBranchComparison: () =>
+          set({
+            branchComparison: null,
+            comparisonError: null,
+          }),
+
         // Reset
         reset: () => set(initialState),
       }),
@@ -532,6 +774,46 @@ export const selectPRFiles = (state: GitHubState) => state.prFiles;
 export const selectIsLoadingPRDetails = (state: GitHubState) => state.isLoadingPRDetails;
 
 export const selectPRDetailsError = (state: GitHubState) => state.prDetailsError;
+
+// UI selectors
+export const selectShowPRListPanel = (state: GitHubState) => state.showPRListPanel;
+
+export const selectShowBranchComparePanel = (state: GitHubState) => state.showBranchComparePanel;
+
+// Branch switching selectors
+export const selectCurrentBranch = (state: GitHubState) => state.currentBranch;
+
+export const selectPreviousBranch = (state: GitHubState) => state.previousBranch;
+
+export const selectIsSwitchingBranch = (state: GitHubState) => state.isSwitchingBranch;
+
+export const selectBranchSwitchError = (state: GitHubState) => state.branchSwitchError;
+
+export const selectCanSwitchBack = (state: GitHubState) => state.previousBranch !== null;
+
+// Pending review selectors
+export const selectPendingReview = (state: GitHubState) => state.pendingReview;
+
+export const selectPendingComments = (state: GitHubState) => state.pendingReview?.comments ?? [];
+
+export const selectPendingCommentCount = (state: GitHubState) =>
+  state.pendingReview?.comments.length ?? 0;
+
+export const selectHasPendingReview = (state: GitHubState) => state.pendingReview !== null;
+
+// Review comments selectors
+export const selectPRReviewComments = (state: GitHubState) => state.prReviewComments;
+
+export const selectReviewThreads = (state: GitHubState) => state.reviewThreads;
+
+export const selectIsLoadingReviewComments = (state: GitHubState) => state.isLoadingReviewComments;
+
+// Branch comparison selectors
+export const selectBranchComparison = (state: GitHubState) => state.branchComparison;
+
+export const selectIsLoadingComparison = (state: GitHubState) => state.isLoadingComparison;
+
+export const selectComparisonError = (state: GitHubState) => state.comparisonError;
 
 // ============================================================================
 // Initialize from stored auth

@@ -64,6 +64,7 @@ vi.mock('@/services/storage/localFileService', () => ({
 
 vi.mock('@/services/platform/platform', () => ({
   isElectron: vi.fn(() => false),
+  getAssetPath: vi.fn((path: string) => path),
 }));
 
 vi.mock('@/services/api/electronAuthService', () => ({
@@ -180,4 +181,3 @@ describe('Home Page', () => {
     });
   });
 });
-

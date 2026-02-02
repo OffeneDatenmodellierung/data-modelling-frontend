@@ -505,6 +505,113 @@ export interface GitHubUpdateBranchResult {
 }
 
 // ============================================================================
+// PR Review Workflow Types
+// ============================================================================
+
+/**
+ * A pending review comment that hasn't been submitted yet
+ */
+export interface PendingReviewComment {
+  id: string;
+  path: string;
+  line: number;
+  side: 'LEFT' | 'RIGHT';
+  body: string;
+  startLine?: number;
+  startSide?: 'LEFT' | 'RIGHT';
+}
+
+/**
+ * A thread of review comments on a specific line
+ */
+export interface ReviewThread {
+  id: string;
+  path: string;
+  line: number;
+  side: 'LEFT' | 'RIGHT';
+  originalLine?: number;
+  isResolved: boolean;
+  isOutdated: boolean;
+  isCollapsed: boolean;
+  comments: GitHubPullRequestComment[];
+}
+
+/**
+ * A single line in a diff view
+ */
+export interface DiffLine {
+  type: 'addition' | 'deletion' | 'context' | 'hunk' | 'header';
+  content: string;
+  oldLineNumber?: number;
+  newLineNumber?: number;
+  threads?: ReviewThread[];
+}
+
+/**
+ * A hunk (section) of a diff
+ */
+export interface DiffHunk {
+  header: string;
+  oldStart: number;
+  oldCount: number;
+  newStart: number;
+  newCount: number;
+  lines: DiffLine[];
+}
+
+/**
+ * A parsed file diff with structured data
+ */
+export interface ParsedFileDiff {
+  filename: string;
+  previousFilename?: string;
+  status: 'added' | 'modified' | 'removed' | 'renamed' | 'copied';
+  additions: number;
+  deletions: number;
+  isBinary: boolean;
+  hunks: DiffHunk[];
+}
+
+/**
+ * Branch comparison result
+ */
+export interface BranchComparison {
+  status: 'ahead' | 'behind' | 'identical' | 'diverged';
+  aheadBy: number;
+  behindBy: number;
+  totalCommits: number;
+  commits: Array<{
+    sha: string;
+    shortSha: string;
+    message: string;
+    author: string;
+    authorAvatar?: string;
+    date: string;
+  }>;
+  files: Array<{
+    filename: string;
+    status: string;
+    additions: number;
+    deletions: number;
+  }>;
+  mergeBaseCommit?: string;
+}
+
+/**
+ * Review event types
+ */
+export type ReviewEvent = 'APPROVE' | 'REQUEST_CHANGES' | 'COMMENT';
+
+/**
+ * Pending review state (for collecting inline comments before submission)
+ */
+export interface PendingReview {
+  prNumber: number;
+  comments: PendingReviewComment[];
+  startedAt: string;
+}
+
+// ============================================================================
 // Workspace Integration
 // ============================================================================
 

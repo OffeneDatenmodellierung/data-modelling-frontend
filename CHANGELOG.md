@@ -7,6 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **PR Review Workflow**: Complete pull request review workflow with inline comments
+  - PR List Panel: Sidebar panel for browsing and filtering PRs with status indicators
+  - Enhanced Diff Viewer: Line numbers, click-to-comment, inline comment threads
+  - Inline Comments: Threaded review comments on specific lines of code
+  - Review Submission: Submit reviews with Approve, Request Changes, or Comment options
+  - Pending Reviews: Collect comments before submitting for batch review
+  - Branch Switching: Switch to PR branch for full code review
+  - Branch Comparison: Compare branches and view merge changes with diff preview
+- **PR Review Components**: Six new React components for PR review workflow
+  - `PRListPanel.tsx`: Collapsible sidebar with PR filtering and status badges
+  - `PRFileDiffViewer.tsx`: Enhanced diff viewer with line numbers and click-to-comment
+  - `PRInlineComment.tsx`: Inline comment thread display with reply support
+  - `PRReviewSubmitDialog.tsx`: Modal for submitting reviews with event type selection
+  - `BranchSwitcher.tsx`: UI for switching between branches during review
+  - `BranchComparePanel.tsx`: Compare branches with commit list and file changes
+- **PR Review Types**: TypeScript types for review workflow
+  - `PendingReviewComment`: Comment awaiting submission with line/side info
+  - `ReviewThread`: Threaded comment structure with resolved/outdated state
+  - `DiffLine`: Parsed diff line with type, content, and line numbers
+  - `ParsedFileDiff`: Complete file diff with hunks and statistics
+  - `DiffHunk`: Individual diff hunk with header and lines
+- **PR Review Store State**: GitHub store extensions for review workflow
+  - Pending review management (start, add comment, submit, discard)
+  - Branch switching with previous branch tracking
+  - PR list panel visibility toggle
+  - Review comment and thread management
+- **PR Review Tests**: 37 new component tests for PR review workflow
+  - `PRListPanel.test.tsx`: 8 tests for list rendering, selection, filtering
+  - `PRFileDiffViewer.test.tsx`: 5 tests for diff display and comments
+  - `PRInlineComment.test.tsx`: 5 tests for comment threads and replies
+  - `PRReviewSubmitDialog.test.tsx`: 8 tests for review submission
+  - `BranchSwitcher.test.tsx`: 4 tests for branch switching UI
+  - `BranchComparePanel.test.tsx`: 7 tests for branch comparison
+
+### Changed
+- **GitHubPRDetailPanel**: Integrated new PR review components for inline commenting
+- **ModelEditor**: Added PR List Panel toggle button in toolbar
+- **GitHub Store Tests**: Extended with 14 new tests for pending review and branch switching
+
 ## [3.0.0] - 2026-02-02
 
 ### Added

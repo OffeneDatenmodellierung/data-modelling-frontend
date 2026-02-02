@@ -3,7 +3,12 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { useGitHubStore } from '@/stores/githubStore';
+import {
+  useGitHubStore,
+  selectPendingComments,
+  selectPendingCommentCount,
+  selectHasPendingReview,
+} from '@/stores/githubStore';
 import type {
   GitHubUser,
   GitHubRepository,
@@ -455,6 +460,204 @@ describe('githubStore', () => {
       expect(state.auth.isAuthenticated).toBe(false);
       expect(state.pullRequests.length).toBe(0);
       expect(state.connectedRepo).toBeNull();
+    });
+  });
+
+  describe('pending review', () => {
+    it('should start a pending review', () => {
+      useGitHubStore.getState().startPendingReview(42);
+
+      const { pendingReview } = useGitHubStore.getState();
+      expect(pendingReview).not.toBeNull();
+      expect(pendingReview?.prNumber).toBe(42);
+      expect(pendingReview?.comments).toEqual([]);
+    });
+
+    it('should add a pending comment', () => {
+      useGitHubStore.getState().startPendingReview(42);
+      useGitHubStore.getState().addPendingComment({
+        path: 'src/index.ts',
+        line: 10,
+        side: 'RIGHT',
+        body: 'This needs refactoring',
+      });
+
+      const { pendingReview } = useGitHubStore.getState();
+      expect(pendingReview?.comments.length).toBe(1);
+      expect(pendingReview?.comments[0]?.path).toBe('src/index.ts');
+      expect(pendingReview?.comments[0]?.line).toBe(10);
+      expect(pendingReview?.comments[0]?.body).toBe('This needs refactoring');
+      expect(pendingReview?.comments[0]?.id).toBeDefined();
+    });
+
+    it('should remove a pending comment', () => {
+      useGitHubStore.getState().startPendingReview(42);
+      useGitHubStore.getState().addPendingComment({
+        path: 'src/index.ts',
+        line: 10,
+        side: 'RIGHT',
+        body: 'Comment 1',
+      });
+      useGitHubStore.getState().addPendingComment({
+        path: 'src/index.ts',
+        line: 20,
+        side: 'RIGHT',
+        body: 'Comment 2',
+      });
+
+      const { pendingReview } = useGitHubStore.getState();
+      const commentId = pendingReview?.comments[0]?.id;
+      expect(commentId).toBeDefined();
+
+      useGitHubStore.getState().removePendingComment(commentId!);
+
+      const updatedReview = useGitHubStore.getState().pendingReview;
+      expect(updatedReview?.comments.length).toBe(1);
+      expect(updatedReview?.comments[0]?.body).toBe('Comment 2');
+    });
+
+    it('should discard pending review', () => {
+      useGitHubStore.getState().startPendingReview(42);
+      useGitHubStore.getState().addPendingComment({
+        path: 'src/index.ts',
+        line: 10,
+        side: 'RIGHT',
+        body: 'Test comment',
+      });
+
+      useGitHubStore.getState().discardPendingReview();
+
+      expect(useGitHubStore.getState().pendingReview).toBeNull();
+    });
+
+    it('should not add comment without starting review', () => {
+      // Ensure no pending review
+      useGitHubStore.getState().discardPendingReview();
+
+      useGitHubStore.getState().addPendingComment({
+        path: 'src/index.ts',
+        line: 10,
+        side: 'RIGHT',
+        body: 'Test comment',
+      });
+
+      // Should still be null since review wasn't started
+      expect(useGitHubStore.getState().pendingReview).toBeNull();
+    });
+  });
+
+  describe('branch switching', () => {
+    it('should set current branch', () => {
+      useGitHubStore.getState().setCurrentBranch('feature/new-thing');
+      expect(useGitHubStore.getState().currentBranch).toBe('feature/new-thing');
+    });
+
+    it('should clear current branch', () => {
+      useGitHubStore.getState().setCurrentBranch('main');
+      expect(useGitHubStore.getState().currentBranch).toBe('main');
+
+      useGitHubStore.getState().setCurrentBranch(null);
+      expect(useGitHubStore.getState().currentBranch).toBeNull();
+    });
+  });
+
+  describe('PR list panel', () => {
+    it('should toggle PR list panel visibility', () => {
+      useGitHubStore.getState().setShowPRListPanel(true);
+      expect(useGitHubStore.getState().showPRListPanel).toBe(true);
+
+      useGitHubStore.getState().setShowPRListPanel(false);
+      expect(useGitHubStore.getState().showPRListPanel).toBe(false);
+    });
+  });
+
+  describe('branch comparison', () => {
+    it('should set branch comparison', () => {
+      const comparison = {
+        baseBranch: 'main',
+        headBranch: 'feature/test',
+        aheadBy: 5,
+        behindBy: 2,
+        commits: [
+          {
+            sha: 'abc123',
+            commit: {
+              message: 'Add feature',
+              author: { name: 'Test', email: 'test@example.com', date: '2024-01-01' },
+            },
+            html_url: 'https://github.com/owner/repo/commit/abc123',
+          },
+        ],
+        files: [],
+        status: 'ahead' as const,
+      };
+
+      useGitHubStore.getState().setBranchComparison(comparison);
+      expect(useGitHubStore.getState().branchComparison).toEqual(comparison);
+    });
+
+    it('should toggle branch compare panel', () => {
+      useGitHubStore.getState().setShowBranchComparePanel(true);
+      expect(useGitHubStore.getState().showBranchComparePanel).toBe(true);
+
+      useGitHubStore.getState().setShowBranchComparePanel(false);
+      expect(useGitHubStore.getState().showBranchComparePanel).toBe(false);
+    });
+
+    it('should clear branch comparison', () => {
+      useGitHubStore.getState().setBranchComparison({
+        baseBranch: 'main',
+        headBranch: 'feature',
+        aheadBy: 1,
+        behindBy: 0,
+        commits: [],
+        files: [],
+        status: 'ahead',
+      });
+
+      useGitHubStore.getState().setBranchComparison(null);
+      expect(useGitHubStore.getState().branchComparison).toBeNull();
+    });
+  });
+
+  describe('selectors', () => {
+    it('should select pending comments', () => {
+      useGitHubStore.getState().startPendingReview(42);
+      useGitHubStore.getState().addPendingComment({
+        path: 'test.ts',
+        line: 5,
+        side: 'RIGHT',
+        body: 'Comment',
+      });
+
+      const comments = selectPendingComments(useGitHubStore.getState());
+      expect(comments.length).toBe(1);
+    });
+
+    it('should select pending comment count', () => {
+      useGitHubStore.getState().startPendingReview(42);
+      useGitHubStore.getState().addPendingComment({
+        path: 'test.ts',
+        line: 5,
+        side: 'RIGHT',
+        body: 'Comment 1',
+      });
+      useGitHubStore.getState().addPendingComment({
+        path: 'test.ts',
+        line: 10,
+        side: 'RIGHT',
+        body: 'Comment 2',
+      });
+
+      const count = selectPendingCommentCount(useGitHubStore.getState());
+      expect(count).toBe(2);
+    });
+
+    it('should select has pending review', () => {
+      expect(selectHasPendingReview(useGitHubStore.getState())).toBe(false);
+
+      useGitHubStore.getState().startPendingReview(42);
+      expect(selectHasPendingReview(useGitHubStore.getState())).toBe(true);
     });
   });
 });
