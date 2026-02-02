@@ -51,6 +51,27 @@ export class WorkspaceV2Saver {
     allDecisionRecords: Decision[] = [],
     allSketches: Sketch[] = []
   ): Promise<SavedFile[]> {
+    // Log input data for debugging
+    console.log('[WorkspaceV2Saver] generateFiles called with:', {
+      workspaceId: workspace.id,
+      workspaceName: workspace.name,
+      domainsCount: domains.length,
+      tablesCount: allTables.length,
+      systemsCount: allSystems.length,
+      tables: allTables.map((t) => ({
+        id: t.id,
+        name: t.name,
+        primary_domain_id: t.primary_domain_id,
+      })),
+      domains: domains.map((d) => ({ id: d.id, name: d.name })),
+      systems: allSystems.map((s) => ({
+        id: s.id,
+        name: s.name,
+        domain_id: (s as any).domain_id,
+        table_ids: s.table_ids,
+      })),
+    });
+
     const files: SavedFile[] = [];
 
     // Sanitize workspace name for filenames
@@ -87,6 +108,27 @@ export class WorkspaceV2Saver {
       `[WorkspaceV2Saver] Generated workspace.yaml and README.md for "${workspace.name}"`
     );
 
+    // Log all tables and domains for debugging
+    console.log(
+      `[WorkspaceV2Saver] Total tables to save: ${allTables.length}, domains: ${domains.length}`
+    );
+    const domainIds = new Set(domains.map((d) => d.id));
+    const orphanedTables = allTables.filter((t) => !domainIds.has(t.primary_domain_id));
+    if (orphanedTables.length > 0) {
+      console.error(
+        `[WorkspaceV2Saver] WARNING: ${orphanedTables.length} table(s) have no matching domain and will NOT be saved:`,
+        orphanedTables.map((t) => ({
+          id: t.id,
+          name: t.name,
+          primary_domain_id: t.primary_domain_id,
+        }))
+      );
+      console.error(
+        `[WorkspaceV2Saver] Available domain IDs:`,
+        domains.map((d) => ({ id: d.id, name: d.name }))
+      );
+    }
+
     // 3. Generate individual resource files in type-specific subdirectories
     for (const domain of domains) {
       const domainName = FileMigration.sanitizeFileName(domain.name);
@@ -108,14 +150,53 @@ export class WorkspaceV2Saver {
       const tablesWithoutSystem: Table[] = [];
 
       // Build a reverse lookup: table_id -> system_id
+      // First, check domain systems (primary lookup)
       const tableToSystemMap = new Map<string, string>();
       for (const system of domainSystems) {
-        if (system.table_ids) {
+        if (system.table_ids && system.table_ids.length > 0) {
+          console.log(
+            `[WorkspaceV2Saver] System "${system.name}" (${system.id}) has ${system.table_ids.length} table_ids:`,
+            system.table_ids
+          );
           for (const tableId of system.table_ids) {
             tableToSystemMap.set(tableId, system.id);
           }
+        } else {
+          console.log(`[WorkspaceV2Saver] System "${system.name}" (${system.id}) has NO table_ids`);
         }
       }
+
+      // Also check ALL systems for tables that might be linked to systems in other domains
+      // This handles the edge case where a table is imported into domain A but linked to a system in domain B
+      const crossDomainSystemsForTables = new Map<string, System>();
+      for (const table of domainTables) {
+        if (!tableToSystemMap.has(table.id)) {
+          // Table not found in domain systems, check all systems
+          const systemWithTable = allSystems.find(
+            (s) => s.table_ids?.includes(table.id) && !domainSystems.some((ds) => ds.id === s.id)
+          );
+          if (systemWithTable) {
+            console.warn(
+              `[WorkspaceV2Saver] Table "${table.name}" (${table.id}) is in domain "${domain.name}" but linked to system "${systemWithTable.name}" (${systemWithTable.id}) in different domain. Adding system to export.`
+            );
+            // Add this system to the lookup so the table gets exported with its system
+            crossDomainSystemsForTables.set(systemWithTable.id, systemWithTable);
+            tableToSystemMap.set(table.id, systemWithTable.id);
+          }
+        }
+      }
+
+      // Log domain tables for comparison
+      console.log(
+        `[WorkspaceV2Saver] Domain "${domain.name}" has ${domainTables.length} table(s):`,
+        domainTables.map((t) => ({ id: t.id, name: t.name }))
+      );
+
+      // Merge cross-domain systems into domainSystems for the export loop
+      const effectiveDomainSystems = [
+        ...domainSystems,
+        ...Array.from(crossDomainSystemsForTables.values()),
+      ];
 
       for (const table of domainTables) {
         const systemId = tableToSystemMap.get(table.id);
@@ -124,13 +205,28 @@ export class WorkspaceV2Saver {
           existing.push(table);
           tablesBySystem.set(systemId, existing);
         } else {
+          // Log warning for tables that should have a system but don't
+          // This helps diagnose issues where tables are not being saved correctly
+          const metadataSystemId = (table as any).metadata?.system_id;
+          if (metadataSystemId) {
+            console.warn(
+              `[WorkspaceV2Saver] Table "${table.name}" (${table.id}) has metadata.system_id="${metadataSystemId}" but no system in domain "${domain.name}" has this table in table_ids. Available systems:`,
+              domainSystems.map((s) => ({ id: s.id, name: s.name, table_ids: s.table_ids }))
+            );
+          }
           tablesWithoutSystem.push(table);
         }
       }
 
+      // Log summary of table grouping for debugging
+      console.log(
+        `[WorkspaceV2Saver] Domain "${domain.name}" table grouping: ${tablesBySystem.size} system(s) with tables, ${tablesWithoutSystem.length} table(s) without system`
+      );
+
       // Generate one ODCS file per system (containing all tables for that system)
       for (const [systemId, systemTables] of tablesBySystem) {
-        const system = domainSystems.find((s) => s.id === systemId);
+        // Use effectiveDomainSystems to include cross-domain systems
+        const system = effectiveDomainSystems.find((s) => s.id === systemId);
         const systemName = system?.name || systemId;
         const fileName = FileMigration.generateFileName(
           workspaceName,

@@ -218,9 +218,19 @@ export function processNestedColumns(columns: any[], tableId: string): any[] {
     hasExistingHierarchy,
   });
 
-  const columnMap = new Map<string, any>(); // Map column names to column objects
+  const columnMap = new Map<string, any>(); // Map column IDs to column objects (use ID to avoid name collisions)
+  const columnNameMap = new Map<string, any>(); // Map column names to column objects (for dot notation detection)
   const originalIdToColumn = new Map<string, any>(); // Map original column IDs to column objects
   const oldIdToNewId = new Map<string, string>(); // Map old IDs to new IDs for parent_column_id updates
+
+  // Debug: Check for quality in incoming columns
+  const incomingWithQuality = columns.filter((c) => c.quality || c.quality_rules);
+  if (incomingWithQuality.length > 0) {
+    console.log(
+      `[processNestedColumns] Incoming columns with quality: ${incomingWithQuality.length}`,
+      incomingWithQuality.map((c) => ({ name: c.name, qualityLength: c.quality?.length }))
+    );
+  }
 
   // First pass: Assign UUIDs to all columns and build maps
   columns.forEach((col, index) => {
@@ -247,7 +257,11 @@ export function processNestedColumns(columns: any[], tableId: string): any[] {
       colCopy.order = index;
     }
 
-    columnMap.set(colCopy.name, colCopy);
+    // Use ID as key to avoid losing columns with duplicate names (e.g., nested columns)
+    columnMap.set(colCopy.id, colCopy);
+    // Also map by name for dot notation detection (SQL imports)
+    // Note: This may overwrite if names are duplicated, but that's only used for dot notation fallback
+    columnNameMap.set(colCopy.name, colCopy);
     // Map by ORIGINAL ID so we can find parents when child has parent_column_id
     if (originalId) {
       originalIdToColumn.set(originalId, colCopy);
@@ -286,13 +300,14 @@ export function processNestedColumns(columns: any[], tableId: string): any[] {
     });
   } else {
     // No existing hierarchy - use dot notation detection (for SQL imports)
+    // Use columnNameMap for dot notation lookup (parent names)
     columnMap.forEach((col) => {
       const nameParts = col.name.split('.');
 
       if (nameParts.length > 1) {
         // This is a nested column (e.g., "parent.child")
         const parentName = nameParts.slice(0, -1).join('.');
-        const parentCol = columnMap.get(parentName);
+        const parentCol = columnNameMap.get(parentName);
 
         if (parentCol) {
           // Link to parent
@@ -319,14 +334,16 @@ export function processNestedColumns(columns: any[], tableId: string): any[] {
     return a.order - b.order;
   });
 
+  // Debug: Check for quality in output columns
+  const outputWithQuality = allColumns.filter((c) => c.quality || c.quality_rules);
   console.log('[processNestedColumns] Processed columns:', {
     totalColumns: allColumns.length,
     rootColumns: allColumns.filter((c) => !c.parent_column_id).length,
     nestedColumns: allColumns.filter((c) => c.parent_column_id).length,
-    hierarchy: allColumns.map((c) => ({
+    columnsWithQuality: outputWithQuality.length,
+    qualityColumns: outputWithQuality.map((c) => ({
       name: c.name,
-      hasParent: !!c.parent_column_id,
-      childCount: c.nested_columns?.length || 0,
+      qualityLength: c.quality?.length,
     })),
   });
 

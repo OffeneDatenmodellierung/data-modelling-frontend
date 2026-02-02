@@ -5,14 +5,13 @@
  * Shows as a small indicator that expands to show full details.
  */
 
-import React, { useState } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
+import { useShallow } from 'zustand/shallow';
 import {
   useValidationStore,
-  selectActiveIssues,
-  selectErrorCount,
-  selectWarningCount,
   type ValidationIssue,
   type ResourceType,
+  type ValidationState,
 } from '@/stores/validationStore';
 
 interface ValidationWarningsProps {
@@ -35,36 +34,71 @@ const resourceTypeLabels: Record<ResourceType, string> = {
 
 export const ValidationWarnings: React.FC<ValidationWarningsProps> = ({ className = '' }) => {
   const [isExpanded, setIsExpanded] = useState(false);
-  const issues = useValidationStore(selectActiveIssues);
-  const errorCount = useValidationStore(selectErrorCount);
-  const warningCount = useValidationStore(selectWarningCount);
-  const clearAllIssues = useValidationStore((state) => state.clearAllIssues);
-  const removeIssue = useValidationStore((state) => state.removeIssue);
+
+  // Use useShallow for shallow comparison to prevent unnecessary re-renders
+  const { issues, clearAllIssues, removeIssue } = useValidationStore(
+    useShallow((state: ValidationState) => ({
+      issues: state.issues,
+      clearAllIssues: state.clearAllIssues,
+      removeIssue: state.removeIssue,
+    }))
+  );
+
+  // Compute derived values with useMemo to avoid recalculating on every render
+  const activeIssues = useMemo(() => issues.filter((i: ValidationIssue) => i.isActive), [issues]);
+
+  const errorCount = useMemo(
+    () => activeIssues.filter((i: ValidationIssue) => i.severity === 'error').length,
+    [activeIssues]
+  );
+
+  const warningCount = useMemo(
+    () => activeIssues.filter((i: ValidationIssue) => i.severity === 'warning').length,
+    [activeIssues]
+  );
 
   const totalCount = errorCount + warningCount;
+
+  // Group issues by resource type - memoized
+  const groupedIssues = useMemo(() => {
+    return activeIssues.reduce(
+      (acc: Record<ResourceType, ValidationIssue[]>, issue: ValidationIssue) => {
+        const key = issue.resourceType;
+        if (!acc[key]) {
+          acc[key] = [];
+        }
+        acc[key].push(issue);
+        return acc;
+      },
+      {} as Record<ResourceType, ValidationIssue[]>
+    );
+  }, [activeIssues]);
+
+  // Stable callback references
+  const handleToggleExpanded = useCallback(() => {
+    setIsExpanded((prev) => !prev);
+  }, []);
+
+  const handleClose = useCallback(() => {
+    setIsExpanded(false);
+  }, []);
+
+  const handleRemoveIssue = useCallback(
+    (id: string) => {
+      removeIssue(id);
+    },
+    [removeIssue]
+  );
 
   if (totalCount === 0) {
     return null;
   }
 
-  // Group issues by resource type
-  const groupedIssues = issues.reduce(
-    (acc, issue) => {
-      const key = issue.resourceType;
-      if (!acc[key]) {
-        acc[key] = [];
-      }
-      acc[key].push(issue);
-      return acc;
-    },
-    {} as Record<ResourceType, ValidationIssue[]>
-  );
-
   return (
     <div className={`relative ${className}`}>
       {/* Indicator button */}
       <button
-        onClick={() => setIsExpanded(!isExpanded)}
+        onClick={handleToggleExpanded}
         className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
           errorCount > 0
             ? 'bg-red-100 text-red-700 hover:bg-red-200'
@@ -115,10 +149,7 @@ export const ValidationWarnings: React.FC<ValidationWarningsProps> = ({ classNam
               >
                 Clear All
               </button>
-              <button
-                onClick={() => setIsExpanded(false)}
-                className="text-gray-400 hover:text-gray-600"
-              >
+              <button onClick={handleClose} className="text-gray-400 hover:text-gray-600">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path
                     strokeLinecap="round"
@@ -139,7 +170,7 @@ export const ValidationWarnings: React.FC<ValidationWarningsProps> = ({ classNam
                   {resourceTypeLabels[type as ResourceType]} ({typeIssues.length})
                 </h4>
                 <ul className="space-y-2">
-                  {typeIssues.map((issue) => (
+                  {typeIssues.map((issue: ValidationIssue) => (
                     <li
                       key={issue.id}
                       className={`text-sm rounded-md p-2 ${
@@ -164,7 +195,7 @@ export const ValidationWarnings: React.FC<ValidationWarningsProps> = ({ classNam
                           )}
                         </div>
                         <button
-                          onClick={() => removeIssue(issue.id)}
+                          onClick={() => handleRemoveIssue(issue.id)}
                           className="flex-shrink-0 opacity-50 hover:opacity-100"
                           title="Dismiss"
                         >

@@ -70,6 +70,13 @@ export const CreateTableDialog: React.FC<CreateTableDialogProps> = ({
   }, [isOpen]);
 
   const handleImport = async () => {
+    console.log('[CreateTableDialog] handleImport called', {
+      importYaml: importYaml ? `${importYaml.substring(0, 100)}...` : 'empty',
+      importFile: importFile?.name || 'none',
+      importFormat,
+      selectedSystemId,
+    });
+
     if (!importYaml.trim() && !importFile) {
       addToast({
         type: 'error',
@@ -83,6 +90,7 @@ export const CreateTableDialog: React.FC<CreateTableDialogProps> = ({
 
     try {
       const content = importYaml.trim() || (importFile ? await importFile.text() : '');
+      console.log('[CreateTableDialog] Content to parse:', content.substring(0, 200));
 
       let workspace;
       if (importFormat === 'odcs') {
@@ -121,6 +129,11 @@ export const CreateTableDialog: React.FC<CreateTableDialogProps> = ({
       } else {
         throw new Error(`Unsupported import format: ${importFormat}`);
       }
+
+      console.log('[CreateTableDialog] Parsed workspace:', {
+        tablesCount: workspace?.tables?.length || 0,
+        tables: workspace?.tables?.map((t: any) => ({ id: t.id, name: t.name })) || [],
+      });
 
       if (!workspace.tables || workspace.tables.length === 0) {
         // Provide more helpful error message based on import format
@@ -233,19 +246,71 @@ export const CreateTableDialog: React.FC<CreateTableDialogProps> = ({
       );
 
       // Add tables to store
+      console.log('[CreateTableDialog] Adding tables to store:', importedTables);
       importedTables.forEach((table) => {
+        // Debug: Check for quality rules in columns before adding to store
+        const columnsWithQuality = table.columns?.filter((c: any) => c.quality || c.quality_rules);
+        if (columnsWithQuality?.length > 0) {
+          console.log(
+            `[CreateTableDialog] Table "${table.name}" being added with ${columnsWithQuality.length} columns with quality:`,
+            columnsWithQuality.map((c: any) => ({
+              name: c.name,
+              parent_column_id: c.parent_column_id,
+              qualityLength: c.quality?.length,
+            }))
+          );
+        }
         addTable(table);
       });
 
       // If a system is selected, add imported tables to that system
-      if (selectedSystemId && importedTables.length > 0) {
-        const selectedSystem = systems.find((s) => s.id === selectedSystemId);
+      // IMPORTANT: Get fresh state from store to avoid stale closure issues
+      // (e.g., when system was just created and component state hasn't updated yet)
+      const { systems: freshSystems, selectedSystemId: freshSelectedSystemId } =
+        useModelStore.getState();
+      const effectiveSystemId = freshSelectedSystemId || selectedSystemId;
+
+      console.log('[CreateTableDialog] Checking system linkage:', {
+        selectedSystemId,
+        freshSelectedSystemId,
+        effectiveSystemId,
+        importedTablesCount: importedTables.length,
+        systemsCount: systems.length,
+        freshSystemsCount: freshSystems.length,
+        systems: freshSystems.map((s) => ({ id: s.id, name: s.name, table_ids: s.table_ids })),
+      });
+      if (effectiveSystemId && importedTables.length > 0) {
+        const selectedSystem = freshSystems.find((s) => s.id === effectiveSystemId);
+        console.log(
+          '[CreateTableDialog] Found selected system:',
+          selectedSystem
+            ? {
+                id: selectedSystem.id,
+                name: selectedSystem.name,
+                table_ids: selectedSystem.table_ids,
+              }
+            : 'NOT FOUND'
+        );
         if (selectedSystem) {
           const newTableIds = importedTables.map((t) => t.id);
           const updatedTableIds = [...(selectedSystem.table_ids || []), ...newTableIds];
           const uniqueTableIds = Array.from(new Set(updatedTableIds));
-          updateSystem(selectedSystemId, { table_ids: uniqueTableIds });
+          console.log('[CreateTableDialog] Updating system table_ids:', {
+            systemId: effectiveSystemId,
+            newTableIds,
+            updatedTableIds: uniqueTableIds,
+          });
+          updateSystem(effectiveSystemId, { table_ids: uniqueTableIds });
+        } else {
+          console.error('[CreateTableDialog] System not found in store!', {
+            effectiveSystemId,
+            availableSystems: freshSystems.map((s) => s.id),
+          });
         }
+      } else {
+        console.warn(
+          '[CreateTableDialog] No system selected or no tables imported - tables will not be linked to a system'
+        );
       }
 
       addToast({

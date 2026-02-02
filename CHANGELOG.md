@@ -182,6 +182,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Upgraded `lint-staged`: 15.5.2 → 16.2.7
 - Security vulnerabilities reduced from 15 to 6
 
+## [2.4.4] - 2026-02-02
+
+### Fixed
+- **Quality Rules Export from Imported Contracts**: Fixed quality rules not being exported for columns imported from external data contracts
+  - Quality rules with `type` and `implementation` fields (but no `dimension` field) were being dropped during export
+  - Updated `constraintsToQualityArray` to recognize and preserve quality rules in various formats
+  - Now handles quality rules with `type`, `implementation`, `engine`, `expectation`, `rule`, or `check` fields
+  - Includes catch-all to preserve any non-empty quality rule objects to prevent data loss
+
 ## [2.4.3] - 2026-01-28
 
 ### Changed
