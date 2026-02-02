@@ -400,6 +400,123 @@ const ModelEditor: React.FC = () => {
         setIsLoading(true);
         setError(null);
 
+        // Handle GitHub repo mode - load workspace content from GitHub
+        if (workspaceId.startsWith('github/')) {
+          const githubRepoState = useGitHubRepoStore.getState();
+          const { workspace: githubWorkspace } = githubRepoState;
+
+          if (!githubWorkspace) {
+            setError('GitHub workspace not initialized');
+            setIsLoading(false);
+            return;
+          }
+
+          console.log('[ModelEditor] Loading GitHub workspace content...', {
+            owner: githubWorkspace.owner,
+            repo: githubWorkspace.repo,
+            branch: githubWorkspace.branch,
+            workspacePath: githubWorkspace.workspacePath,
+          });
+
+          // Import the V2 loader for loading workspace from GitHub files
+          const { WorkspaceV2Loader } = await import('@/services/storage/workspaceV2Loader');
+          const { githubContentsService } = await import('@/services/github/githubContentsService');
+
+          // Get the list of files in the workspace
+          const files = await githubContentsService.getWorkspaceFiles(
+            githubWorkspace.owner,
+            githubWorkspace.repo,
+            githubWorkspace.workspacePath,
+            githubWorkspace.branch
+          );
+
+          console.log('[ModelEditor] GitHub workspace files:', files);
+
+          // Load the content of each file
+          const fileContents: Array<{ name: string; content: string }> = [];
+          for (const filePath of files) {
+            try {
+              const content = await githubRepoState.readFile(filePath);
+              // Extract just the filename from the path
+              const fileName = filePath.split('/').pop() || filePath;
+              fileContents.push({ name: fileName, content });
+            } catch (err) {
+              console.warn(`[ModelEditor] Failed to read file ${filePath}:`, err);
+            }
+          }
+
+          console.log(
+            '[ModelEditor] Loaded file contents:',
+            fileContents.map((f) => f.name)
+          );
+
+          // Use the V2 loader to parse the workspace content
+          // The loader returns an extended workspace with additional properties
+          const loadedWorkspace = (await WorkspaceV2Loader.loadFromStringFiles(
+            fileContents
+          )) as any;
+
+          console.log('[ModelEditor] Parsed workspace:', {
+            name: loadedWorkspace.name,
+            tablesCount: loadedWorkspace.tables?.length || 0,
+            domainsCount: loadedWorkspace.domains?.length || 0,
+          });
+
+          // Set the loaded data into the model store
+          if (loadedWorkspace.tables) {
+            setTables(loadedWorkspace.tables);
+          }
+          if (loadedWorkspace.relationships) {
+            setRelationships(loadedWorkspace.relationships);
+          }
+          if (loadedWorkspace.systems) {
+            setSystems(loadedWorkspace.systems);
+          }
+          if (loadedWorkspace.products) {
+            setProducts(loadedWorkspace.products);
+          }
+          if (loadedWorkspace.assets) {
+            setComputeAssets(loadedWorkspace.assets);
+          }
+          if (loadedWorkspace.bpmnProcesses) {
+            setBPMNProcesses(loadedWorkspace.bpmnProcesses);
+          }
+          if (loadedWorkspace.dmnDecisions) {
+            setDMNDecisions(loadedWorkspace.dmnDecisions);
+          }
+
+          // Set domains
+          if (loadedWorkspace.domains && loadedWorkspace.domains.length > 0) {
+            setDomains(loadedWorkspace.domains);
+            const firstDomain = loadedWorkspace.domains[0];
+            if (firstDomain) {
+              setSelectedDomain(firstDomain.id);
+            }
+          } else {
+            // Create default domain
+            const { generateUUID } = await import('@/utils/validation');
+            const defaultDomain = {
+              id: generateUUID(),
+              workspace_id: workspaceId,
+              name: 'Default',
+              model_type: 'conceptual' as const,
+              is_primary: true,
+              created_at: new Date().toISOString(),
+              last_modified_at: new Date().toISOString(),
+            };
+            setDomains([defaultDomain]);
+            setSelectedDomain(defaultDomain.id);
+          }
+
+          addToast({
+            type: 'success',
+            message: `Loaded GitHub workspace: ${githubWorkspace.workspaceName}`,
+          });
+
+          setIsLoading(false);
+          return;
+        }
+
         // Check if we're in offline mode - skip API calls
         const currentMode = useSDKModeStore.getState().mode;
         if (currentMode === 'offline') {
