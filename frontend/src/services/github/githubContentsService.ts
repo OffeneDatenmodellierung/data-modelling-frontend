@@ -490,21 +490,29 @@ async function updateRef(owner: string, repo: string, ref: string, sha: string):
 // ============================================================================
 
 function buildAuthHeaders(): HeadersInit {
-  // Use the same auth service as githubApi.ts for consistency
-  // Import dynamically to avoid circular dependencies at module load time
-  const { githubAuth } = require('./githubAuth');
-  const token = githubAuth.getToken();
-
-  if (!token) {
+  // Get token from github_auth storage (same key as githubAuth.ts)
+  // We read directly from localStorage to avoid circular dependency issues
+  const storedAuth = localStorage.getItem('github_auth');
+  if (!storedAuth) {
     throw new Error('Not authenticated with GitHub');
   }
 
-  return {
-    Accept: 'application/vnd.github+json',
-    Authorization: `Bearer ${token}`,
-    'X-GitHub-Api-Version': '2022-11-28',
-    'Content-Type': 'application/json',
-  };
+  try {
+    const authData = JSON.parse(storedAuth);
+    const token = authData.token;
+    if (!token) {
+      throw new Error('No token found in GitHub auth data');
+    }
+
+    return {
+      Accept: 'application/vnd.github+json',
+      Authorization: `Bearer ${token}`,
+      'X-GitHub-Api-Version': '2022-11-28',
+      'Content-Type': 'application/json',
+    };
+  } catch (e) {
+    throw new Error('Invalid GitHub auth data in storage');
+  }
 }
 
 /**
