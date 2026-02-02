@@ -387,6 +387,14 @@ const ModelEditor: React.FC = () => {
             workspacePath === '_root_' ? '' : workspacePath,
             workspaceName
           );
+
+        // Also set the connection in githubStore so PR panel works
+        useGitHubStore.getState().setConnection({
+          owner,
+          repo,
+          branch,
+        });
+
         setIsGitHubRepoInitialized(true);
       } catch (error) {
         console.error('[ModelEditor] Failed to initialize GitHub repo:', error);
