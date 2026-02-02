@@ -518,8 +518,8 @@ export const GitHubAuthDialog: React.FC<GitHubAuthDialogProps> = ({ className = 
               {/* Info */}
               <div className="mb-4 p-3 bg-purple-50 border border-purple-200 rounded-md">
                 <p className="text-sm text-purple-800">
-                  You will be redirected to GitHub to authorize the app. After authorization, you'll
-                  be returned to this application.
+                  You will be redirected to GitHub to authorize the app. After authorization,
+                  you&apos;ll be returned to this application.
                 </p>
               </div>
 

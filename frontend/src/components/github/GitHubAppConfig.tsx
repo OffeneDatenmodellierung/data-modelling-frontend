@@ -174,7 +174,7 @@ export const GitHubAppConfigManager: React.FC<GitHubAppConfigProps> = ({
               className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
             <p className="mt-1 text-xs text-gray-500">
-              Found in your GitHub App settings under "Client ID"
+              Found in your GitHub App settings under &ldquo;Client ID&rdquo;
             </p>
           </div>
 

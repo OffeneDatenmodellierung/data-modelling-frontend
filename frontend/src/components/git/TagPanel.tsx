@@ -190,7 +190,7 @@ export const TagPanel: React.FC<TagPanelProps> = ({ className = '' }) => {
           </div>
         ) : filteredTags.length === 0 ? (
           <div className="flex items-center justify-center h-20">
-            <span className="text-sm text-gray-500">No tags match "{filter}"</span>
+            <span className="text-sm text-gray-500">No tags match &ldquo;{filter}&rdquo;</span>
           </div>
         ) : (
           <div className="divide-y divide-gray-100">
@@ -269,6 +269,7 @@ export const TagPanel: React.FC<TagPanelProps> = ({ className = '' }) => {
                   onChange={(e) => setTagName(e.target.value)}
                   placeholder="v1.0.0"
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  /* eslint-disable-next-line jsx-a11y/no-autofocus */
                   autoFocus
                 />
                 <p className="mt-1 text-xs text-gray-500">
@@ -353,7 +354,8 @@ export const TagPanel: React.FC<TagPanelProps> = ({ className = '' }) => {
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900">Delete Tag?</h3>
                   <p className="text-sm text-gray-500">
-                    Delete tag "{showDeleteConfirm}" locally. This won't affect remote tags.
+                    Delete tag &ldquo;{showDeleteConfirm}&rdquo; locally. This won&apos;t affect
+                    remote tags.
                   </p>
                 </div>
               </div>
