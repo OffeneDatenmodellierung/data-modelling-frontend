@@ -7,3 +7,5 @@ export { GitHubAuthDialog } from './GitHubAuthDialog';
 export { GitHubUserMenu } from './GitHubUserMenu';
 export { GitHubRepoSelector } from './GitHubRepoSelector';
 export { GitHubConnectionStatus } from './GitHubConnectionStatus';
+export { GitHubFileBrowser } from './GitHubFileBrowser';
+export { GitHubCommitHistory } from './GitHubCommitHistory';
