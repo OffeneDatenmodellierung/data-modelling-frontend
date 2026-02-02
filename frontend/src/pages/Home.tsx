@@ -26,6 +26,7 @@ import {
   type ExampleWorkspaceInfo,
 } from '@/services/exampleWorkspaces';
 import { GitHubRepoOpenDialog } from '@/components/github-repo';
+import { GitHubAuthDialog } from '@/components/github/GitHubAuthDialog';
 import {
   useGitHubStore,
   selectIsAuthenticated as selectGitHubAuthenticated,
@@ -758,6 +759,9 @@ const Home: React.FC = () => {
               onClose={() => setShowGitHubRepoDialog(false)}
               onOpen={handleOpenGitHubRepo}
             />
+
+            {/* GitHub Auth Dialog */}
+            <GitHubAuthDialog />
 
             {/* Create Workspace Dialog for offline mode */}
             {showCreateDialog && (

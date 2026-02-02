@@ -690,6 +690,17 @@ export const useGitHubStore = create<GitHubState>()(
         partialize: (state) => ({
           connection: state.connection,
         }),
+        // Ensure UI state is always reset on hydration (in case old persisted state exists)
+        merge: (persistedState, currentState) => ({
+          ...currentState,
+          ...(persistedState as Partial<GitHubState>),
+          // Always reset UI dialogs to closed state
+          showAuthDialog: false,
+          showConnectDialog: false,
+          showPRDetailPanel: false,
+          showPRListPanel: false,
+          showBranchComparePanel: false,
+        }),
       }
     ),
     { name: 'github-store' }
