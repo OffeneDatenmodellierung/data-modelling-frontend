@@ -30,7 +30,9 @@ This will automatically trigger the release workflow.
 
 ## Required Secrets
 
-### For macOS Code Signing (Optional but Recommended)
+**No secrets are strictly required** - the workflow will build unsigned apps for all platforms without any configuration. However, for production releases, macOS signing and notarization is highly recommended.
+
+### For macOS Code Signing (Recommended for Production)
 
 | Secret | Description |
 |--------|-------------|
@@ -38,13 +40,19 @@ This will automatically trigger the release workflow.
 | `MACOS_CERTIFICATE_PWD` | Password for the .p12 certificate |
 | `MACOS_KEYCHAIN_PWD` | Temporary keychain password (any secure string) |
 
-### For macOS Notarization (Optional but Recommended)
+### For macOS Notarization (Recommended for Production)
 
 | Secret | Description |
 |--------|-------------|
 | `APPLE_ID` | Your Apple ID email |
 | `APPLE_ID_PASSWORD` | App-specific password (not your Apple ID password) |
 | `APPLE_TEAM_ID` | Your Apple Developer Team ID |
+
+### Windows Code Signing (Not Currently Configured)
+
+Windows builds are currently unsigned. To add Windows signing in the future, you would need:
+- A Windows code signing certificate (EV certificate recommended)
+- `WIN_CSC_LINK` and `WIN_CSC_KEY_PASSWORD` secrets
 
 ### Creating macOS Secrets
 
