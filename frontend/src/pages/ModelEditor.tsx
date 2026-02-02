@@ -43,6 +43,8 @@ import { gitService } from '@/services/git/gitService';
 import { GitHubUserMenu, GitHubAuthDialog, GitHubRepoSelector } from '@/components/github';
 import { isElectron } from '@/services/platform/platform';
 import type { SharedResourceReference } from '@/types/domain';
+import { HelpButton, HelpPanel } from '@/components/help';
+import { useHelpPanel } from '@/hooks/useHelpPanel';
 
 const ModelEditor: React.FC = () => {
   const { workspaceId, domainId } = useParams<{ workspaceId: string; domainId?: string }>();
@@ -93,6 +95,9 @@ const ModelEditor: React.FC = () => {
   const [isFiltering, setIsFiltering] = useState(false);
   const [showSharedResourcePicker, setShowSharedResourcePicker] = useState(false);
   const [canvasRefreshKey, setCanvasRefreshKey] = useState(0);
+
+  // Initialize help panel keyboard shortcuts (F1, Cmd+?)
+  useHelpPanel();
 
   // Handle shared resource selection
   const handleSharedResourcesSelected = (sharedResources: SharedResourceReference[]) => {
@@ -626,6 +631,9 @@ const ModelEditor: React.FC = () => {
             {/* GitHub User Menu (Browser mode) */}
             {!isElectron() && <GitHubUserMenu />}
 
+            {/* Help Button */}
+            <HelpButton />
+
             <button
               onClick={() => setShowWorkspaceSettings(!showWorkspaceSettings)}
               className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors"
@@ -901,6 +909,9 @@ const ModelEditor: React.FC = () => {
           onResourcesSelected={handleSharedResourcesSelected}
         />
       )}
+
+      {/* Help Panel */}
+      <HelpPanel />
     </div>
   );
 };
