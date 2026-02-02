@@ -5,9 +5,9 @@ This file provides context for Large Language Models working with this codebase.
 ## Project Overview
 
 A domain-centric data modelling application built with React, TypeScript, and Electron.
-Creates data architectures, models, and flow diagrams entirely offline.
+Creates data architectures, models, and flow diagrams entirely offline with full Git/GitHub integration.
 
-**Version**: 2.5.0
+**Version**: 3.0.0
 **License**: ISC
 
 ## Technology Stack
@@ -26,6 +26,7 @@ Creates data architectures, models, and flow diagrams entirely offline.
 - Electron for cross-platform desktop app
 - Native file system access
 - IPC for main/renderer communication
+- simple-git for Git operations
 
 ### WASM Modules
 - **data-modelling-sdk 2.1.0**: YAML parsing, validation, ODCS/ODPS/CADS format support, Knowledge Base, Decision Records, Sketches, stable YAML key ordering
@@ -35,12 +36,15 @@ Creates data architectures, models, and flow diagrams entirely offline.
 
 1. **Data Modelling**: Conceptual, logical, physical models with crow's feet notation
 2. **Domain-Centric**: Organize by business domains with systems, tables, relationships
-3. **Excalidraw Sketches**: Freeform diagramming with Excalidraw integration (architecture, dataflow, ER, sequence, flowchart, wireframe, concept, infrastructure diagrams)
-4. **Decision Logs**: MADR-format Architecture Decision Records
-5. **Knowledge Base**: Documentation articles (Guide, Tutorial, Reference, etc.)
-6. **DuckDB-WASM**: In-browser SQL with OPFS persistence
-7. **Import/Export**: ODCS, SQL, AVRO, JSON Schema, Protobuf formats
-8. **Offline Only**: No backend server required
+3. **Git Integration** (v3.0.0): Full Git version control with staging, commits, branches, stash, rebase, tags, blame
+4. **GitHub Integration** (v3.0.0): PRs, reviews, comments, merge with PAT and OAuth authentication
+5. **Excalidraw Sketches**: Freeform diagramming with Excalidraw integration
+6. **Decision Logs**: MADR-format Architecture Decision Records
+7. **Knowledge Base**: Documentation articles (Guide, Tutorial, Reference, etc.)
+8. **Help Panel**: Searchable in-app documentation with keyboard shortcuts (F1)
+9. **DuckDB-WASM**: In-browser SQL with OPFS persistence
+10. **Import/Export**: ODCS, SQL, AVRO, JSON Schema, Protobuf formats
+11. **Offline First**: Works without backend; GitHub features require authentication
 
 ## Project Structure
 
@@ -107,7 +111,11 @@ dm/
 - `tests/unit/services/database/`: DuckDB unit tests (117 tests)
 - `tests/unit/stores/sketchStore.test.ts`: Sketch store tests (50 tests)
 - `tests/unit/services/sdk/sketchService.test.ts`: Sketch service tests (37 tests)
-- Total test count: 744 tests
+- `tests/unit/stores/gitStore.test.ts`: Git store tests (37 tests)
+- `tests/unit/stores/githubStore.test.ts`: GitHub store tests (34 tests)
+- `tests/unit/stores/helpStore.test.ts`: Help store tests (23 tests)
+- `tests/unit/types/help.test.ts`: Help utility tests (22 tests)
+- Total test count: 860 tests
 
 ## Development Commands
 
@@ -194,6 +202,47 @@ Excalidraw integration provides freeform diagramming for architecture, dataflow,
 - Directory: `sketches/`
 - File pattern: `{workspace}_{domain}_{name}.sketch.json`
 - Global sketches: `{workspace}_global_{name}.sketch.json`
+
+## Git/GitHub Integration (v3.0.0)
+
+### Git Features (Electron Only)
+Full Git version control via `simple-git` library:
+- **Repository**: Initialize, status, current branch
+- **Staging**: Stage/unstage files, view diffs
+- **Commits**: Create commits, view history with diffs
+- **Branches**: Create, switch, delete, merge branches
+- **Remotes**: Push, pull, fetch from remotes
+- **Stash**: Save, apply, pop, drop stashes
+- **Advanced**: Cherry-pick, rebase, tags, blame
+
+### GitHub Features (Browser + Electron)
+GitHub API integration with dual authentication:
+- **PAT Auth**: Personal Access Token for individual use
+- **OAuth**: GitHub App authentication for organizations
+- **Pull Requests**: List, view, create, review, merge
+- **Reviews**: Approve, request changes, add comments
+- **Issues**: View and manage issues
+
+### Stores
+- `gitStore.ts`: Local Git operations state
+- `githubStore.ts`: GitHub API state and operations
+- `helpStore.ts`: Help panel state and navigation
+
+### Components
+- `components/git/`: GitPanel, CommitHistory, BranchSelector, StashList, etc.
+- `components/github/`: GitHubPanel, PullRequestList, PRDetail, CreatePRDialog, etc.
+- `components/help/`: HelpPanel, HelpSearch, HelpTopicList, HelpTopicViewer, etc.
+
+### Services
+- `services/git/gitService.ts`: Git operations via Electron IPC
+- `services/github/githubService.ts`: GitHub REST API client
+- `services/github/githubAuthService.ts`: PAT and OAuth authentication
+
+### Help System
+- Press **F1** or **Cmd+?** to open help panel
+- Searchable topics with relevance scoring
+- Contextual filtering by current view
+- Categories: Getting Started, Git, Canvas, Tables, Keyboard Shortcuts
 
 ## Common Tasks
 

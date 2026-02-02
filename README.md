@@ -11,8 +11,11 @@ A domain-centric data modelling application built with React and Electron. Creat
 
 - **Data Modelling**: Conceptual, logical, and physical models with crow's feet notation
 - **Infinite Canvas**: ReactFlow-based canvas for visualizing data models
+- **Git Integration** (v3.0.0): Full Git version control - staging, commits, branches, stash, rebase, tags, blame
+- **GitHub Integration** (v3.0.0): Pull requests, reviews, comments, merge with PAT and OAuth authentication
 - **Excalidraw Sketches** (v2.5.0+): Freeform diagramming for architecture, dataflow, ER, sequence, flowchart, wireframe, and infrastructure diagrams
-- **Offline Mode**: **Currently only supports offline mode** - Works without API using local files and WASM SDK
+- **Help Panel** (v3.0.0): Searchable in-app documentation with keyboard shortcuts (F1, Cmd+?)
+- **Offline First**: Works without backend; GitHub features available when authenticated
 - **Import/Export**: Support for ODCS, SQL, AVRO, JSON Schema, and Protobuf formats
 - **Cross-Platform**: Electron desktop app (macOS, Windows, Linux)
 - **Domain-Centric**: Organize data models by business domains with systems, tables, relationships, BPMN processes, and DMN decisions
@@ -244,16 +247,67 @@ The application includes DuckDB-WASM 1.29.0 (DuckDB 1.4.3) for in-browser SQL qu
 
 See [DuckDB Guide](frontend/docs/DUCKDB_GUIDE.md) for detailed documentation.
 
-## Offline Mode
+### Git/GitHub Integration (v3.0.0)
 
-**⚠️ IMPORTANT: This application currently only supports OFFLINE MODE.**
+Full Git version control and GitHub integration for collaborative workflows:
 
-The app operates entirely offline using:
+**Git Features (Electron Only)**:
+- Repository initialization and status monitoring
+- File staging with diff preview
+- Commit history with full diff display
+- Branch management (create, switch, delete, merge)
+- Remote operations (push, pull, fetch)
+- Stash management (save, apply, pop, drop)
+- Advanced: cherry-pick, rebase, tags, blame
+
+**GitHub Features (Browser + Electron)**:
+- Personal Access Token (PAT) authentication
+- GitHub App OAuth authentication
+- Pull request management:
+  - List and view pull requests
+  - Create PRs with template support
+  - Add comments and review comments
+  - Submit reviews (approve, request changes)
+  - Merge PRs (merge, squash, rebase)
+  - Conflict detection before merge
+- Issue viewing and management
+
+**Authentication Options**:
+1. **PAT (Personal Access Token)**: Best for individual users
+   - Go to GitHub → Settings → Developer settings → Personal access tokens
+   - Generate token with `repo` scope
+   - Paste in the app's GitHub connection dialog
+
+2. **GitHub App (OAuth)**: Best for organizations
+   - Admin creates GitHub App in org settings
+   - Configure app credentials in the application
+   - Users authenticate via OAuth flow
+
+### Help System (v3.0.0)
+
+Press **F1** or **Cmd+?** (Ctrl+? on Windows) to open the searchable help panel:
+- Comprehensive Git/GitHub documentation
+- Getting started guides
+- Keyboard shortcuts reference
+- Contextual help based on current view
+
+## Offline-First Architecture
+
+The application operates offline-first with optional GitHub connectivity:
+
+**Core Features (Fully Offline)**:
 - **WASM SDK**: Direct use of `data-modelling-sdk` compiled to WebAssembly
 - **Local File System**: Electron file system access for saving/loading workspaces
-- **No API Required**: All functionality works without any backend server
+- **DuckDB-WASM**: In-browser SQL database with local persistence
+- **Git Operations**: Full local Git via simple-git (Electron only)
 
-**Note**: Online mode (API integration) is not currently supported. The application is designed to work standalone with local file storage.
+**GitHub Features (Requires Authentication)**:
+- Pull request management
+- Code reviews and comments
+- Remote repository operations
+- Issue tracking
+
+**Note**: All core data modelling functionality works completely offline. GitHub integration is optional and only needed for collaborative workflows.
 
 ## CI/CD
 

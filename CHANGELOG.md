@@ -7,6 +7,87 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.0] - 2026-02-02
+
+### Added
+- **Full Git Integration**: Complete Git version control integration for workspaces
+  - Repository initialization and status monitoring
+  - Staging, committing, and viewing commit history
+  - Branch management (create, switch, delete, merge)
+  - Remote operations (push, pull, fetch)
+  - Stash management (save, apply, pop, drop)
+  - Cherry-pick commits between branches
+  - Interactive rebase support
+  - Tag management (create, delete, push)
+  - Git blame for file history tracking
+  - Merge conflict detection and resolution
+- **GitHub Integration**: Full GitHub API integration for collaborative workflows
+  - Personal Access Token (PAT) authentication
+  - GitHub App OAuth authentication with easy switching
+  - Repository connection and management
+  - Pull request support:
+    - List, view, and create pull requests
+    - Add comments and review comments
+    - Approve, request changes, or comment reviews
+    - Merge PRs (merge, squash, rebase strategies)
+    - Conflict detection before merge
+  - Issue viewing and management
+  - Branch protection status display
+- **Git Panel UI**: New Git panel in the application sidebar
+  - File staging with checkbox selection
+  - Commit message editor with conventional commit support
+  - Branch selector with create/switch/delete actions
+  - Remote operations toolbar (push, pull, fetch)
+  - Commit history viewer with diff display
+  - Stash list with apply/pop/drop actions
+- **GitHub Panel UI**: Dedicated GitHub panel for repository operations
+  - Repository connection dialog with PAT/OAuth options
+  - Pull request list with status indicators
+  - PR detail view with files changed, comments, reviews
+  - Create PR dialog with template support
+  - Review submission interface
+- **Help Panel System**: Extensible in-app help documentation
+  - Searchable help topics with scoring algorithm
+  - Contextual help based on current view
+  - Keyboard shortcuts (F1, Cmd+?)
+  - Category-based organization
+  - Comprehensive Git documentation (8 topics):
+    - Git Integration Overview
+    - Authentication Methods (PAT, GitHub App)
+    - Basic Workflow (staging, commits, push/pull)
+    - Branch Management
+    - GitHub Pull Requests
+    - Advanced Operations (stash, rebase, cherry-pick, tags)
+    - Browser vs Electron differences
+    - Troubleshooting guide
+  - Getting Started guide
+  - Keyboard shortcuts reference
+- **Electron Release Workflow**: GitHub Actions workflow for building signed Electron apps
+  - Multi-platform builds (macOS, Windows, Linux)
+  - macOS code signing and notarization support
+  - Windows code signing support (optional)
+  - Artifact upload to GitHub Releases
+  - SHA256 checksums for all artifacts
+- **Test Coverage**: 116 new unit tests
+  - `helpStore.test.ts`: 23 tests for help panel state
+  - `help.test.ts`: 22 tests for search and filtering
+  - `githubStore.test.ts`: 34 tests for GitHub state management
+  - `gitStore.test.ts`: 37 tests for Git state management
+
+### Changed
+- **SDK Upgrade**: Works with `@offenedatenmodellierung/data-modelling-sdk` v2.1.0+
+- **Test Count**: Increased from 744 to 860 tests
+- **React Upgrade**: Using React 19.2.4 with latest features
+
+### Security
+- Fixed all npm audit vulnerabilities (0 vulnerabilities)
+  - `dompurify`: Override to ^3.3.1 (fixes XSS GHSA-vhxf-7vqr-mrjg)
+  - `nanoid`: Override to ^3.3.8 (fixes predictable ID GHSA-mwcw-c2x4-8c55)
+  - `mermaid`: Override to ^10.9.4 (fixes XSS GHSA-7rqq-prvp-x9jh)
+
+### Dependencies
+- Added `simple-git: ^3.30.0` for Git operations in Electron
+
 ## [2.5.0] - 2026-02-01
 
 ### Added
