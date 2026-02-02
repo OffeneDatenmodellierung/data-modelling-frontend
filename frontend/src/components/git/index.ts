@@ -13,3 +13,5 @@ export { RebasePanel, RebaseStatusIndicator } from './RebasePanel';
 // Phase 6: Tags and Blame
 export { TagPanel } from './TagPanel';
 export { BlameViewer, BlameDialog } from './BlameViewer';
+// Pull Requests (via GitHub API)
+export { PullRequestsPanel } from './PullRequestsPanel';

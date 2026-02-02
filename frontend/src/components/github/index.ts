@@ -23,3 +23,6 @@ export type { AuthMethodPreference } from './GitHubAuthSettings';
 export { GitHubTagPanel } from './GitHubTagPanel';
 export { GitHubBlameViewer, GitHubBlameDialog } from './GitHubBlameViewer';
 export { GitHubPRConflictPanel, GitHubPRConflictBadge } from './GitHubPRConflictPanel';
+
+// PR Detail View
+export { GitHubPRDetailPanel } from './GitHubPRDetailPanel';

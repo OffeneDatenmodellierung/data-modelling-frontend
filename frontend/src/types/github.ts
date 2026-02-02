@@ -224,6 +224,7 @@ export interface GitHubPullRequestReview {
   state: 'APPROVED' | 'CHANGES_REQUESTED' | 'COMMENTED' | 'DISMISSED' | 'PENDING';
   html_url: string;
   submitted_at: string;
+  commit_id?: string;
 }
 
 export interface GitHubPullRequestComment {
@@ -236,6 +237,68 @@ export interface GitHubPullRequestComment {
   path?: string;
   position?: number;
   line?: number;
+  // For review comments
+  pull_request_review_id?: number;
+  diff_hunk?: string;
+  original_position?: number;
+  commit_id?: string;
+  original_commit_id?: string;
+  in_reply_to_id?: number;
+}
+
+// Issue comment (also used for PR general comments)
+export interface GitHubIssueComment {
+  id: number;
+  body: string;
+  user: GitHubUser;
+  created_at: string;
+  updated_at: string;
+  html_url: string;
+  author_association?: string;
+}
+
+// PR file changed
+export interface GitHubPRFile {
+  sha: string;
+  filename: string;
+  status: 'added' | 'removed' | 'modified' | 'renamed' | 'copied' | 'changed' | 'unchanged';
+  additions: number;
+  deletions: number;
+  changes: number;
+  patch?: string;
+  blob_url: string;
+  raw_url: string;
+  contents_url: string;
+  previous_filename?: string;
+}
+
+// Create review params
+export interface CreatePRReviewParams {
+  body?: string;
+  event: 'APPROVE' | 'REQUEST_CHANGES' | 'COMMENT';
+  comments?: Array<{
+    path: string;
+    position?: number;
+    body: string;
+    line?: number;
+    side?: 'LEFT' | 'RIGHT';
+    start_line?: number;
+    start_side?: 'LEFT' | 'RIGHT';
+  }>;
+}
+
+// Review request params
+export interface RequestReviewersParams {
+  reviewers?: string[];
+  team_reviewers?: string[];
+}
+
+// Merge params
+export interface MergePRParams {
+  commit_title?: string;
+  commit_message?: string;
+  merge_method?: 'merge' | 'squash' | 'rebase';
+  sha?: string;
 }
 
 // ============================================================================

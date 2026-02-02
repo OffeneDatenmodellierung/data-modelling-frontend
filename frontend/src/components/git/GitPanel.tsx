@@ -16,8 +16,10 @@ import { StashPanel } from './StashPanel';
 import { CherryPickDialog, CherryPickConflictPanel } from './CherryPickDialog';
 import { RebasePanel, RebaseStatusIndicator } from './RebasePanel';
 import { TagPanel } from './TagPanel';
+import { PullRequestsPanel } from './PullRequestsPanel';
+import { useGitHubStore, selectIsAuthenticated } from '@/stores/githubStore';
 
-type TabType = 'changes' | 'history' | 'remotes' | 'advanced';
+type TabType = 'changes' | 'history' | 'remotes' | 'prs' | 'advanced';
 
 export interface GitPanelProps {
   className?: string;
@@ -42,6 +44,8 @@ export const GitPanel: React.FC<GitPanelProps> = ({ className = '' }) => {
     isCherryPicking,
     stashes,
   } = useGitStore();
+
+  const isGitHubAuthenticated = useGitHubStore(selectIsAuthenticated);
 
   const [activeTab, setActiveTab] = useState<TabType>('changes');
   const [cherryPickCommit, setCherryPickCommit] = useState<typeof selectedCommit>(null);
@@ -297,7 +301,7 @@ export const GitPanel: React.FC<GitPanelProps> = ({ className = '' }) => {
       <div className="flex border-b border-gray-200">
         <button
           onClick={() => setActiveTab('changes')}
-          className={`flex-1 px-3 py-2 text-sm font-medium ${
+          className={`flex-1 px-2 py-2 text-xs font-medium ${
             activeTab === 'changes'
               ? 'text-blue-600 border-b-2 border-blue-600'
               : 'text-gray-500 hover:text-gray-700'
@@ -305,14 +309,14 @@ export const GitPanel: React.FC<GitPanelProps> = ({ className = '' }) => {
         >
           Changes
           {status.files.length > 0 && (
-            <span className="ml-1 px-1.5 py-0.5 text-xs bg-blue-100 text-blue-700 rounded-full">
+            <span className="ml-1 px-1 py-0.5 text-xs bg-blue-100 text-blue-700 rounded-full">
               {status.files.length}
             </span>
           )}
         </button>
         <button
           onClick={() => setActiveTab('history')}
-          className={`flex-1 px-3 py-2 text-sm font-medium ${
+          className={`flex-1 px-2 py-2 text-xs font-medium ${
             activeTab === 'history'
               ? 'text-blue-600 border-b-2 border-blue-600'
               : 'text-gray-500 hover:text-gray-700'
@@ -321,8 +325,21 @@ export const GitPanel: React.FC<GitPanelProps> = ({ className = '' }) => {
           History
         </button>
         <button
+          onClick={() => setActiveTab('prs')}
+          className={`flex-1 px-2 py-2 text-xs font-medium ${
+            activeTab === 'prs'
+              ? 'text-blue-600 border-b-2 border-blue-600'
+              : 'text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          PRs
+          {isGitHubAuthenticated && (
+            <span className="ml-1 w-1.5 h-1.5 bg-green-500 rounded-full inline-block" />
+          )}
+        </button>
+        <button
           onClick={() => setActiveTab('remotes')}
-          className={`flex-1 px-3 py-2 text-sm font-medium ${
+          className={`flex-1 px-2 py-2 text-xs font-medium ${
             activeTab === 'remotes'
               ? 'text-blue-600 border-b-2 border-blue-600'
               : 'text-gray-500 hover:text-gray-700'
@@ -332,15 +349,15 @@ export const GitPanel: React.FC<GitPanelProps> = ({ className = '' }) => {
         </button>
         <button
           onClick={() => setActiveTab('advanced')}
-          className={`flex-1 px-3 py-2 text-sm font-medium ${
+          className={`flex-1 px-2 py-2 text-xs font-medium ${
             activeTab === 'advanced'
               ? 'text-blue-600 border-b-2 border-blue-600'
               : 'text-gray-500 hover:text-gray-700'
           }`}
         >
-          Advanced
+          More
           {(stashes.length > 0 || isRebasing || isCherryPicking) && (
-            <span className="ml-1 w-2 h-2 bg-amber-500 rounded-full inline-block" />
+            <span className="ml-1 w-1.5 h-1.5 bg-amber-500 rounded-full inline-block" />
           )}
         </button>
       </div>
@@ -480,6 +497,9 @@ export const GitPanel: React.FC<GitPanelProps> = ({ className = '' }) => {
               />
             )}
           </div>
+        ) : activeTab === 'prs' ? (
+          /* Pull Requests tab */
+          <PullRequestsPanel className="flex-1" />
         ) : activeTab === 'advanced' ? (
           /* Advanced tab - Stash, Tags, Rebase, Cherry-pick */
           <div className="flex-1 overflow-y-auto">

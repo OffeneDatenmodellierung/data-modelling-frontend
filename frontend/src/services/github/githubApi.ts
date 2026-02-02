@@ -14,12 +14,19 @@ import type {
   GitHubCommitDetail,
   GitHubContent,
   GitHubPullRequest,
+  GitHubPullRequestReview,
+  GitHubPullRequestComment,
+  GitHubIssueComment,
+  GitHubPRFile,
   GitHubUser,
   GitHubTag,
   GitHubAnnotatedTag,
   CreateBranchParams,
   CreatePullRequestParams,
   CreateTagParams,
+  CreatePRReviewParams,
+  RequestReviewersParams,
+  MergePRParams,
   UpdateFileParams,
   GitHubBlameResult,
   GitHubBlameLine,
@@ -457,18 +464,308 @@ export async function mergePullRequest(
   owner: string,
   repo: string,
   pullNumber: number,
-  options?: {
-    commit_title?: string;
-    commit_message?: string;
-    merge_method?: 'merge' | 'squash' | 'rebase';
-    sha?: string;
-  }
+  options?: MergePRParams
 ): Promise<{ sha: string; merged: boolean; message: string }> {
   const response = await apiRequest<{ sha: string; merged: boolean; message: string }>(
     'PUT',
     `/repos/${owner}/${repo}/pulls/${pullNumber}/merge`,
     options
   );
+  return response.data;
+}
+
+// ============================================================================
+// Pull Request Files API
+// ============================================================================
+
+export async function listPRFiles(
+  owner: string,
+  repo: string,
+  pullNumber: number,
+  options?: { per_page?: number; page?: number }
+): Promise<GitHubPRFile[]> {
+  const params = new URLSearchParams();
+  if (options?.per_page) params.set('per_page', String(options.per_page));
+  if (options?.page) params.set('page', String(options.page));
+
+  const query = params.toString();
+  const path = `/repos/${owner}/${repo}/pulls/${pullNumber}/files${query ? `?${query}` : ''}`;
+
+  const response = await apiRequest<GitHubPRFile[]>('GET', path);
+  return response.data;
+}
+
+// ============================================================================
+// Pull Request Comments API (Issue Comments - general discussion)
+// ============================================================================
+
+export async function listPRComments(
+  owner: string,
+  repo: string,
+  pullNumber: number,
+  options?: { per_page?: number; page?: number; since?: string }
+): Promise<GitHubIssueComment[]> {
+  const params = new URLSearchParams();
+  if (options?.per_page) params.set('per_page', String(options.per_page));
+  if (options?.page) params.set('page', String(options.page));
+  if (options?.since) params.set('since', options.since);
+
+  const query = params.toString();
+  // PRs use the issues endpoint for general comments
+  const path = `/repos/${owner}/${repo}/issues/${pullNumber}/comments${query ? `?${query}` : ''}`;
+
+  const response = await apiRequest<GitHubIssueComment[]>('GET', path);
+  return response.data;
+}
+
+export async function createPRComment(
+  owner: string,
+  repo: string,
+  pullNumber: number,
+  body: string
+): Promise<GitHubIssueComment> {
+  const response = await apiRequest<GitHubIssueComment>(
+    'POST',
+    `/repos/${owner}/${repo}/issues/${pullNumber}/comments`,
+    { body }
+  );
+  return response.data;
+}
+
+export async function updatePRComment(
+  owner: string,
+  repo: string,
+  commentId: number,
+  body: string
+): Promise<GitHubIssueComment> {
+  const response = await apiRequest<GitHubIssueComment>(
+    'PATCH',
+    `/repos/${owner}/${repo}/issues/comments/${commentId}`,
+    { body }
+  );
+  return response.data;
+}
+
+export async function deletePRComment(
+  owner: string,
+  repo: string,
+  commentId: number
+): Promise<void> {
+  await apiRequest<void>('DELETE', `/repos/${owner}/${repo}/issues/comments/${commentId}`);
+}
+
+// ============================================================================
+// Pull Request Review Comments API (inline code comments)
+// ============================================================================
+
+export async function listPRReviewComments(
+  owner: string,
+  repo: string,
+  pullNumber: number,
+  options?: {
+    per_page?: number;
+    page?: number;
+    since?: string;
+    sort?: 'created' | 'updated';
+    direction?: 'asc' | 'desc';
+  }
+): Promise<GitHubPullRequestComment[]> {
+  const params = new URLSearchParams();
+  if (options?.per_page) params.set('per_page', String(options.per_page));
+  if (options?.page) params.set('page', String(options.page));
+  if (options?.since) params.set('since', options.since);
+  if (options?.sort) params.set('sort', options.sort);
+  if (options?.direction) params.set('direction', options.direction);
+
+  const query = params.toString();
+  const path = `/repos/${owner}/${repo}/pulls/${pullNumber}/comments${query ? `?${query}` : ''}`;
+
+  const response = await apiRequest<GitHubPullRequestComment[]>('GET', path);
+  return response.data;
+}
+
+export async function createPRReviewComment(
+  owner: string,
+  repo: string,
+  pullNumber: number,
+  params: {
+    body: string;
+    commit_id: string;
+    path: string;
+    line?: number;
+    side?: 'LEFT' | 'RIGHT';
+    start_line?: number;
+    start_side?: 'LEFT' | 'RIGHT';
+    in_reply_to?: number;
+  }
+): Promise<GitHubPullRequestComment> {
+  const response = await apiRequest<GitHubPullRequestComment>(
+    'POST',
+    `/repos/${owner}/${repo}/pulls/${pullNumber}/comments`,
+    params
+  );
+  return response.data;
+}
+
+export async function updatePRReviewComment(
+  owner: string,
+  repo: string,
+  commentId: number,
+  body: string
+): Promise<GitHubPullRequestComment> {
+  const response = await apiRequest<GitHubPullRequestComment>(
+    'PATCH',
+    `/repos/${owner}/${repo}/pulls/comments/${commentId}`,
+    { body }
+  );
+  return response.data;
+}
+
+export async function deletePRReviewComment(
+  owner: string,
+  repo: string,
+  commentId: number
+): Promise<void> {
+  await apiRequest<void>('DELETE', `/repos/${owner}/${repo}/pulls/comments/${commentId}`);
+}
+
+// ============================================================================
+// Pull Request Reviews API
+// ============================================================================
+
+export async function listPRReviews(
+  owner: string,
+  repo: string,
+  pullNumber: number,
+  options?: { per_page?: number; page?: number }
+): Promise<GitHubPullRequestReview[]> {
+  const params = new URLSearchParams();
+  if (options?.per_page) params.set('per_page', String(options.per_page));
+  if (options?.page) params.set('page', String(options.page));
+
+  const query = params.toString();
+  const path = `/repos/${owner}/${repo}/pulls/${pullNumber}/reviews${query ? `?${query}` : ''}`;
+
+  const response = await apiRequest<GitHubPullRequestReview[]>('GET', path);
+  return response.data;
+}
+
+export async function getPRReview(
+  owner: string,
+  repo: string,
+  pullNumber: number,
+  reviewId: number
+): Promise<GitHubPullRequestReview> {
+  const response = await apiRequest<GitHubPullRequestReview>(
+    'GET',
+    `/repos/${owner}/${repo}/pulls/${pullNumber}/reviews/${reviewId}`
+  );
+  return response.data;
+}
+
+export async function createPRReview(
+  owner: string,
+  repo: string,
+  pullNumber: number,
+  params: CreatePRReviewParams
+): Promise<GitHubPullRequestReview> {
+  const response = await apiRequest<GitHubPullRequestReview>(
+    'POST',
+    `/repos/${owner}/${repo}/pulls/${pullNumber}/reviews`,
+    params
+  );
+  return response.data;
+}
+
+export async function submitPRReview(
+  owner: string,
+  repo: string,
+  pullNumber: number,
+  reviewId: number,
+  params: { body?: string; event: 'APPROVE' | 'REQUEST_CHANGES' | 'COMMENT' }
+): Promise<GitHubPullRequestReview> {
+  const response = await apiRequest<GitHubPullRequestReview>(
+    'POST',
+    `/repos/${owner}/${repo}/pulls/${pullNumber}/reviews/${reviewId}/events`,
+    params
+  );
+  return response.data;
+}
+
+export async function dismissPRReview(
+  owner: string,
+  repo: string,
+  pullNumber: number,
+  reviewId: number,
+  message: string
+): Promise<GitHubPullRequestReview> {
+  const response = await apiRequest<GitHubPullRequestReview>(
+    'PUT',
+    `/repos/${owner}/${repo}/pulls/${pullNumber}/reviews/${reviewId}/dismissals`,
+    { message }
+  );
+  return response.data;
+}
+
+export async function listReviewCommentsForReview(
+  owner: string,
+  repo: string,
+  pullNumber: number,
+  reviewId: number,
+  options?: { per_page?: number; page?: number }
+): Promise<GitHubPullRequestComment[]> {
+  const params = new URLSearchParams();
+  if (options?.per_page) params.set('per_page', String(options.per_page));
+  if (options?.page) params.set('page', String(options.page));
+
+  const query = params.toString();
+  const path = `/repos/${owner}/${repo}/pulls/${pullNumber}/reviews/${reviewId}/comments${query ? `?${query}` : ''}`;
+
+  const response = await apiRequest<GitHubPullRequestComment[]>('GET', path);
+  return response.data;
+}
+
+// ============================================================================
+// Pull Request Reviewers API
+// ============================================================================
+
+export async function requestReviewers(
+  owner: string,
+  repo: string,
+  pullNumber: number,
+  params: RequestReviewersParams
+): Promise<GitHubPullRequest> {
+  const response = await apiRequest<GitHubPullRequest>(
+    'POST',
+    `/repos/${owner}/${repo}/pulls/${pullNumber}/requested_reviewers`,
+    params
+  );
+  return response.data;
+}
+
+export async function removeReviewers(
+  owner: string,
+  repo: string,
+  pullNumber: number,
+  params: RequestReviewersParams
+): Promise<GitHubPullRequest> {
+  const response = await apiRequest<GitHubPullRequest>(
+    'DELETE',
+    `/repos/${owner}/${repo}/pulls/${pullNumber}/requested_reviewers`,
+    params
+  );
+  return response.data;
+}
+
+export async function listRequestedReviewers(
+  owner: string,
+  repo: string,
+  pullNumber: number
+): Promise<{ users: GitHubUser[]; teams: Array<{ id: number; name: string; slug: string }> }> {
+  const response = await apiRequest<{
+    users: GitHubUser[];
+    teams: Array<{ id: number; name: string; slug: string }>;
+  }>('GET', `/repos/${owner}/${repo}/pulls/${pullNumber}/requested_reviewers`);
   return response.data;
 }
 
@@ -852,12 +1149,35 @@ export const githubApi = {
   getContent,
   createOrUpdateFile,
   deleteFile,
-  // Pull Request
+  // Pull Request - Basic
   listPullRequests,
   getPullRequest,
   createPullRequest,
   updatePullRequest,
   mergePullRequest,
+  // Pull Request - Files
+  listPRFiles,
+  // Pull Request - Comments (general discussion)
+  listPRComments,
+  createPRComment,
+  updatePRComment,
+  deletePRComment,
+  // Pull Request - Review Comments (inline code comments)
+  listPRReviewComments,
+  createPRReviewComment,
+  updatePRReviewComment,
+  deletePRReviewComment,
+  // Pull Request - Reviews
+  listPRReviews,
+  getPRReview,
+  createPRReview,
+  submitPRReview,
+  dismissPRReview,
+  listReviewCommentsForReview,
+  // Pull Request - Reviewers
+  requestReviewers,
+  removeReviewers,
+  listRequestedReviewers,
   // Comparison
   compareBranches,
   // Tags

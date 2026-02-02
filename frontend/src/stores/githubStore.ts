@@ -14,6 +14,10 @@ import type {
   GitHubTag,
   GitHubBlameResult,
   GitHubPRConflictInfo,
+  GitHubPullRequest,
+  GitHubPullRequestReview,
+  GitHubIssueComment,
+  GitHubPRFile,
 } from '@/types/github';
 import { githubAuth } from '@/services/github/githubAuth';
 import { getRateLimit } from '@/services/github/githubApi';
@@ -57,9 +61,23 @@ export interface GitHubState {
   prConflictInfo: Map<number, GitHubPRConflictInfo>;
   isLoadingConflictInfo: boolean;
 
+  // Pull Requests
+  pullRequests: GitHubPullRequest[];
+  isLoadingPRs: boolean;
+  prError: string | null;
+  selectedPR: GitHubPullRequest | null;
+
+  // PR Details (for selected PR)
+  prComments: GitHubIssueComment[];
+  prReviews: GitHubPullRequestReview[];
+  prFiles: GitHubPRFile[];
+  isLoadingPRDetails: boolean;
+  prDetailsError: string | null;
+
   // UI State
   showConnectDialog: boolean;
   showAuthDialog: boolean;
+  showPRDetailPanel: boolean;
 
   // Actions - Auth
   setAuth: (auth: GitHubAuthState) => void;
@@ -100,9 +118,30 @@ export interface GitHubState {
   setLoadingConflictInfo: (isLoading: boolean) => void;
   clearPRConflictInfo: (prNumber: number) => void;
 
+  // Actions - Pull Requests
+  setPullRequests: (prs: GitHubPullRequest[]) => void;
+  setLoadingPRs: (isLoading: boolean) => void;
+  setPRError: (error: string | null) => void;
+  setSelectedPR: (pr: GitHubPullRequest | null) => void;
+  updatePR: (pr: GitHubPullRequest) => void;
+  removePR: (prNumber: number) => void;
+
+  // Actions - PR Details
+  setPRComments: (comments: GitHubIssueComment[]) => void;
+  addPRComment: (comment: GitHubIssueComment) => void;
+  updatePRComment: (commentId: number, body: string) => void;
+  removePRComment: (commentId: number) => void;
+  setPRReviews: (reviews: GitHubPullRequestReview[]) => void;
+  addPRReview: (review: GitHubPullRequestReview) => void;
+  setPRFiles: (files: GitHubPRFile[]) => void;
+  setLoadingPRDetails: (isLoading: boolean) => void;
+  setPRDetailsError: (error: string | null) => void;
+  clearPRDetails: () => void;
+
   // Actions - UI
   setShowConnectDialog: (show: boolean) => void;
   setShowAuthDialog: (show: boolean) => void;
+  setShowPRDetailPanel: (show: boolean) => void;
 
   // Actions - Reset
   reset: () => void;
@@ -163,9 +202,23 @@ const initialState = {
   prConflictInfo: new Map<number, GitHubPRConflictInfo>(),
   isLoadingConflictInfo: false,
 
+  // Pull Requests
+  pullRequests: [] as GitHubPullRequest[],
+  isLoadingPRs: false,
+  prError: null as string | null,
+  selectedPR: null as GitHubPullRequest | null,
+
+  // PR Details
+  prComments: [] as GitHubIssueComment[],
+  prReviews: [] as GitHubPullRequestReview[],
+  prFiles: [] as GitHubPRFile[],
+  isLoadingPRDetails: false,
+  prDetailsError: null as string | null,
+
   // UI State
   showConnectDialog: false,
   showAuthDialog: false,
+  showPRDetailPanel: false,
 };
 
 // ============================================================================
@@ -303,10 +356,88 @@ export const useGitHubStore = create<GitHubState>()(
             return { prConflictInfo: newMap };
           }),
 
+        // Pull Request Actions
+        setPullRequests: (pullRequests) =>
+          set({ pullRequests, isLoadingPRs: false, prError: null }),
+
+        setLoadingPRs: (isLoadingPRs) => set({ isLoadingPRs }),
+
+        setPRError: (prError) => set({ prError, isLoadingPRs: false }),
+
+        setSelectedPR: (selectedPR) =>
+          set({
+            selectedPR,
+            showPRDetailPanel: selectedPR !== null,
+            // Clear details when selecting a new PR
+            prComments: [],
+            prReviews: [],
+            prFiles: [],
+            prDetailsError: null,
+          }),
+
+        updatePR: (pr) =>
+          set((state) => ({
+            pullRequests: state.pullRequests.map((p) => (p.number === pr.number ? pr : p)),
+            selectedPR: state.selectedPR?.number === pr.number ? pr : state.selectedPR,
+          })),
+
+        removePR: (prNumber) =>
+          set((state) => ({
+            pullRequests: state.pullRequests.filter((p) => p.number !== prNumber),
+            selectedPR: state.selectedPR?.number === prNumber ? null : state.selectedPR,
+            showPRDetailPanel:
+              state.selectedPR?.number === prNumber ? false : state.showPRDetailPanel,
+          })),
+
+        // PR Details Actions
+        setPRComments: (prComments) => set({ prComments, isLoadingPRDetails: false }),
+
+        addPRComment: (comment) =>
+          set((state) => ({
+            prComments: [...state.prComments, comment],
+          })),
+
+        updatePRComment: (commentId, body) =>
+          set((state) => ({
+            prComments: state.prComments.map((c) =>
+              c.id === commentId ? { ...c, body, updated_at: new Date().toISOString() } : c
+            ),
+          })),
+
+        removePRComment: (commentId) =>
+          set((state) => ({
+            prComments: state.prComments.filter((c) => c.id !== commentId),
+          })),
+
+        setPRReviews: (prReviews) => set({ prReviews }),
+
+        addPRReview: (review) =>
+          set((state) => ({
+            prReviews: [...state.prReviews, review],
+          })),
+
+        setPRFiles: (prFiles) => set({ prFiles }),
+
+        setLoadingPRDetails: (isLoadingPRDetails) => set({ isLoadingPRDetails }),
+
+        setPRDetailsError: (prDetailsError) => set({ prDetailsError, isLoadingPRDetails: false }),
+
+        clearPRDetails: () =>
+          set({
+            prComments: [],
+            prReviews: [],
+            prFiles: [],
+            prDetailsError: null,
+            selectedPR: null,
+            showPRDetailPanel: false,
+          }),
+
         // UI Actions
         setShowConnectDialog: (showConnectDialog) => set({ showConnectDialog }),
 
         setShowAuthDialog: (showAuthDialog) => set({ showAuthDialog }),
+
+        setShowPRDetailPanel: (showPRDetailPanel) => set({ showPRDetailPanel }),
 
         // Reset
         reset: () => set(initialState),
@@ -379,6 +510,28 @@ export const selectPRConflictInfo = (prNumber: number) => (state: GitHubState) =
   state.prConflictInfo.get(prNumber);
 
 export const selectIsLoadingConflictInfo = (state: GitHubState) => state.isLoadingConflictInfo;
+
+// Pull Request selectors
+export const selectPullRequests = (state: GitHubState) => state.pullRequests;
+
+export const selectIsLoadingPRs = (state: GitHubState) => state.isLoadingPRs;
+
+export const selectPRError = (state: GitHubState) => state.prError;
+
+export const selectSelectedPR = (state: GitHubState) => state.selectedPR;
+
+export const selectShowPRDetailPanel = (state: GitHubState) => state.showPRDetailPanel;
+
+// PR Details selectors
+export const selectPRComments = (state: GitHubState) => state.prComments;
+
+export const selectPRReviews = (state: GitHubState) => state.prReviews;
+
+export const selectPRFiles = (state: GitHubState) => state.prFiles;
+
+export const selectIsLoadingPRDetails = (state: GitHubState) => state.isLoadingPRDetails;
+
+export const selectPRDetailsError = (state: GitHubState) => state.prDetailsError;
 
 // ============================================================================
 // Initialize from stored auth
