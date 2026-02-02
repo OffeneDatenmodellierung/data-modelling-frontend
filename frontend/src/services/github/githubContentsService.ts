@@ -489,6 +489,14 @@ async function updateRef(owner: string, repo: string, ref: string, sha: string):
 // Helpers
 // ============================================================================
 
+/**
+ * Decode the obfuscated token from storage
+ * Must match the encoding in githubAuth.ts
+ */
+function decodeToken(encoded: string): string {
+  return atob(encoded).split('').reverse().join('');
+}
+
 function buildAuthHeaders(): HeadersInit {
   // Get token from github_auth storage (same key as githubAuth.ts)
   // We read directly from localStorage to avoid circular dependency issues
@@ -499,10 +507,13 @@ function buildAuthHeaders(): HeadersInit {
 
   try {
     const authData = JSON.parse(storedAuth);
-    const token = authData.token;
-    if (!token) {
+    const encodedToken = authData.token;
+    if (!encodedToken) {
       throw new Error('No token found in GitHub auth data');
     }
+
+    // Token is stored encoded, must decode it (same as githubAuth.ts)
+    const token = decodeToken(encodedToken);
 
     return {
       Accept: 'application/vnd.github+json',
