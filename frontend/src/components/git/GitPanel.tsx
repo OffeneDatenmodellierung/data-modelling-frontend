@@ -6,6 +6,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useGitStore } from '@/stores/gitStore';
 import { gitService } from '@/services/git/gitService';
+import { runWorkspaceValidation } from '@/utils/workspaceValidation';
 import { GitFileList } from './GitFileList';
 import { GitHistoryList } from './GitHistoryList';
 import { DiffViewer } from './DiffViewer';
@@ -17,6 +18,7 @@ import { CherryPickDialog, CherryPickConflictPanel } from './CherryPickDialog';
 import { RebasePanel, RebaseStatusIndicator } from './RebasePanel';
 import { TagPanel } from './TagPanel';
 import { PullRequestsPanel } from './PullRequestsPanel';
+import { ValidationConfirmDialog } from '@/components/common/ValidationConfirmDialog';
 import { useGitHubStore, selectIsAuthenticated } from '@/stores/githubStore';
 
 type TabType = 'changes' | 'history' | 'remotes' | 'prs' | 'advanced';
@@ -53,6 +55,9 @@ export const GitPanel: React.FC<GitPanelProps> = ({ className = '' }) => {
   const [commitMessage, setCommitMessage] = useState('');
   const [isCommitting, setIsCommitting] = useState(false);
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
+  const [showValidationConfirm, setShowValidationConfirm] = useState(false);
+  const [validationErrorCount, setValidationErrorCount] = useState(0);
+  const [validationWarningCount, setValidationWarningCount] = useState(0);
 
   const isRemoteOperationInProgress = isFetching || isPulling || isPushing;
 
@@ -72,7 +77,8 @@ export const GitPanel: React.FC<GitPanelProps> = ({ className = '' }) => {
     }
   }, [selectedFile, activeTab, status.files.length]);
 
-  const handleCommit = useCallback(async () => {
+  // Perform the actual commit
+  const performCommit = useCallback(async () => {
     if (!commitMessage.trim()) return;
 
     setIsCommitting(true);
@@ -83,6 +89,37 @@ export const GitPanel: React.FC<GitPanelProps> = ({ className = '' }) => {
       setCommitMessage('');
     }
   }, [commitMessage]);
+
+  // Handle commit with validation check
+  const handleCommit = useCallback(async () => {
+    if (!commitMessage.trim()) return;
+
+    // Run validation before commit
+    const validationResult = await runWorkspaceValidation();
+
+    if (validationResult.hasErrors || validationResult.hasWarnings) {
+      // Store validation counts and show confirmation dialog
+      setValidationErrorCount(validationResult.errorCount);
+      setValidationWarningCount(validationResult.warningCount);
+      setShowValidationConfirm(true);
+    } else {
+      // No validation issues, proceed with commit
+      await performCommit();
+    }
+  }, [commitMessage, performCommit]);
+
+  // Handle confirmation to commit despite validation issues
+  const handleConfirmCommit = useCallback(async () => {
+    setShowValidationConfirm(false);
+    await performCommit();
+  }, [performCommit]);
+
+  // Handle viewing validation issues
+  const handleViewValidationIssues = useCallback(() => {
+    setShowValidationConfirm(false);
+    // The ValidationWarnings component in the header will show the issues
+    // We could add additional logic here to scroll to or highlight the ValidationWarnings panel
+  }, []);
 
   const handleDiscardAll = useCallback(async () => {
     if (!window.confirm('Discard all changes? This cannot be undone.')) {
@@ -540,6 +577,19 @@ export const GitPanel: React.FC<GitPanelProps> = ({ className = '' }) => {
         open={showCherryPickDialog}
         onOpenChange={setShowCherryPickDialog}
         commit={cherryPickCommit}
+      />
+
+      {/* Validation Confirmation Dialog */}
+      <ValidationConfirmDialog
+        isOpen={showValidationConfirm}
+        onClose={() => setShowValidationConfirm(false)}
+        onConfirm={handleConfirmCommit}
+        onViewIssues={handleViewValidationIssues}
+        errorCount={validationErrorCount}
+        warningCount={validationWarningCount}
+        title="Validation Issues Found"
+        message="There are validation issues in the workspace. Do you want to commit anyway?"
+        confirmLabel="Commit"
       />
     </div>
   );

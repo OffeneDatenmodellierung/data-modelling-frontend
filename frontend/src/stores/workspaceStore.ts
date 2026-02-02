@@ -429,6 +429,10 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           }
 
           try {
+            // Run validation before save (silent - just updates validation store)
+            const { runWorkspaceValidation } = await import('@/utils/workspaceValidation');
+            await runWorkspaceValidation();
+
             const mode = await useSDKModeStore.getState().getMode();
             const uiStoreModule = await import('@/stores/uiStore');
 
@@ -707,6 +711,17 @@ export const useWorkspaceStore = create<WorkspaceState>()(
               message: 'Workspace not found.',
             });
             return;
+          }
+
+          // Run validation before save and update validation store
+          const { runWorkspaceValidation } = await import('@/utils/workspaceValidation');
+          const validationResult = await runWorkspaceValidation();
+
+          // Log validation results (UI components will handle displaying warnings)
+          if (validationResult.hasErrors) {
+            console.log(
+              `[WorkspaceStore] Manual save with ${validationResult.errorCount} validation error(s)`
+            );
           }
 
           const mode = await useSDKModeStore.getState().getMode();

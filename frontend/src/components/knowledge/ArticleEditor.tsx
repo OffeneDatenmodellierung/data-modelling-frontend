@@ -71,6 +71,7 @@ export const ArticleEditor: React.FC<ArticleEditorProps> = ({
   const [showStatusChange, setShowStatusChange] = useState(false);
   const [newAuthor, setNewAuthor] = useState('');
   const [newReviewer, setNewReviewer] = useState('');
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
   const isNew = !article;
 
@@ -90,6 +91,7 @@ export const ArticleEditor: React.FC<ArticleEditorProps> = ({
       setFormData(emptyFormData);
     }
     setIsDirty(false);
+    setValidationErrors({});
     clearError();
   }, [article, clearError]);
 
@@ -127,8 +129,23 @@ export const ArticleEditor: React.FC<ArticleEditorProps> = ({
     handleInputChange('reviewers', newReviewers);
   };
 
-  const handleSave = () => {
+  const validateForm = (): boolean => {
+    const errors: Record<string, string> = {};
+
     if (!formData.title.trim()) {
+      errors.title = 'Title is required';
+    }
+
+    if (!formData.type) {
+      errors.type = 'Article type is required';
+    }
+
+    setValidationErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const handleSave = () => {
+    if (!validateForm()) {
       return;
     }
 
@@ -289,8 +306,17 @@ export const ArticleEditor: React.FC<ArticleEditorProps> = ({
               onChange={(e) => handleInputChange('title', e.target.value)}
               placeholder="Article title"
               maxLength={255}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                validationErrors.title ? 'border-red-500' : 'border-gray-300'
+              }`}
+              aria-invalid={!!validationErrors.title}
+              aria-describedby={validationErrors.title ? 'article-title-error' : undefined}
             />
+            {validationErrors.title && (
+              <p id="article-title-error" className="mt-1 text-sm text-red-600" role="alert">
+                {validationErrors.title}
+              </p>
+            )}
           </div>
           <div>
             <label htmlFor="article-type" className="block text-sm font-medium text-gray-700 mb-1">

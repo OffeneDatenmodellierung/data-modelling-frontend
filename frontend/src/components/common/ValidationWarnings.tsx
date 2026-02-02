@@ -13,6 +13,7 @@ import {
   type ResourceType,
   type ValidationState,
 } from '@/stores/validationStore';
+import { runWorkspaceValidation } from '@/utils/workspaceValidation';
 
 interface ValidationWarningsProps {
   className?: string;
@@ -34,15 +35,19 @@ const resourceTypeLabels: Record<ResourceType, string> = {
 
 export const ValidationWarnings: React.FC<ValidationWarningsProps> = ({ className = '' }) => {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [isValidating, setIsValidating] = useState(false);
 
   // Use useShallow for shallow comparison to prevent unnecessary re-renders
-  const { issues, clearAllIssues, removeIssue } = useValidationStore(
-    useShallow((state: ValidationState) => ({
-      issues: state.issues,
-      clearAllIssues: state.clearAllIssues,
-      removeIssue: state.removeIssue,
-    }))
-  );
+  const { issues, clearAllIssues, removeIssue, lastValidatedAt, isValidatingStore } =
+    useValidationStore(
+      useShallow((state: ValidationState) => ({
+        issues: state.issues,
+        clearAllIssues: state.clearAllIssues,
+        removeIssue: state.removeIssue,
+        lastValidatedAt: state.lastValidatedAt,
+        isValidatingStore: state.isValidating,
+      }))
+    );
 
   // Compute derived values with useMemo to avoid recalculating on every render
   const activeIssues = useMemo(() => issues.filter((i: ValidationIssue) => i.isActive), [issues]);
@@ -89,6 +94,34 @@ export const ValidationWarnings: React.FC<ValidationWarningsProps> = ({ classNam
     },
     [removeIssue]
   );
+
+  // Handle manual validation
+  const handleValidateNow = useCallback(async () => {
+    setIsValidating(true);
+    try {
+      await runWorkspaceValidation();
+    } finally {
+      setIsValidating(false);
+    }
+  }, []);
+
+  // Format relative time
+  const formatRelativeTime = useCallback((isoString: string | null): string => {
+    if (!isoString) return '';
+    const date = new Date(isoString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / (1000 * 60));
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+    if (diffMins < 1) return 'just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    return `${diffDays}d ago`;
+  }, []);
+
+  const validatingNow = isValidating || isValidatingStore;
 
   if (totalCount === 0) {
     return null;
@@ -140,26 +173,67 @@ export const ValidationWarnings: React.FC<ValidationWarningsProps> = ({ classNam
       {isExpanded && (
         <div className="absolute right-0 top-full mt-2 w-96 max-h-96 overflow-auto bg-white rounded-lg shadow-lg border border-gray-200 z-50">
           {/* Header */}
-          <div className="sticky top-0 bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-gray-900">Validation Issues</h3>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={clearAllIssues}
-                className="text-xs text-gray-500 hover:text-gray-700"
-              >
-                Clear All
-              </button>
-              <button onClick={handleClose} className="text-gray-400 hover:text-gray-600">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
-              </button>
+          <div className="sticky top-0 bg-white border-b border-gray-200 px-4 py-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-gray-900">Validation Issues</h3>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleValidateNow}
+                  disabled={validatingNow}
+                  className="text-xs px-2 py-1 bg-blue-100 text-blue-700 hover:bg-blue-200 rounded disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                  title="Run validation on all workspace resources"
+                >
+                  {validatingNow ? (
+                    <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      />
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                      />
+                    </svg>
+                  ) : (
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                      />
+                    </svg>
+                  )}
+                  {validatingNow ? 'Validating...' : 'Validate Now'}
+                </button>
+                <button
+                  onClick={clearAllIssues}
+                  className="text-xs text-gray-500 hover:text-gray-700"
+                >
+                  Clear All
+                </button>
+                <button onClick={handleClose} className="text-gray-400 hover:text-gray-600">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                </button>
+              </div>
             </div>
+            {lastValidatedAt && (
+              <p className="text-xs text-gray-400 mt-1">
+                Last validated: {formatRelativeTime(lastValidatedAt)}
+              </p>
+            )}
           </div>
 
           {/* Issues list */}
@@ -224,8 +298,8 @@ export const ValidationWarnings: React.FC<ValidationWarningsProps> = ({ classNam
           {/* Footer with help text */}
           <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 px-4 py-2">
             <p className="text-xs text-gray-500">
-              These issues were detected during import. Resources were loaded with default values
-              where possible. Fix these issues and save to validate again.
+              These issues were detected during validation. Fix issues to ensure data integrity
+              before saving or committing. Click &quot;Validate Now&quot; to re-check all resources.
             </p>
           </div>
         </div>
