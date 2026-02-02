@@ -295,6 +295,66 @@ export interface GitRevertResult {
   conflictFiles?: string[];
 }
 
+// Phase 6: Tag Types
+export interface GitTag {
+  name: string;
+  hash: string;
+  message?: string;
+  tagger?: string;
+  taggerEmail?: string;
+  date?: string;
+  isAnnotated: boolean;
+}
+
+export interface GitTagListResult {
+  success: boolean;
+  error?: string;
+  tags: GitTag[];
+}
+
+export interface GitTagCreateOptions {
+  message?: string; // If provided, creates an annotated tag
+  commit?: string; // SHA to tag (defaults to HEAD)
+  force?: boolean; // Overwrite existing tag
+}
+
+export interface GitTagDeleteOptions {
+  remote?: string; // Also delete from remote
+}
+
+export interface GitTagPushOptions {
+  remote?: string;
+  allTags?: boolean;
+}
+
+// Phase 6: Blame Types
+export interface GitBlameLine {
+  lineNumber: number;
+  content: string;
+  commit: {
+    hash: string;
+    hashShort: string;
+    author: string;
+    authorEmail: string;
+    date: string;
+    message: string;
+  };
+  isOriginal: boolean; // True if this line hasn't changed since the file was created
+}
+
+export interface GitBlameResult {
+  success: boolean;
+  error?: string;
+  lines: GitBlameLine[];
+  filePath: string;
+}
+
+export interface GitBlameOptions {
+  startLine?: number;
+  endLine?: number;
+  commit?: string; // Blame at specific commit (defaults to HEAD)
+}
+
 declare global {
   interface Window {
     electronAPI?: {
@@ -431,6 +491,29 @@ declare global {
         commitHash: string,
         options?: GitRevertOptions
       ) => Promise<GitRevertResult>;
+      // Phase 6: Tag Operations
+      gitTagList: (workspacePath: string) => Promise<GitTagListResult>;
+      gitTagCreate: (
+        workspacePath: string,
+        tagName: string,
+        options?: GitTagCreateOptions
+      ) => Promise<{ success: boolean; error?: string }>;
+      gitTagDelete: (
+        workspacePath: string,
+        tagName: string,
+        options?: GitTagDeleteOptions
+      ) => Promise<{ success: boolean; error?: string }>;
+      gitTagPush: (
+        workspacePath: string,
+        tagName?: string,
+        options?: GitTagPushOptions
+      ) => Promise<{ success: boolean; error?: string }>;
+      // Phase 6: Blame Operations
+      gitBlame: (
+        workspacePath: string,
+        filePath: string,
+        options?: GitBlameOptions
+      ) => Promise<GitBlameResult>;
     };
   }
 }

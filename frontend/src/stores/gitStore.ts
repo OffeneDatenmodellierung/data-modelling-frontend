@@ -65,6 +65,37 @@ export interface GitRebaseStatus {
   conflictFiles?: string[];
 }
 
+// Phase 6: Tag types
+export interface GitTag {
+  name: string;
+  hash: string;
+  message?: string;
+  tagger?: string;
+  taggerEmail?: string;
+  date?: string;
+  isAnnotated: boolean;
+}
+
+// Phase 6: Blame types
+export interface GitBlameLine {
+  lineNumber: number;
+  content: string;
+  commit: {
+    hash: string;
+    hashShort: string;
+    author: string;
+    authorEmail: string;
+    date: string;
+    message: string;
+  };
+  isOriginal: boolean;
+}
+
+export interface GitBlameResult {
+  lines: GitBlameLine[];
+  filePath: string;
+}
+
 export interface GitStatus {
   isGitRepo: boolean;
   currentBranch: string | null;
@@ -117,6 +148,16 @@ export interface GitState {
   isCherryPicking: boolean;
   cherryPickConflicts: string[];
 
+  // Phase 6: Tags
+  tags: GitTag[];
+  isLoadingTags: boolean;
+  selectedTag: GitTag | null;
+
+  // Phase 6: Blame
+  blameResult: GitBlameResult | null;
+  isLoadingBlame: boolean;
+  blameFilePath: string | null;
+
   // UI State
   isPanelOpen: boolean;
   selectedCommit: GitCommit | null;
@@ -158,6 +199,15 @@ export interface GitState {
   // Phase 5: Cherry-pick actions
   setCherryPicking: (cherryPicking: boolean) => void;
   setCherryPickConflicts: (conflicts: string[]) => void;
+  // Phase 6: Tag actions
+  setTags: (tags: GitTag[]) => void;
+  setLoadingTags: (loading: boolean) => void;
+  setSelectedTag: (tag: GitTag | null) => void;
+  // Phase 6: Blame actions
+  setBlameResult: (result: GitBlameResult | null) => void;
+  setLoadingBlame: (loading: boolean) => void;
+  setBlameFilePath: (filePath: string | null) => void;
+  clearBlame: () => void;
   // UI actions
   setPanelOpen: (open: boolean) => void;
   togglePanel: () => void;
@@ -214,6 +264,14 @@ const initialState = {
   // Phase 5: Cherry-pick
   isCherryPicking: false,
   cherryPickConflicts: [] as string[],
+  // Phase 6: Tags
+  tags: [] as GitTag[],
+  isLoadingTags: false,
+  selectedTag: null as GitTag | null,
+  // Phase 6: Blame
+  blameResult: null as GitBlameResult | null,
+  isLoadingBlame: false,
+  blameFilePath: null as string | null,
   // UI State
   isPanelOpen: false,
   selectedCommit: null,
@@ -288,6 +346,22 @@ export const useGitStore = create<GitState>()(
 
       setCherryPickConflicts: (cherryPickConflicts) => set({ cherryPickConflicts }),
 
+      // Phase 6: Tag actions
+      setTags: (tags) => set({ tags, isLoadingTags: false }),
+
+      setLoadingTags: (isLoadingTags) => set({ isLoadingTags }),
+
+      setSelectedTag: (selectedTag) => set({ selectedTag }),
+
+      // Phase 6: Blame actions
+      setBlameResult: (blameResult) => set({ blameResult, isLoadingBlame: false }),
+
+      setLoadingBlame: (isLoadingBlame) => set({ isLoadingBlame }),
+
+      setBlameFilePath: (blameFilePath) => set({ blameFilePath }),
+
+      clearBlame: () => set({ blameResult: null, blameFilePath: null, isLoadingBlame: false }),
+
       // UI actions
       setPanelOpen: (isPanelOpen) => set({ isPanelOpen }),
 
@@ -357,3 +431,39 @@ export const selectHasConflicts = (state: GitState) =>
   state.status.hasConflicts ||
   (state.rebaseStatus.conflictFiles && state.rebaseStatus.conflictFiles.length > 0) ||
   state.cherryPickConflicts.length > 0;
+
+// Phase 6: Tag selectors
+export const selectTags = (state: GitState) => state.tags;
+
+export const selectTagCount = (state: GitState) => state.tags.length;
+
+export const selectAnnotatedTags = (state: GitState) => state.tags.filter((t) => t.isAnnotated);
+
+export const selectLightweightTags = (state: GitState) => state.tags.filter((t) => !t.isAnnotated);
+
+export const selectTagByName = (state: GitState, name: string) =>
+  state.tags.find((t) => t.name === name);
+
+// Phase 6: Blame selectors
+export const selectBlameResult = (state: GitState) => state.blameResult;
+
+export const selectIsBlameLoading = (state: GitState) => state.isLoadingBlame;
+
+export const selectBlameAuthors = (state: GitState) => {
+  if (!state.blameResult) return [];
+  const authors = new Map<string, { name: string; email: string; lineCount: number }>();
+  for (const line of state.blameResult.lines) {
+    const key = line.commit.authorEmail;
+    const existing = authors.get(key);
+    if (existing) {
+      existing.lineCount++;
+    } else {
+      authors.set(key, {
+        name: line.commit.author,
+        email: line.commit.authorEmail,
+        lineCount: 1,
+      });
+    }
+  }
+  return Array.from(authors.values()).sort((a, b) => b.lineCount - a.lineCount);
+};

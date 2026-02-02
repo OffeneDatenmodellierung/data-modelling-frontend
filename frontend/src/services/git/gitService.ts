@@ -13,6 +13,8 @@ import {
   GitRemote,
   GitStashEntry,
   GitRebaseStatus,
+  GitTag,
+  GitBlameResult,
 } from '@/stores/gitStore';
 import { getPlatform } from '@/services/platform/platform';
 import type {
@@ -29,6 +31,10 @@ import type {
   GitRebaseOptions,
   GitResetOptions,
   GitRevertOptions,
+  GitTagCreateOptions,
+  GitTagDeleteOptions,
+  GitTagPushOptions,
+  GitBlameOptions,
 } from '@/services/platform/electron';
 
 class GitService {
@@ -1320,6 +1326,258 @@ class GitService {
       store.setError(message);
       return { success: false };
     }
+  }
+
+  // ============================================================================
+  // Phase 6: Tag Operations
+  // ============================================================================
+
+  /**
+   * Load all tags
+   */
+  async loadTags(): Promise<void> {
+    const store = useGitStore.getState();
+    const workspacePath = store.workspacePath;
+
+    if (!workspacePath || !this.isAvailable()) {
+      return;
+    }
+
+    store.setLoadingTags(true);
+
+    try {
+      const result = await window.electronAPI!.gitTagList(workspacePath);
+
+      if (result.success) {
+        const tags: GitTag[] = result.tags.map((t) => ({
+          name: t.name,
+          hash: t.hash,
+          message: t.message,
+          tagger: t.tagger,
+          taggerEmail: t.taggerEmail,
+          date: t.date,
+          isAnnotated: t.isAnnotated,
+        }));
+        store.setTags(tags);
+      } else {
+        store.setLoadingTags(false);
+        console.error('[GitService] loadTags failed:', result.error);
+      }
+    } catch (error) {
+      console.error('[GitService] loadTags failed:', error);
+      store.setLoadingTags(false);
+    }
+  }
+
+  /**
+   * Create a new tag
+   */
+  async createTag(tagName: string, options?: GitTagCreateOptions): Promise<boolean> {
+    const store = useGitStore.getState();
+    const workspacePath = store.workspacePath;
+
+    if (!workspacePath || !this.isAvailable()) {
+      return false;
+    }
+
+    try {
+      const result = await window.electronAPI!.gitTagCreate(workspacePath, tagName, options);
+
+      if (result.success) {
+        await this.loadTags();
+        return true;
+      }
+
+      store.setError(result.error || 'Failed to create tag');
+      return false;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to create tag';
+      store.setError(message);
+      return false;
+    }
+  }
+
+  /**
+   * Delete a tag
+   */
+  async deleteTag(tagName: string, options?: GitTagDeleteOptions): Promise<boolean> {
+    const store = useGitStore.getState();
+    const workspacePath = store.workspacePath;
+
+    if (!workspacePath || !this.isAvailable()) {
+      return false;
+    }
+
+    try {
+      const result = await window.electronAPI!.gitTagDelete(workspacePath, tagName, options);
+
+      if (result.success) {
+        await this.loadTags();
+        return true;
+      }
+
+      store.setError(result.error || 'Failed to delete tag');
+      return false;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to delete tag';
+      store.setError(message);
+      return false;
+    }
+  }
+
+  /**
+   * Push tag(s) to remote
+   */
+  async pushTag(tagName?: string, options?: GitTagPushOptions): Promise<boolean> {
+    const store = useGitStore.getState();
+    const workspacePath = store.workspacePath;
+
+    if (!workspacePath || !this.isAvailable()) {
+      return false;
+    }
+
+    try {
+      const result = await window.electronAPI!.gitTagPush(workspacePath, tagName, options);
+
+      if (result.success) {
+        return true;
+      }
+
+      store.setError(result.error || 'Failed to push tag');
+      return false;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to push tag';
+      store.setError(message);
+      return false;
+    }
+  }
+
+  /**
+   * Checkout a tag (detached HEAD)
+   */
+  async checkoutTag(tagName: string): Promise<boolean> {
+    const store = useGitStore.getState();
+    const workspacePath = store.workspacePath;
+
+    if (!workspacePath || !this.isAvailable()) {
+      return false;
+    }
+
+    // Check for uncommitted changes
+    if (store.status.files.length > 0) {
+      store.setError('Please commit or discard changes before checking out a tag');
+      return false;
+    }
+
+    try {
+      // Use branch checkout with tag name (creates detached HEAD)
+      const result = await window.electronAPI!.gitBranchCheckout(workspacePath, tagName);
+
+      if (result.success) {
+        await this.refreshStatus();
+        return true;
+      }
+
+      store.setError(result.error || 'Failed to checkout tag');
+      return false;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to checkout tag';
+      store.setError(message);
+      return false;
+    }
+  }
+
+  // ============================================================================
+  // Phase 6: Blame Operations
+  // ============================================================================
+
+  /**
+   * Get blame information for a file
+   */
+  async getBlame(filePath: string, options?: GitBlameOptions): Promise<GitBlameResult | null> {
+    const store = useGitStore.getState();
+    const workspacePath = store.workspacePath;
+
+    if (!workspacePath || !this.isAvailable()) {
+      return null;
+    }
+
+    store.setLoadingBlame(true);
+    store.setBlameFilePath(filePath);
+
+    try {
+      const result = await window.electronAPI!.gitBlame(workspacePath, filePath, options);
+
+      if (result.success) {
+        const blameResult: GitBlameResult = {
+          lines: result.lines.map((l) => ({
+            lineNumber: l.lineNumber,
+            content: l.content,
+            commit: {
+              hash: l.commit.hash,
+              hashShort: l.commit.hashShort,
+              author: l.commit.author,
+              authorEmail: l.commit.authorEmail,
+              date: l.commit.date,
+              message: l.commit.message,
+            },
+            isOriginal: l.isOriginal,
+          })),
+          filePath: result.filePath,
+        };
+        store.setBlameResult(blameResult);
+        return blameResult;
+      }
+
+      store.setLoadingBlame(false);
+      console.error('[GitService] getBlame failed:', result.error);
+      return null;
+    } catch (error) {
+      console.error('[GitService] getBlame failed:', error);
+      store.setLoadingBlame(false);
+      return null;
+    }
+  }
+
+  /**
+   * Clear blame information
+   */
+  clearBlame(): void {
+    useGitStore.getState().clearBlame();
+  }
+
+  /**
+   * Get blame summary for a file (author statistics)
+   */
+  async getBlameSummary(
+    filePath: string
+  ): Promise<{ author: string; email: string; lines: number; percentage: number }[] | null> {
+    const blameResult = await this.getBlame(filePath);
+    if (!blameResult) return null;
+
+    const authorStats = new Map<string, { author: string; email: string; lines: number }>();
+    const totalLines = blameResult.lines.length;
+
+    for (const line of blameResult.lines) {
+      const key = line.commit.authorEmail;
+      const existing = authorStats.get(key);
+      if (existing) {
+        existing.lines++;
+      } else {
+        authorStats.set(key, {
+          author: line.commit.author,
+          email: line.commit.authorEmail,
+          lines: 1,
+        });
+      }
+    }
+
+    return Array.from(authorStats.values())
+      .map((stat) => ({
+        ...stat,
+        percentage: Math.round((stat.lines / totalLines) * 100),
+      }))
+      .sort((a, b) => b.lines - a.lines);
   }
 
   /**

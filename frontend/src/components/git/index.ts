@@ -10,3 +10,6 @@ export { RemoteOperationsPanel } from './RemoteOperationsPanel';
 export { StashPanel } from './StashPanel';
 export { CherryPickDialog, CherryPickConflictPanel } from './CherryPickDialog';
 export { RebasePanel, RebaseStatusIndicator } from './RebasePanel';
+// Phase 6: Tags and Blame
+export { TagPanel } from './TagPanel';
+export { BlameViewer, BlameDialog } from './BlameViewer';

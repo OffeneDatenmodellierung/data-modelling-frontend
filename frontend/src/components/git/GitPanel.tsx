@@ -15,6 +15,7 @@ import { RemoteOperationsPanel } from './RemoteOperationsPanel';
 import { StashPanel } from './StashPanel';
 import { CherryPickDialog, CherryPickConflictPanel } from './CherryPickDialog';
 import { RebasePanel, RebaseStatusIndicator } from './RebasePanel';
+import { TagPanel } from './TagPanel';
 
 type TabType = 'changes' | 'history' | 'remotes' | 'advanced';
 
@@ -96,6 +97,7 @@ export const GitPanel: React.FC<GitPanelProps> = ({ className = '' }) => {
     }
     if (activeTab === 'advanced') {
       gitService.loadStashes();
+      gitService.loadTags();
       gitService.loadRebaseStatus();
     }
   }, [activeTab]);
@@ -479,7 +481,7 @@ export const GitPanel: React.FC<GitPanelProps> = ({ className = '' }) => {
             )}
           </div>
         ) : activeTab === 'advanced' ? (
-          /* Advanced tab - Stash, Rebase, Cherry-pick */
+          /* Advanced tab - Stash, Tags, Rebase, Cherry-pick */
           <div className="flex-1 overflow-y-auto">
             {/* Cherry-pick conflict panel */}
             <CherryPickConflictPanel className="px-3 pt-3" />
@@ -487,6 +489,11 @@ export const GitPanel: React.FC<GitPanelProps> = ({ className = '' }) => {
             {/* Stash Panel */}
             <div className="border-b">
               <StashPanel />
+            </div>
+
+            {/* Tag Panel */}
+            <div className="border-b">
+              <TagPanel />
             </div>
 
             {/* Rebase Panel */}
