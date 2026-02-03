@@ -33,8 +33,13 @@ import * as Diff from 'diff';
 
 // Constants for panel resizing
 const MIN_PANEL_WIDTH = 280;
-const MAX_PANEL_WIDTH = 600;
+const MAX_PANEL_WIDTH = 1200; // Allow panel to expand up to 1200px (most of screen)
 const DEFAULT_PANEL_WIDTH = 320;
+
+// Constants for diff viewer resizing
+const MIN_DIFF_HEIGHT = 100;
+const MAX_DIFF_HEIGHT = 600;
+const DEFAULT_DIFF_HEIGHT = 256;
 
 type TabType = 'changes' | 'history' | 'remotes' | 'prs' | 'advanced';
 
@@ -120,10 +125,14 @@ export const GitPanel: React.FC<GitPanelProps> = ({ className = '' }) => {
   // GitHub repo mode: branch creation dialog
   const [showGitHubBranchDialog, setShowGitHubBranchDialog] = useState(false);
 
-  // Panel resizing
+  // Panel resizing (horizontal)
   const [panelWidth, setPanelWidth] = useState(DEFAULT_PANEL_WIDTH);
   const isResizing = useRef(false);
   const panelRef = useRef<HTMLDivElement>(null);
+
+  // Diff viewer resizing (vertical)
+  const [diffHeight, setDiffHeight] = useState(DEFAULT_DIFF_HEIGHT);
+  const isDiffResizing = useRef(false);
 
   const isRemoteOperationInProgress = isFetching || isPulling || isPushing;
 
@@ -289,7 +298,7 @@ export const GitPanel: React.FC<GitPanelProps> = ({ className = '' }) => {
     }
   }, [isGitHubRepoMode]);
 
-  // Handle panel resize
+  // Handle panel resize (horizontal)
   const handleResizeStart = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     isResizing.current = true;
@@ -313,6 +322,38 @@ export const GitPanel: React.FC<GitPanelProps> = ({ className = '' }) => {
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
   }, []);
+
+  // Handle diff viewer resize (vertical)
+  const handleDiffResizeStart = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      isDiffResizing.current = true;
+      document.body.style.cursor = 'row-resize';
+      document.body.style.userSelect = 'none';
+
+      const startY = e.clientY;
+      const startHeight = diffHeight;
+
+      const handleMouseMove = (moveEvent: MouseEvent) => {
+        if (!isDiffResizing.current) return;
+        const deltaY = startY - moveEvent.clientY;
+        const newHeight = startHeight + deltaY;
+        setDiffHeight(Math.min(MAX_DIFF_HEIGHT, Math.max(MIN_DIFF_HEIGHT, newHeight)));
+      };
+
+      const handleMouseUp = () => {
+        isDiffResizing.current = false;
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+      };
+
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+    },
+    [diffHeight]
+  );
 
   if (!isPanelOpen) {
     return null;
@@ -806,7 +847,15 @@ export const GitPanel: React.FC<GitPanelProps> = ({ className = '' }) => {
 
               {/* Diff viewer for selected pending change */}
               {selectedPendingChange && (
-                <div className="h-64 border-t border-gray-200 overflow-hidden flex flex-col">
+                <div
+                  style={{ height: diffHeight }}
+                  className="border-t border-gray-200 overflow-hidden flex flex-col relative"
+                >
+                  {/* Resize handle for diff viewer */}
+                  <div
+                    className="absolute top-0 left-0 right-0 h-1 cursor-row-resize hover:bg-blue-500 hover:opacity-50 transition-opacity z-10"
+                    onMouseDown={handleDiffResizeStart}
+                  />
                   <DiffViewer
                     diff={pendingChangeDiff || ''}
                     isLoading={isLoadingPendingDiff}
@@ -876,7 +925,15 @@ export const GitPanel: React.FC<GitPanelProps> = ({ className = '' }) => {
 
               {/* Diff viewer */}
               {(selectedFile || status.files.length > 0) && diffContent && (
-                <div className="h-48 border-t border-gray-200 overflow-hidden">
+                <div
+                  style={{ height: diffHeight }}
+                  className="border-t border-gray-200 overflow-hidden relative"
+                >
+                  {/* Resize handle for diff viewer */}
+                  <div
+                    className="absolute top-0 left-0 right-0 h-1 cursor-row-resize hover:bg-blue-500 hover:opacity-50 transition-opacity z-10"
+                    onMouseDown={handleDiffResizeStart}
+                  />
                   <DiffViewer
                     diff={diffContent}
                     isLoading={isLoadingDiff}
