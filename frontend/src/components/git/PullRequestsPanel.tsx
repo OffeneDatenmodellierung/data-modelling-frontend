@@ -71,6 +71,9 @@ export const PullRequestsPanel: React.FC<PullRequestsPanelProps> = ({ className 
     }))
   );
 
+  // Get branch switching action from repo store
+  const switchBranchInRepoStore = useGitHubRepoStore((state) => state.switchBranch);
+
   // Check authentication from both store and auth service directly
   // (auth service may have a valid token before store is initialized)
   const isAuthenticated = isAuthenticatedFromStore || githubAuth.isAuthenticated();
@@ -129,12 +132,27 @@ export const PullRequestsPanel: React.FC<PullRequestsPanelProps> = ({ className 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isConnected, filter]);
 
-  // Handle PR click
+  // Handle PR click - switch to PR branch and show details
   const handlePRClick = useCallback(
-    (pr: GitHubPullRequest) => {
+    async (pr: GitHubPullRequest) => {
+      // Store current branch before switching (for later return)
+      // This is stored in githubStore.previousBranch automatically when using switchToPRBranch
+
+      // Select the PR to show detail panel
       setSelectedPR(pr);
+
+      // Switch to the PR's head branch
+      // In GitHub repo mode, use the repo store's switchBranch with storePrevious=true
+      // so we can switch back to the original branch after reviewing
+      if (repoWorkspace.hasWorkspace) {
+        try {
+          await switchBranchInRepoStore(pr.head.ref, true);
+        } catch (err) {
+          console.error('Failed to switch to PR branch:', err);
+        }
+      }
     },
-    [setSelectedPR]
+    [setSelectedPR, repoWorkspace.hasWorkspace, switchBranchInRepoStore]
   );
 
   // Get status color

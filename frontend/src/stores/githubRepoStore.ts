@@ -30,6 +30,9 @@ export interface GitHubRepoState {
   // Current workspace
   workspace: GitHubRepoWorkspace | null;
 
+  // Branch tracking
+  previousBranch: string | null;
+
   // Sync state
   syncStatus: SyncStatus;
   syncError: SyncError | null;
@@ -76,7 +79,8 @@ export interface GitHubRepoState {
   resolveConflicts: (resolutions: ResolvedConflict[]) => Promise<void>;
 
   // Actions - Branch
-  switchBranch: (branch: string) => Promise<void>;
+  switchBranch: (branch: string, storePrevious?: boolean) => Promise<void>;
+  switchBack: () => Promise<void>;
   createBranch: (name: string, fromBranch?: string) => Promise<void>;
 
   // Actions - State management
@@ -126,6 +130,7 @@ function getFullPath(workspacePath: string, relativePath: string): string {
 
 const initialState = {
   workspace: null as GitHubRepoWorkspace | null,
+  previousBranch: null as string | null,
   syncStatus: 'idle' as SyncStatus,
   syncError: null as SyncError | null,
   pendingChanges: [] as PendingChange[],
@@ -651,15 +656,37 @@ export const useGitHubRepoStore = create<GitHubRepoState>()(
       // Branch Operations
       // ========================================================================
 
-      switchBranch: async (branch: string) => {
+      switchBranch: async (branch: string, storePrevious: boolean = false) => {
         const { workspace } = get();
         if (!workspace) throw new Error('No workspace open');
+
+        // Store current branch before switching (for switch back functionality)
+        if (storePrevious) {
+          set({ previousBranch: workspace.branch });
+        }
 
         // Close current workspace and open with new branch
         await get().openWorkspace(
           workspace.owner,
           workspace.repo,
           branch,
+          workspace.workspacePath,
+          workspace.workspaceName
+        );
+      },
+
+      switchBack: async () => {
+        const { workspace, previousBranch } = get();
+        if (!workspace || !previousBranch) return;
+
+        // Clear previous branch before switching
+        set({ previousBranch: null });
+
+        // Switch to the previous branch
+        await get().openWorkspace(
+          workspace.owner,
+          workspace.repo,
+          previousBranch,
           workspace.workspacePath,
           workspace.workspaceName
         );
@@ -865,6 +892,10 @@ export const selectWorkspaceDisplayName = (state: GitHubRepoState) => {
 export const selectWorkspaceBranch = (state: GitHubRepoState) => {
   return state.workspace?.branch || null;
 };
+
+export const selectPreviousBranch = (state: GitHubRepoState) => state.previousBranch;
+
+export const selectCanSwitchBack = (state: GitHubRepoState) => state.previousBranch !== null;
 
 export const selectWorkspacePath = (state: GitHubRepoState) => {
   return state.workspace?.workspacePath || '';

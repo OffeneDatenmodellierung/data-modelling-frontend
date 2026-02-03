@@ -42,7 +42,7 @@ export const GitHubPRDetailPanel: React.FC<GitHubPRDetailPanelProps> = ({
   className = '',
   onClose,
 }) => {
-  const isConnected = useGitHubStore(selectIsConnected);
+  const isConnectedFromStore = useGitHubStore(selectIsConnected);
   const selectedPR = useGitHubStore(selectSelectedPR);
   const comments = useGitHubStore(selectPRComments);
   const reviews = useGitHubStore(selectPRReviews);
@@ -95,8 +95,12 @@ export const GitHubPRDetailPanel: React.FC<GitHubPRDetailPanelProps> = ({
       repo: state.workspace?.repo ?? null,
       branch: state.workspace?.branch ?? null,
       hasWorkspace: state.workspace !== null,
+      previousBranch: state.previousBranch,
     }))
   );
+
+  // Get switchBack action from repo store
+  const switchBack = useGitHubRepoStore((state) => state.switchBack);
 
   // Use connection from either store - prefer local store, fallback to repo workspace
   const connection = useMemo(() => {
@@ -116,6 +120,9 @@ export const GitHubPRDetailPanel: React.FC<GitHubPRDetailPanelProps> = ({
     repoWorkspace.repo,
     repoWorkspace.branch,
   ]);
+
+  // Check connection from either store
+  const isConnected = isConnectedFromStore || repoWorkspace.hasWorkspace;
 
   const [activeTab, setActiveTab] = useState<DetailTab>('conversation');
   const [newComment, setNewComment] = useState('');
@@ -314,9 +321,19 @@ export const GitHubPRDetailPanel: React.FC<GitHubPRDetailPanelProps> = ({
     }
   };
 
-  // Close handler
-  const handleClose = () => {
+  // Close handler - also switch back to previous branch if available
+  const handleClose = async () => {
     clearPRDetails();
+
+    // If we have a previous branch stored, switch back to it
+    if (repoWorkspace.hasWorkspace && repoWorkspace.previousBranch) {
+      try {
+        await switchBack();
+      } catch (err) {
+        console.error('Failed to switch back to previous branch:', err);
+      }
+    }
+
     onClose?.();
   };
 
