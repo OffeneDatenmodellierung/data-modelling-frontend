@@ -79,9 +79,30 @@ export const GitPanel: React.FC<GitPanelProps> = ({ className = '' }) => {
   const isSyncing = syncStatus === 'syncing';
 
   // Derive staged/unstaged from pendingChanges to avoid selector re-render issues
-  const stagedChanges = useMemo(() => pendingChanges.filter((c) => c.staged), [pendingChanges]);
-  const unstagedChanges = useMemo(() => pendingChanges.filter((c) => !c.staged), [pendingChanges]);
+  const stagedChanges = useMemo(() => {
+    const staged = pendingChanges.filter((c) => c.staged);
+    console.log(
+      '[GitPanel] stagedChanges computed:',
+      staged.length,
+      staged.map((c) => ({ id: c.id, staged: c.staged }))
+    );
+    return staged;
+  }, [pendingChanges]);
+  const unstagedChanges = useMemo(() => {
+    const unstaged = pendingChanges.filter((c) => !c.staged);
+    console.log('[GitPanel] unstagedChanges computed:', unstaged.length);
+    return unstaged;
+  }, [pendingChanges]);
   const hasStagedChanges = stagedChanges.length > 0;
+
+  // Debug: log when pendingChanges updates
+  useEffect(() => {
+    console.log(
+      '[GitPanel] pendingChanges updated:',
+      pendingChanges.length,
+      pendingChanges.map((c) => ({ id: c.id, staged: c.staged }))
+    );
+  }, [pendingChanges]);
 
   // Staging actions - use shallow to get multiple actions in one subscription
   const { stageChange, unstageChange, stageAllChanges, unstageAllChanges } = useGitHubRepoStore(
