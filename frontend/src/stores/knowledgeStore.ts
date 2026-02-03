@@ -172,6 +172,10 @@ export const useKnowledgeStore = create<KnowledgeState>()(
           articles,
           filteredArticles: applyFilter(articles, filter),
         });
+        // Mark workspace as having pending changes
+        import('@/stores/workspaceStore').then(({ useWorkspaceStore }) => {
+          useWorkspaceStore.getState().setPendingChanges(true);
+        });
       },
 
       updateArticleInStore: (articleId, updates) => {
@@ -188,6 +192,10 @@ export const useKnowledgeStore = create<KnowledgeState>()(
           selectedArticle:
             selectedArticle?.id === articleId ? (updatedArticle ?? null) : selectedArticle,
         });
+        // Mark workspace as having pending changes
+        import('@/stores/workspaceStore').then(({ useWorkspaceStore }) => {
+          useWorkspaceStore.getState().setPendingChanges(true);
+        });
       },
 
       removeArticle: (articleId) => {
@@ -199,6 +207,10 @@ export const useKnowledgeStore = create<KnowledgeState>()(
           articles,
           filteredArticles: applyFilter(articles, filter),
           selectedArticle: selectedArticle?.id === articleId ? null : selectedArticle,
+        });
+        // Mark workspace as having pending changes
+        import('@/stores/workspaceStore').then(({ useWorkspaceStore }) => {
+          useWorkspaceStore.getState().setPendingChanges(true);
         });
       },
 

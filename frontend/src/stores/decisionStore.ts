@@ -141,6 +141,10 @@ export const useDecisionStore = create<DecisionState>()(
           decisions,
           filteredDecisions: applyFilter(decisions, filter),
         });
+        // Mark workspace as having pending changes
+        import('@/stores/workspaceStore').then(({ useWorkspaceStore }) => {
+          useWorkspaceStore.getState().setPendingChanges(true);
+        });
       },
 
       updateDecisionInStore: (decisionId, updates) => {
@@ -157,6 +161,10 @@ export const useDecisionStore = create<DecisionState>()(
           selectedDecision:
             selectedDecision?.id === decisionId ? (updatedDecision ?? null) : selectedDecision,
         });
+        // Mark workspace as having pending changes
+        import('@/stores/workspaceStore').then(({ useWorkspaceStore }) => {
+          useWorkspaceStore.getState().setPendingChanges(true);
+        });
       },
 
       removeDecision: (decisionId) => {
@@ -168,6 +176,10 @@ export const useDecisionStore = create<DecisionState>()(
           decisions,
           filteredDecisions: applyFilter(decisions, filter),
           selectedDecision: selectedDecision?.id === decisionId ? null : selectedDecision,
+        });
+        // Mark workspace as having pending changes
+        import('@/stores/workspaceStore').then(({ useWorkspaceStore }) => {
+          useWorkspaceStore.getState().setPendingChanges(true);
         });
       },
 

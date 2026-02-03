@@ -848,7 +848,7 @@ const ModelEditor: React.FC = () => {
 
   return (
     <div className="flex flex-col h-screen bg-gray-50">
-      {/* Domain Selector, Tag Filter, and Settings - combined header row with logo */}
+      {/* Main header row with logo, actions, and controls */}
       <div className="bg-white border-b border-gray-200 px-4 py-2 shadow-sm">
         <div className="flex items-center gap-4">
           {/* Logo */}
@@ -859,8 +859,6 @@ const ModelEditor: React.FC = () => {
             style={{ maxHeight: '32px' }}
           />
 
-          <DomainSelector workspaceId={workspaceId ?? ''} />
-
           {/* Collaboration Status - inline when online */}
           {mode === 'online' && workspaceId && (
             <div className="flex items-center gap-2">
@@ -868,12 +866,7 @@ const ModelEditor: React.FC = () => {
               <PresenceIndicator workspaceId={workspaceId} />
             </div>
           )}
-          <div className="flex-1">
-            <TagFilter
-              onFilterChange={handleTagFilterChange}
-              placeholder="Filter by tags (e.g., env:production, product:food)"
-            />
-          </div>
+
           {selectedDomainId && (
             <>
               <button
@@ -910,8 +903,11 @@ const ModelEditor: React.FC = () => {
             </>
           )}
 
-          {/* Git Status, GitHub, Settings and History buttons */}
-          <div className="flex items-center gap-2 ml-auto">
+          {/* Spacer to push right-side items */}
+          <div className="flex-1" />
+
+          {/* Git Status, GitHub, Settings, History, and Save/Exit buttons */}
+          <div className="flex items-center gap-2">
             {/* Git Status Indicator (works in both Electron and GitHub repo mode) */}
             <GitStatusIndicator />
 
@@ -940,24 +936,40 @@ const ModelEditor: React.FC = () => {
                 History
               </button>
             )}
+
+            {/* Save/Exit Controls - moved to top row */}
+            <SaveExitControls />
           </div>
         </div>
-        {isFiltering && <div className="mt-1 text-xs text-gray-500">Filtering resources...</div>}
-        {tagFilter.length > 0 && !isFiltering && (
-          <div className="mt-1 text-xs text-blue-600">
-            Showing {tables.length} table(s), {computeAssets.length} asset(s),{' '}
-            {relationships.length} relationship(s), {systems.length} system(s)
-          </div>
+      </div>
+
+      {/* Secondary toolbar: Domain, View mode, Filter, BPMN links */}
+      <div className="bg-gray-50 border-b border-gray-200 px-4 py-2 flex items-center gap-4">
+        <DomainSelector workspaceId={workspaceId ?? ''} />
+        {selectedDomainId && (
+          <>
+            <ViewModeSelector domainId={selectedDomainId} />
+            <div className="flex-1">
+              <TagFilter
+                onFilterChange={handleTagFilterChange}
+                placeholder="Filter by tags (e.g., env:production, product:food)"
+              />
+            </div>
+            <BPMNProcessLinks domainId={selectedDomainId} />
+          </>
         )}
       </div>
 
-      {/* Secondary toolbar: View mode, BPMN links, Save/Exit */}
-      {selectedDomainId && (
-        <div className="bg-gray-50 border-b border-gray-200 px-4 py-2 flex items-center gap-4">
-          <ViewModeSelector domainId={selectedDomainId} />
-          <BPMNProcessLinks domainId={selectedDomainId} />
-          <div className="flex-1" />
-          <SaveExitControls />
+      {/* Filter status messages */}
+      {(isFiltering || tagFilter.length > 0) && (
+        <div className="bg-gray-50 px-4 py-1 border-b border-gray-200">
+          {isFiltering && <div className="text-xs text-gray-500">Filtering resources...</div>}
+          {tagFilter.length > 0 && !isFiltering && (
+            <div className="text-xs text-blue-600">
+              Showing {tables.length} table(s), {computeAssets.length} asset(s),{' '}
+              {relationships.length} relationship(s), {systems.length} system(s)
+            </div>
+          )}
         </div>
       )}
 

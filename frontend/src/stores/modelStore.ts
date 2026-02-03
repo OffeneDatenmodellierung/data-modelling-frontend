@@ -416,10 +416,12 @@ export const useModelStore = create<ModelState>((set, get) => ({
     }));
     useWorkspaceStore.getState().setPendingChanges(true);
   },
-  updateProduct: (productId, updates) =>
+  updateProduct: (productId, updates) => {
     set((state) => ({
       products: state.products.map((p) => (p.id === productId ? { ...p, ...updates } : p)),
-    })),
+    }));
+    useWorkspaceStore.getState().setPendingChanges(true);
+  },
   removeProduct: (productId) => {
     set((state) => ({
       products: state.products.filter((p) => p.id !== productId),
@@ -457,12 +459,14 @@ export const useModelStore = create<ModelState>((set, get) => ({
     }));
     useWorkspaceStore.getState().setPendingChanges(true);
   },
-  updateBPMNProcess: (processId, updates) =>
+  updateBPMNProcess: (processId, updates) => {
     set((state) => ({
       bpmnProcesses: state.bpmnProcesses.map((p) =>
         p.id === processId ? { ...p, ...updates } : p
       ),
-    })),
+    }));
+    useWorkspaceStore.getState().setPendingChanges(true);
+  },
   removeBPMNProcess: (processId) => {
     set((state) => ({
       bpmnProcesses: state.bpmnProcesses.filter((p) => p.id !== processId),
@@ -475,10 +479,12 @@ export const useModelStore = create<ModelState>((set, get) => ({
     }));
     useWorkspaceStore.getState().setPendingChanges(true);
   },
-  updateDMNDecision: (decisionId, updates) =>
+  updateDMNDecision: (decisionId, updates) => {
     set((state) => ({
       dmnDecisions: state.dmnDecisions.map((d) => (d.id === decisionId ? { ...d, ...updates } : d)),
-    })),
+    }));
+    useWorkspaceStore.getState().setPendingChanges(true);
+  },
   removeDMNDecision: (decisionId) => {
     set((state) => ({
       dmnDecisions: state.dmnDecisions.filter((d) => d.id !== decisionId),
