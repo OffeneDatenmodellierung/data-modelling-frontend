@@ -121,11 +121,13 @@ export async function addPendingChange(change: PendingChange): Promise<void> {
           deleteRequest.onerror = () => reject(deleteRequest.error);
         } else {
           // Otherwise update the existing change
+          // Note: We explicitly include 'staged' to allow staging/unstaging changes
           const updatedChange: PendingChange = {
             ...existing,
             action: change.action,
             content: change.content,
             timestamp: change.timestamp,
+            staged: change.staged ?? existing.staged,
           };
           const updateRequest = store.put(updatedChange);
           updateRequest.onsuccess = () => resolve();
