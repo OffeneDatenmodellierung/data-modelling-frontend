@@ -18,6 +18,7 @@ import {
 } from '@/stores/githubStore';
 import { useGitHubRepoStore } from '@/stores/githubRepoStore';
 import { githubApi } from '@/services/github/githubApi';
+import { githubAuth } from '@/services/github/githubAuth';
 import type { GitHubPullRequest } from '@/types/github';
 import { GitHubPRDetailPanel } from '@/components/github/GitHubPRDetailPanel';
 
@@ -28,13 +29,17 @@ export interface PullRequestsPanelProps {
 type PRFilter = 'open' | 'closed' | 'all';
 
 export const PullRequestsPanel: React.FC<PullRequestsPanelProps> = ({ className = '' }) => {
-  const isAuthenticated = useGitHubStore(selectIsAuthenticated);
+  const isAuthenticatedFromStore = useGitHubStore(selectIsAuthenticated);
   const isConnectedFromStore = useGitHubStore(selectIsConnected);
   const connectionInfo = useGitHubStore(selectConnectionInfo);
   const connectionFromStore = useGitHubStore((state) => state.connection);
 
   // Also check githubRepoStore for connection info (used when opening from URL)
   const repoWorkspace = useGitHubRepoStore((state) => state.workspace);
+
+  // Check authentication from both store and auth service directly
+  // (auth service may have a valid token before store is initialized)
+  const isAuthenticated = isAuthenticatedFromStore || githubAuth.isAuthenticated();
 
   // Use connection from either store
   const connection = useMemo(() => {

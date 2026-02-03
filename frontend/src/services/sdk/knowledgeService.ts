@@ -104,8 +104,18 @@ class KnowledgeService {
           return sdkKnowledgeToFrontend(sdkArticle);
         } catch (error) {
           // Capture the validation error but continue to fallback
-          validationError = error;
-          console.warn('[KnowledgeService] SDK parse failed, trying fallback:', error);
+          // Handle case where SDK throws a JSON string error
+          if (typeof error === 'string') {
+            try {
+              const parsedError = JSON.parse(error);
+              validationError = parsedError;
+            } catch {
+              validationError = { message: error };
+            }
+          } else {
+            validationError = error;
+          }
+          console.warn('[KnowledgeService] SDK parse failed, trying fallback:', validationError);
         }
       }
     }

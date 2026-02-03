@@ -56,6 +56,13 @@ export const GitPanel: React.FC<GitPanelProps> = ({ className = '' }) => {
 
   // In GitHub repo mode, default to PRs tab since local git features aren't available
   const [activeTab, setActiveTab] = useState<TabType>(isGitHubRepoMode ? 'prs' : 'changes');
+
+  // Auto-open panel in GitHub repo mode
+  useEffect(() => {
+    if (isGitHubRepoMode && !isPanelOpen) {
+      useGitStore.getState().setPanelOpen(true);
+    }
+  }, [isGitHubRepoMode, isPanelOpen]);
   const [cherryPickCommit, setCherryPickCommit] = useState<typeof selectedCommit>(null);
   const [showCherryPickDialog, setShowCherryPickDialog] = useState(false);
   const [commitMessage, setCommitMessage] = useState('');
