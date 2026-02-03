@@ -177,8 +177,7 @@ export const selectErrorCount = (state: ValidationState) =>
   state.issues.filter((i) => i.severity === 'error' && i.isActive).length;
 export const selectWarningCount = (state: ValidationState) =>
   state.issues.filter((i) => i.severity === 'warning' && i.isActive).length;
-export const selectHasIssues = (state: ValidationState) =>
-  state.issues.some((i) => i.isActive);
+export const selectHasIssues = (state: ValidationState) => state.issues.some((i) => i.isActive);
 export const selectIsValidating = (state: ValidationState) => state.isValidating;
 
 // ============================================================================
@@ -207,8 +206,8 @@ export function parseValidationError(
     if (err.message && typeof err.message === 'string') {
       const message = err.message;
 
-      // Parse "Validation error: ... at path 'root': \"field\" is a required property"
-      const requiredMatch = message.match(/\"(\w+)\" is a required property/);
+      // Parse "Validation error: ... at path 'root': "field" is a required property"
+      const requiredMatch = message.match(/"(\w+)" is a required property/);
       if (requiredMatch) {
         issues.push({
           id: crypto.randomUUID(),

@@ -521,7 +521,7 @@ function buildAuthHeaders(): HeadersInit {
       'X-GitHub-Api-Version': '2022-11-28',
       'Content-Type': 'application/json',
     };
-  } catch (e) {
+  } catch {
     throw new Error('Invalid GitHub auth data in storage');
   }
 }

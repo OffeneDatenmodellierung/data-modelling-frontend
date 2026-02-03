@@ -811,7 +811,9 @@ export class WorkspaceV2Loader {
     if (issues.length > 0) {
       useValidationStore
         .getState()
-        .addIssues(issues.map(({ id, createdAt, isActive, ...rest }) => rest));
+        .addIssues(
+          issues.map(({ id: _id, createdAt: _createdAt, isActive: _isActive, ...rest }) => rest)
+        );
       console.log(
         `[WorkspaceV2Loader] Recorded ${issues.length} validation issue(s) for ${resourceType}: ${resourceName}`
       );
