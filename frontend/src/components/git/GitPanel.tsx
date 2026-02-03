@@ -682,23 +682,28 @@ export const GitPanel: React.FC<GitPanelProps> = ({ className = '' }) => {
                               }`}
                               onClick={() => handleSelectPendingChange(change)}
                             >
-                              <div
-                                className="flex items-center"
+                              <button
+                                type="button"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   e.preventDefault();
                                   unstageChange(change.id);
                                 }}
-                                onMouseDown={(e) => e.stopPropagation()}
+                                className="w-4 h-4 rounded border border-gray-300 bg-green-600 flex items-center justify-center cursor-pointer hover:bg-green-700 focus:ring-2 focus:ring-green-500 focus:ring-offset-1"
+                                title="Unstage this change"
                               >
-                                <input
-                                  type="checkbox"
-                                  checked={true}
-                                  readOnly
-                                  className="w-4 h-4 text-green-600 rounded border-gray-300 focus:ring-green-500 cursor-pointer"
-                                  title="Unstage this change"
-                                />
-                              </div>
+                                <svg
+                                  className="w-3 h-3 text-white"
+                                  fill="currentColor"
+                                  viewBox="0 0 20 20"
+                                >
+                                  <path
+                                    fillRule="evenodd"
+                                    d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                    clipRule="evenodd"
+                                  />
+                                </svg>
+                              </button>
                               <span
                                 className={`w-5 h-5 flex items-center justify-center rounded text-xs font-bold flex-shrink-0 ${
                                   change.action === 'create'
@@ -751,23 +756,16 @@ export const GitPanel: React.FC<GitPanelProps> = ({ className = '' }) => {
                               }`}
                               onClick={() => handleSelectPendingChange(change)}
                             >
-                              <div
-                                className="flex items-center"
+                              <button
+                                type="button"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   e.preventDefault();
                                   stageChange(change.id);
                                 }}
-                                onMouseDown={(e) => e.stopPropagation()}
-                              >
-                                <input
-                                  type="checkbox"
-                                  checked={false}
-                                  readOnly
-                                  className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500 cursor-pointer"
-                                  title="Stage this change"
-                                />
-                              </div>
+                                className="w-4 h-4 rounded border border-gray-300 bg-white flex items-center justify-center cursor-pointer hover:border-blue-500 hover:bg-blue-50 focus:ring-2 focus:ring-blue-500 focus:ring-offset-1"
+                                title="Stage this change"
+                              />
                               <span
                                 className={`w-5 h-5 flex items-center justify-center rounded text-xs font-bold flex-shrink-0 ${
                                   change.action === 'create'
