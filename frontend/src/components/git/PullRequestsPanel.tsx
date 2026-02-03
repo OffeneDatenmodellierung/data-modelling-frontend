@@ -17,6 +17,7 @@ import {
   selectShowPRDetailPanel,
 } from '@/stores/githubStore';
 import { useGitHubRepoStore } from '@/stores/githubRepoStore';
+import { useShallow } from 'zustand/react/shallow';
 import { githubApi } from '@/services/github/githubApi';
 import { githubAuth } from '@/services/github/githubAuth';
 import type { GitHubPullRequest } from '@/types/github';
@@ -32,10 +33,35 @@ export const PullRequestsPanel: React.FC<PullRequestsPanelProps> = ({ className 
   const isAuthenticatedFromStore = useGitHubStore(selectIsAuthenticated);
   const isConnectedFromStore = useGitHubStore(selectIsConnected);
   const connectionInfo = useGitHubStore(selectConnectionInfo);
-  const connectionFromStore = useGitHubStore((state) => state.connection);
+  const pullRequests = useGitHubStore(selectPullRequests);
+  const isLoading = useGitHubStore(selectIsLoadingPRs);
+  const error = useGitHubStore(selectPRError);
+  const selectedPR = useGitHubStore(selectSelectedPR);
+  const showDetailPanel = useGitHubStore(selectShowPRDetailPanel);
+
+  // Use shallow comparison for store actions and state to prevent infinite loops
+  const {
+    connection: connectionFromStore,
+    setPullRequests,
+    setLoadingPRs,
+    setPRError,
+    setSelectedPR,
+    setShowAuthDialog,
+    setShowConnectDialog,
+  } = useGitHubStore(
+    useShallow((state) => ({
+      connection: state.connection,
+      setPullRequests: state.setPullRequests,
+      setLoadingPRs: state.setLoadingPRs,
+      setPRError: state.setPRError,
+      setSelectedPR: state.setSelectedPR,
+      setShowAuthDialog: state.setShowAuthDialog,
+      setShowConnectDialog: state.setShowConnectDialog,
+    }))
+  );
 
   // Also check githubRepoStore for connection info (used when opening from URL)
-  const repoWorkspace = useGitHubRepoStore((state) => state.workspace);
+  const repoWorkspace = useGitHubRepoStore(useShallow((state) => state.workspace));
 
   // Check authentication from both store and auth service directly
   // (auth service may have a valid token before store is initialized)
@@ -55,18 +81,6 @@ export const PullRequestsPanel: React.FC<PullRequestsPanelProps> = ({ className 
   }, [connectionFromStore, repoWorkspace]);
 
   const isConnected = isConnectedFromStore || repoWorkspace !== null;
-  const pullRequests = useGitHubStore(selectPullRequests);
-  const isLoading = useGitHubStore(selectIsLoadingPRs);
-  const error = useGitHubStore(selectPRError);
-  const selectedPR = useGitHubStore(selectSelectedPR);
-  const showDetailPanel = useGitHubStore(selectShowPRDetailPanel);
-
-  const setPullRequests = useGitHubStore((state) => state.setPullRequests);
-  const setLoadingPRs = useGitHubStore((state) => state.setLoadingPRs);
-  const setPRError = useGitHubStore((state) => state.setPRError);
-  const setSelectedPR = useGitHubStore((state) => state.setSelectedPR);
-  const setShowAuthDialog = useGitHubStore((state) => state.setShowAuthDialog);
-  const setShowConnectDialog = useGitHubStore((state) => state.setShowConnectDialog);
 
   const [filter, setFilter] = useState<PRFilter>('open');
 
