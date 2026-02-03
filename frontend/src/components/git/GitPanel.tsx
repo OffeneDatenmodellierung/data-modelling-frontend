@@ -682,17 +682,18 @@ export const GitPanel: React.FC<GitPanelProps> = ({ className = '' }) => {
                               }`}
                               onClick={() => handleSelectPendingChange(change)}
                             >
-                              <input
-                                type="checkbox"
-                                checked={true}
-                                onChange={(e) => {
-                                  e.stopPropagation();
-                                  unstageChange(change.id);
-                                }}
+                              <label
+                                className="flex items-center cursor-pointer"
                                 onClick={(e) => e.stopPropagation()}
-                                className="w-4 h-4 text-green-600 rounded border-gray-300 focus:ring-green-500 cursor-pointer"
-                                title="Unstage this change"
-                              />
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={true}
+                                  onChange={() => unstageChange(change.id)}
+                                  className="w-4 h-4 text-green-600 rounded border-gray-300 focus:ring-green-500 cursor-pointer"
+                                  title="Unstage this change"
+                                />
+                              </label>
                               <span
                                 className={`w-5 h-5 flex items-center justify-center rounded text-xs font-bold flex-shrink-0 ${
                                   change.action === 'create'
@@ -745,17 +746,18 @@ export const GitPanel: React.FC<GitPanelProps> = ({ className = '' }) => {
                               }`}
                               onClick={() => handleSelectPendingChange(change)}
                             >
-                              <input
-                                type="checkbox"
-                                checked={false}
-                                onChange={(e) => {
-                                  e.stopPropagation();
-                                  stageChange(change.id);
-                                }}
+                              <label
+                                className="flex items-center cursor-pointer"
                                 onClick={(e) => e.stopPropagation()}
-                                className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500 cursor-pointer"
-                                title="Stage this change"
-                              />
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={false}
+                                  onChange={() => stageChange(change.id)}
+                                  className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500 cursor-pointer"
+                                  title="Stage this change"
+                                />
+                              </label>
                               <span
                                 className={`w-5 h-5 flex items-center justify-center rounded text-xs font-bold flex-shrink-0 ${
                                   change.action === 'create'
