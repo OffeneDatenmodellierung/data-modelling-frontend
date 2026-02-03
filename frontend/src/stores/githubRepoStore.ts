@@ -382,14 +382,9 @@ export const useGitHubRepoStore = create<GitHubRepoState>()(
         // Add to queue
         await offlineQueueService.addPendingChange(change);
 
-        // Update local cache
-        await offlineQueueService.cacheFile({
-          workspaceId: workspace.id,
-          path,
-          content,
-          sha: cached?.sha || 'pending',
-          cachedAt: new Date(),
-        });
+        // NOTE: Do NOT update the cache here - the cache should preserve the ORIGINAL
+        // content from GitHub so we can compare against it for diffs. The cache is only
+        // updated after a successful commit to GitHub (in pushChanges).
 
         // Reload pending changes
         const updatedChanges = await offlineQueueService.getPendingChanges(workspace.id);

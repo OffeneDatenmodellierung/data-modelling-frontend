@@ -141,6 +141,10 @@ export const useDecisionStore = create<DecisionState>()(
           decisions,
           filteredDecisions: applyFilter(decisions, filter),
         });
+        // Sync to GitHub repo if in GitHub mode
+        import('@/utils/githubRepoSync').then(({ syncDecisionRecordToGitHub }) => {
+          syncDecisionRecordToGitHub(decision).catch(console.error);
+        });
         // Mark workspace as having pending changes
         import('@/stores/workspaceStore').then(({ useWorkspaceStore }) => {
           useWorkspaceStore.getState().setPendingChanges(true);
@@ -161,6 +165,12 @@ export const useDecisionStore = create<DecisionState>()(
           selectedDecision:
             selectedDecision?.id === decisionId ? (updatedDecision ?? null) : selectedDecision,
         });
+        // Sync to GitHub repo if in GitHub mode
+        if (updatedDecision) {
+          import('@/utils/githubRepoSync').then(({ syncDecisionRecordToGitHub }) => {
+            syncDecisionRecordToGitHub(updatedDecision).catch(console.error);
+          });
+        }
         // Mark workspace as having pending changes
         import('@/stores/workspaceStore').then(({ useWorkspaceStore }) => {
           useWorkspaceStore.getState().setPendingChanges(true);
@@ -168,6 +178,8 @@ export const useDecisionStore = create<DecisionState>()(
       },
 
       removeDecision: (decisionId) => {
+        // Get the decision before removing (for GitHub sync)
+        const decisionToRemove = get().decisions.find((d) => d.id === decisionId);
         const decisions = get().decisions.filter((d) => d.id !== decisionId);
         const filter = get().filter;
         const selectedDecision = get().selectedDecision;
@@ -177,6 +189,12 @@ export const useDecisionStore = create<DecisionState>()(
           filteredDecisions: applyFilter(decisions, filter),
           selectedDecision: selectedDecision?.id === decisionId ? null : selectedDecision,
         });
+        // Delete from GitHub repo if in GitHub mode
+        if (decisionToRemove) {
+          import('@/utils/githubRepoSync').then(({ deleteDecisionRecordFromGitHub }) => {
+            deleteDecisionRecordFromGitHub(decisionToRemove).catch(console.error);
+          });
+        }
         // Mark workspace as having pending changes
         import('@/stores/workspaceStore').then(({ useWorkspaceStore }) => {
           useWorkspaceStore.getState().setPendingChanges(true);

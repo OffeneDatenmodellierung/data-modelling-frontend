@@ -465,55 +465,16 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             const githubRepoWorkspace = useGitHubRepoStore.getState().workspace;
 
             if (githubRepoWorkspace) {
-              // GitHub Repo Mode - save via githubRepoStore to track pending changes
-              const modelStoreModule = await import('@/stores/modelStore');
-              const knowledgeStoreModule = await import('@/stores/knowledgeStore');
-              const decisionStoreModule = await import('@/stores/decisionStore');
-              const sketchStoreModule = await import('@/stores/sketchStore');
-              const { WorkspaceV2Saver } = await import('@/services/storage/workspaceV2Saver');
-
-              const {
-                tables,
-                relationships,
-                domains,
-                products,
-                computeAssets,
-                bpmnProcesses,
-                dmnDecisions,
-                systems,
-              } = modelStoreModule.useModelStore.getState();
-              const { articles } = knowledgeStoreModule.useKnowledgeStore.getState();
-              const { decisions } = decisionStoreModule.useDecisionStore.getState();
-              const { sketches } = sketchStoreModule.useSketchStore.getState();
-
-              // Generate V2 files
-              const files = await WorkspaceV2Saver.generateFiles(
-                workspace,
-                domains,
-                tables,
-                systems,
-                relationships,
-                products,
-                computeAssets,
-                bpmnProcesses,
-                dmnDecisions,
-                articles,
-                decisions,
-                sketches
-              );
-
-              // Write each file via githubRepoStore to track as pending changes
-              for (const file of files) {
-                // Construct path from directory and name
-                const filePath = file.directory ? `${file.directory}/${file.name}` : file.name;
-                await useGitHubRepoStore.getState().writeFile(filePath, file.content);
-              }
-
+              // GitHub Repo Mode - changes are tracked incrementally by githubRepoStore
+              // We do NOT regenerate all files here. Instead, individual stores (modelStore,
+              // knowledgeStore, etc.) should call githubRepoStore.writeFile() when items
+              // are created, updated, or deleted.
+              //
+              // The workspaceStore.pendingChanges flag is not used in GitHub repo mode.
+              // Instead, githubRepoStore.pendingChanges tracks the actual file changes.
               set({ pendingChanges: false, lastSavedAt: new Date().toISOString() });
               console.log(
-                '[WorkspaceStore] Auto-saved to GitHub repo store:',
-                files.length,
-                'files'
+                '[WorkspaceStore] GitHub repo mode - skipping full file regeneration (changes tracked incrementally)'
               );
               return;
             }

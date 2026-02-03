@@ -172,7 +172,10 @@ export const useKnowledgeStore = create<KnowledgeState>()(
           articles,
           filteredArticles: applyFilter(articles, filter),
         });
-        // Mark workspace as having pending changes
+        // Sync to GitHub repo if in GitHub mode, otherwise mark as pending changes
+        import('@/utils/githubRepoSync').then(({ syncKnowledgeArticleToGitHub }) => {
+          syncKnowledgeArticleToGitHub(article).catch(console.error);
+        });
         import('@/stores/workspaceStore').then(({ useWorkspaceStore }) => {
           useWorkspaceStore.getState().setPendingChanges(true);
         });
@@ -192,6 +195,12 @@ export const useKnowledgeStore = create<KnowledgeState>()(
           selectedArticle:
             selectedArticle?.id === articleId ? (updatedArticle ?? null) : selectedArticle,
         });
+        // Sync to GitHub repo if in GitHub mode
+        if (updatedArticle) {
+          import('@/utils/githubRepoSync').then(({ syncKnowledgeArticleToGitHub }) => {
+            syncKnowledgeArticleToGitHub(updatedArticle).catch(console.error);
+          });
+        }
         // Mark workspace as having pending changes
         import('@/stores/workspaceStore').then(({ useWorkspaceStore }) => {
           useWorkspaceStore.getState().setPendingChanges(true);
@@ -199,6 +208,8 @@ export const useKnowledgeStore = create<KnowledgeState>()(
       },
 
       removeArticle: (articleId) => {
+        // Get the article before removing (for GitHub sync)
+        const articleToRemove = get().articles.find((a) => a.id === articleId);
         const articles = get().articles.filter((a) => a.id !== articleId);
         const filter = get().filter;
         const selectedArticle = get().selectedArticle;
@@ -208,6 +219,12 @@ export const useKnowledgeStore = create<KnowledgeState>()(
           filteredArticles: applyFilter(articles, filter),
           selectedArticle: selectedArticle?.id === articleId ? null : selectedArticle,
         });
+        // Delete from GitHub repo if in GitHub mode
+        if (articleToRemove) {
+          import('@/utils/githubRepoSync').then(({ deleteKnowledgeArticleFromGitHub }) => {
+            deleteKnowledgeArticleFromGitHub(articleToRemove).catch(console.error);
+          });
+        }
         // Mark workspace as having pending changes
         import('@/stores/workspaceStore').then(({ useWorkspaceStore }) => {
           useWorkspaceStore.getState().setPendingChanges(true);
