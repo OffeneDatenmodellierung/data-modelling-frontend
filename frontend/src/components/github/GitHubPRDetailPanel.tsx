@@ -3,7 +3,7 @@
  * Comprehensive view of a single pull request with comments, reviews, files, and actions
  */
 
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import {
   useGitHubStore,
   selectIsConnected,
@@ -17,6 +17,7 @@ import {
   selectPendingCommentCount,
   selectHasPendingReview,
 } from '@/stores/githubStore';
+import { useGitHubRepoStore } from '@/stores/githubRepoStore';
 import { useShallow } from 'zustand/react/shallow';
 import { githubApi } from '@/services/github/githubApi';
 import type {
@@ -54,7 +55,7 @@ export const GitHubPRDetailPanel: React.FC<GitHubPRDetailPanelProps> = ({
 
   // Use shallow comparison for store actions and state to prevent infinite loops
   const {
-    connection,
+    connectionFromStore,
     setPRComments,
     setPRReviews,
     setPRFiles,
@@ -70,7 +71,7 @@ export const GitHubPRDetailPanel: React.FC<GitHubPRDetailPanelProps> = ({
     discardPendingReview,
   } = useGitHubStore(
     useShallow((state) => ({
-      connection: state.connection,
+      connectionFromStore: state.connection,
       setPRComments: state.setPRComments,
       setPRReviews: state.setPRReviews,
       setPRFiles: state.setPRFiles,
@@ -86,6 +87,35 @@ export const GitHubPRDetailPanel: React.FC<GitHubPRDetailPanelProps> = ({
       discardPendingReview: state.discardPendingReview,
     }))
   );
+
+  // Also check githubRepoStore for connection info (used when opening from URL)
+  const repoWorkspace = useGitHubRepoStore(
+    useShallow((state) => ({
+      owner: state.workspace?.owner ?? null,
+      repo: state.workspace?.repo ?? null,
+      branch: state.workspace?.branch ?? null,
+      hasWorkspace: state.workspace !== null,
+    }))
+  );
+
+  // Use connection from either store - prefer local store, fallback to repo workspace
+  const connection = useMemo(() => {
+    if (connectionFromStore) return connectionFromStore;
+    if (repoWorkspace.hasWorkspace && repoWorkspace.owner && repoWorkspace.repo) {
+      return {
+        owner: repoWorkspace.owner,
+        repo: repoWorkspace.repo,
+        branch: repoWorkspace.branch,
+      };
+    }
+    return null;
+  }, [
+    connectionFromStore,
+    repoWorkspace.hasWorkspace,
+    repoWorkspace.owner,
+    repoWorkspace.repo,
+    repoWorkspace.branch,
+  ]);
 
   const [activeTab, setActiveTab] = useState<DetailTab>('conversation');
   const [newComment, setNewComment] = useState('');
