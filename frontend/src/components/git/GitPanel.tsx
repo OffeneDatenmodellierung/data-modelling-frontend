@@ -19,6 +19,7 @@ import { CherryPickDialog, CherryPickConflictPanel } from './CherryPickDialog';
 import { RebasePanel, RebaseStatusIndicator } from './RebasePanel';
 import { TagPanel } from './TagPanel';
 import { PullRequestsPanel } from './PullRequestsPanel';
+import { CacheManagementPanel } from './CacheManagementPanel';
 import { ValidationConfirmDialog } from '@/components/common/ValidationConfirmDialog';
 import { useGitHubStore, selectIsAuthenticated } from '@/stores/githubStore';
 import {
@@ -1214,10 +1215,17 @@ export const GitPanel: React.FC<GitPanelProps> = ({ className = '' }) => {
           /* Pull Requests tab */
           <PullRequestsPanel className="flex-1" />
         ) : activeTab === 'advanced' ? (
-          /* Advanced tab - Stash, Tags, Rebase, Cherry-pick */
+          /* Advanced tab - Stash, Tags, Rebase, Cherry-pick, Cache */
           <div className="flex-1 overflow-y-auto">
             {/* Cherry-pick conflict panel */}
             <CherryPickConflictPanel className="px-3 pt-3" />
+
+            {/* Cache Management Panel (GitHub repo mode only) */}
+            {isGitHubRepoMode && (
+              <div className="border-b">
+                <CacheManagementPanel />
+              </div>
+            )}
 
             {/* Stash Panel */}
             <div className="border-b">

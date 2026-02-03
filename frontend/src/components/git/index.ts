@@ -15,3 +15,5 @@ export { TagPanel } from './TagPanel';
 export { BlameViewer, BlameDialog } from './BlameViewer';
 // Pull Requests (via GitHub API)
 export { PullRequestsPanel } from './PullRequestsPanel';
+// Cache Management (GitHub repo mode)
+export { CacheManagementPanel } from './CacheManagementPanel';
