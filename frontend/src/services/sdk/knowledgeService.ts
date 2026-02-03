@@ -95,7 +95,8 @@ class KnowledgeService {
           const resultJson = sdk.parse_knowledge_yaml(yaml);
           const sdkArticle = JSON.parse(resultJson);
 
-          if (sdkArticle.error) {
+          // Check for SDK error responses (can be 'error' or 'error_type')
+          if (sdkArticle.error || sdkArticle.error_type) {
             throw sdkArticle;
           }
 
@@ -200,8 +201,9 @@ class KnowledgeService {
       const resultJson = sdk.parse_knowledge_index_yaml(yaml);
       const sdkIndex = JSON.parse(resultJson);
 
-      if (sdkIndex.error) {
-        throw new Error(sdkIndex.error);
+      // Check for SDK error responses (can be 'error' or 'error_type')
+      if (sdkIndex.error || sdkIndex.error_type) {
+        throw new Error(sdkIndex.error || sdkIndex.message || 'Unknown SDK error');
       }
 
       // Convert from SDK camelCase to frontend snake_case
@@ -301,8 +303,9 @@ class KnowledgeService {
       const resultJson = sdk.export_knowledge_to_pdf(articleJson, brandingJson);
       const result = JSON.parse(resultJson);
 
-      if (result.error) {
-        throw new Error(result.error);
+      // Check for SDK error responses (can be 'error' or 'error_type')
+      if (result.error || result.error_type) {
+        throw new Error(result.error || result.message || 'Unknown SDK error');
       }
 
       return {
@@ -341,8 +344,9 @@ class KnowledgeService {
       const resultJson = sdk.search_knowledge_articles(articlesJson, query);
       const result = JSON.parse(resultJson);
 
-      if (result.error) {
-        throw new Error(result.error);
+      // Check for SDK error responses (can be 'error' or 'error_type')
+      if (result.error || result.error_type) {
+        throw new Error(result.error || result.message || 'Unknown SDK error');
       }
 
       // Convert results back to frontend format
@@ -380,8 +384,9 @@ class KnowledgeService {
       const resultJson = sdk.create_knowledge_article(number, title, summary, content, author);
       const sdkArticle = JSON.parse(resultJson);
 
-      if (sdkArticle.error) {
-        throw new Error(sdkArticle.error);
+      // Check for SDK error responses (can be 'error' or 'error_type')
+      if (sdkArticle.error || sdkArticle.error_type) {
+        throw new Error(sdkArticle.error || sdkArticle.message || 'Unknown SDK error');
       }
 
       // Convert from SDK camelCase to frontend snake_case
@@ -409,8 +414,9 @@ class KnowledgeService {
       const resultJson = sdk.create_knowledge_index();
       const sdkIndex = JSON.parse(resultJson);
 
-      if (sdkIndex.error) {
-        throw new Error(sdkIndex.error);
+      // Check for SDK error responses (can be 'error' or 'error_type')
+      if (sdkIndex.error || sdkIndex.error_type) {
+        throw new Error(sdkIndex.error || sdkIndex.message || 'Unknown SDK error');
       }
 
       // Convert from SDK camelCase to frontend snake_case
@@ -448,8 +454,9 @@ class KnowledgeService {
       const resultJson = sdk.add_article_to_knowledge_index(indexJson, articleJson, filename);
       const result = JSON.parse(resultJson);
 
-      if (result.error) {
-        throw new Error(result.error);
+      // Check for SDK error responses (can be 'error' or 'error_type')
+      if (result.error || result.error_type) {
+        throw new Error(result.error || result.message || 'Unknown SDK error');
       }
 
       // Convert back to frontend format

@@ -119,7 +119,8 @@ class DecisionService {
           const resultJson = sdk.parse_decision_yaml(yaml);
           const sdkDecision = JSON.parse(resultJson);
 
-          if (sdkDecision.error) {
+          // Check for SDK error responses (can be 'error' or 'error_type')
+          if (sdkDecision.error || sdkDecision.error_type) {
             throw sdkDecision;
           }
 
@@ -230,8 +231,9 @@ class DecisionService {
       const resultJson = sdk.parse_decision_index_yaml(yaml);
       const sdkIndex = JSON.parse(resultJson);
 
-      if (sdkIndex.error) {
-        throw new Error(sdkIndex.error);
+      // Check for SDK error responses (can be 'error' or 'error_type')
+      if (sdkIndex.error || sdkIndex.error_type) {
+        throw new Error(sdkIndex.error || sdkIndex.message || 'Unknown SDK error');
       }
 
       // Convert from SDK camelCase to frontend snake_case
@@ -328,8 +330,9 @@ class DecisionService {
       const resultJson = sdk.export_decision_to_pdf(decisionJson, brandingJson);
       const result = JSON.parse(resultJson);
 
-      if (result.error) {
-        throw new Error(result.error);
+      // Check for SDK error responses (can be 'error' or 'error_type')
+      if (result.error || result.error_type) {
+        throw new Error(result.error || result.message || 'Unknown SDK error');
       }
 
       return {
@@ -409,8 +412,9 @@ class DecisionService {
       const resultJson = sdk.create_decision(number, title, context, decisionText);
       const sdkDecision = JSON.parse(resultJson);
 
-      if (sdkDecision.error) {
-        throw new Error(sdkDecision.error);
+      // Check for SDK error responses (can be 'error' or 'error_type')
+      if (sdkDecision.error || sdkDecision.error_type) {
+        throw new Error(sdkDecision.error || sdkDecision.message || 'Unknown SDK error');
       }
 
       // Convert from SDK camelCase to frontend snake_case
@@ -438,8 +442,9 @@ class DecisionService {
       const resultJson = sdk.create_decision_index();
       const sdkIndex = JSON.parse(resultJson);
 
-      if (sdkIndex.error) {
-        throw new Error(sdkIndex.error);
+      // Check for SDK error responses (can be 'error' or 'error_type')
+      if (sdkIndex.error || sdkIndex.error_type) {
+        throw new Error(sdkIndex.error || sdkIndex.message || 'Unknown SDK error');
       }
 
       // Convert from SDK camelCase to frontend snake_case
@@ -477,8 +482,9 @@ class DecisionService {
       const resultJson = sdk.add_decision_to_index(indexJson, decisionJson, filename);
       const result = JSON.parse(resultJson);
 
-      if (result.error) {
-        throw new Error(result.error);
+      // Check for SDK error responses (can be 'error' or 'error_type')
+      if (result.error || result.error_type) {
+        throw new Error(result.error || result.message || 'Unknown SDK error');
       }
 
       // Convert back to frontend format
