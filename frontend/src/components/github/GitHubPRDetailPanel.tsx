@@ -17,6 +17,7 @@ import {
   selectPendingCommentCount,
   selectHasPendingReview,
 } from '@/stores/githubStore';
+import { useShallow } from 'zustand/react/shallow';
 import { githubApi } from '@/services/github/githubApi';
 import type {
   GitHubPullRequest,
@@ -41,23 +42,50 @@ export const GitHubPRDetailPanel: React.FC<GitHubPRDetailPanelProps> = ({
   onClose,
 }) => {
   const isConnected = useGitHubStore(selectIsConnected);
-  const connection = useGitHubStore((state) => state.connection);
   const selectedPR = useGitHubStore(selectSelectedPR);
   const comments = useGitHubStore(selectPRComments);
   const reviews = useGitHubStore(selectPRReviews);
   const files = useGitHubStore(selectPRFiles);
   const isLoading = useGitHubStore(selectIsLoadingPRDetails);
   const error = useGitHubStore(selectPRDetailsError);
+  const pendingComments = useGitHubStore(selectPendingComments);
+  const pendingCommentCount = useGitHubStore(selectPendingCommentCount);
+  const hasPendingReview = useGitHubStore(selectHasPendingReview);
 
-  const setPRComments = useGitHubStore((state) => state.setPRComments);
-  const setPRReviews = useGitHubStore((state) => state.setPRReviews);
-  const setPRFiles = useGitHubStore((state) => state.setPRFiles);
-  const setLoadingPRDetails = useGitHubStore((state) => state.setLoadingPRDetails);
-  const setPRDetailsError = useGitHubStore((state) => state.setPRDetailsError);
-  const addPRComment = useGitHubStore((state) => state.addPRComment);
-  const addPRReview = useGitHubStore((state) => state.addPRReview);
-  const updatePR = useGitHubStore((state) => state.updatePR);
-  const clearPRDetails = useGitHubStore((state) => state.clearPRDetails);
+  // Use shallow comparison for store actions and state to prevent infinite loops
+  const {
+    connection,
+    setPRComments,
+    setPRReviews,
+    setPRFiles,
+    setLoadingPRDetails,
+    setPRDetailsError,
+    addPRComment,
+    addPRReview,
+    updatePR,
+    clearPRDetails,
+    startPendingReview,
+    addPendingComment,
+    removePendingComment,
+    discardPendingReview,
+  } = useGitHubStore(
+    useShallow((state) => ({
+      connection: state.connection,
+      setPRComments: state.setPRComments,
+      setPRReviews: state.setPRReviews,
+      setPRFiles: state.setPRFiles,
+      setLoadingPRDetails: state.setLoadingPRDetails,
+      setPRDetailsError: state.setPRDetailsError,
+      addPRComment: state.addPRComment,
+      addPRReview: state.addPRReview,
+      updatePR: state.updatePR,
+      clearPRDetails: state.clearPRDetails,
+      startPendingReview: state.startPendingReview,
+      addPendingComment: state.addPendingComment,
+      removePendingComment: state.removePendingComment,
+      discardPendingReview: state.discardPendingReview,
+    }))
+  );
 
   const [activeTab, setActiveTab] = useState<DetailTab>('conversation');
   const [newComment, setNewComment] = useState('');
@@ -71,15 +99,6 @@ export const GitHubPRDetailPanel: React.FC<GitHubPRDetailPanelProps> = ({
     'COMMENT'
   );
   const [showReviewDialog, setShowReviewDialog] = useState(false);
-
-  // Pending review state from store
-  const pendingComments = useGitHubStore(selectPendingComments);
-  const pendingCommentCount = useGitHubStore(selectPendingCommentCount);
-  const hasPendingReview = useGitHubStore(selectHasPendingReview);
-  const startPendingReview = useGitHubStore((state) => state.startPendingReview);
-  const addPendingComment = useGitHubStore((state) => state.addPendingComment);
-  const removePendingComment = useGitHubStore((state) => state.removePendingComment);
-  const discardPendingReview = useGitHubStore((state) => state.discardPendingReview);
 
   // Load PR details
   const loadDetails = useCallback(async () => {
