@@ -4,7 +4,7 @@
  * Uses GitHub API when authenticated, shows connection prompt otherwise
  */
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import {
   useGitHubStore,
   selectIsAuthenticated,
@@ -16,6 +16,7 @@ import {
   selectSelectedPR,
   selectShowPRDetailPanel,
 } from '@/stores/githubStore';
+import { useGitHubRepoStore } from '@/stores/githubRepoStore';
 import { githubApi } from '@/services/github/githubApi';
 import type { GitHubPullRequest } from '@/types/github';
 import { GitHubPRDetailPanel } from '@/components/github/GitHubPRDetailPanel';
@@ -28,9 +29,27 @@ type PRFilter = 'open' | 'closed' | 'all';
 
 export const PullRequestsPanel: React.FC<PullRequestsPanelProps> = ({ className = '' }) => {
   const isAuthenticated = useGitHubStore(selectIsAuthenticated);
-  const isConnected = useGitHubStore(selectIsConnected);
+  const isConnectedFromStore = useGitHubStore(selectIsConnected);
   const connectionInfo = useGitHubStore(selectConnectionInfo);
-  const connection = useGitHubStore((state) => state.connection);
+  const connectionFromStore = useGitHubStore((state) => state.connection);
+
+  // Also check githubRepoStore for connection info (used when opening from URL)
+  const repoWorkspace = useGitHubRepoStore((state) => state.workspace);
+
+  // Use connection from either store
+  const connection = useMemo(() => {
+    if (connectionFromStore) return connectionFromStore;
+    if (repoWorkspace) {
+      return {
+        owner: repoWorkspace.owner,
+        repo: repoWorkspace.repo,
+        branch: repoWorkspace.branch,
+      };
+    }
+    return null;
+  }, [connectionFromStore, repoWorkspace]);
+
+  const isConnected = isConnectedFromStore || repoWorkspace !== null;
   const pullRequests = useGitHubStore(selectPullRequests);
   const isLoading = useGitHubStore(selectIsLoadingPRs);
   const error = useGitHubStore(selectPRError);
@@ -282,9 +301,7 @@ export const PullRequestsPanel: React.FC<PullRequestsPanelProps> = ({ className 
                   {/* PR info */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1">
-                      <span className="text-xs font-medium text-gray-900 truncate">
-                        {pr.title}
-                      </span>
+                      <span className="text-xs font-medium text-gray-900 truncate">{pr.title}</span>
                     </div>
 
                     <div className="mt-0.5 flex items-center gap-1.5 text-xs text-gray-500">

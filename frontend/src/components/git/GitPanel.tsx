@@ -20,6 +20,7 @@ import { TagPanel } from './TagPanel';
 import { PullRequestsPanel } from './PullRequestsPanel';
 import { ValidationConfirmDialog } from '@/components/common/ValidationConfirmDialog';
 import { useGitHubStore, selectIsAuthenticated } from '@/stores/githubStore';
+import { useGitHubRepoStore } from '@/stores/githubRepoStore';
 
 type TabType = 'changes' | 'history' | 'remotes' | 'prs' | 'advanced';
 
@@ -49,7 +50,12 @@ export const GitPanel: React.FC<GitPanelProps> = ({ className = '' }) => {
 
   const isGitHubAuthenticated = useGitHubStore(selectIsAuthenticated);
 
-  const [activeTab, setActiveTab] = useState<TabType>('changes');
+  // Check if we're in GitHub repo mode (opened from URL)
+  const githubRepoWorkspace = useGitHubRepoStore((state) => state.workspace);
+  const isGitHubRepoMode = githubRepoWorkspace !== null;
+
+  // In GitHub repo mode, default to PRs tab since local git features aren't available
+  const [activeTab, setActiveTab] = useState<TabType>(isGitHubRepoMode ? 'prs' : 'changes');
   const [cherryPickCommit, setCherryPickCommit] = useState<typeof selectedCommit>(null);
   const [showCherryPickDialog, setShowCherryPickDialog] = useState(false);
   const [commitMessage, setCommitMessage] = useState('');
@@ -164,8 +170,8 @@ export const GitPanel: React.FC<GitPanelProps> = ({ className = '' }) => {
     return null;
   }
 
-  // Not a git repo - show init option
-  if (!status.isGitRepo) {
+  // Not a git repo and not in GitHub repo mode - show init option
+  if (!status.isGitRepo && !isGitHubRepoMode) {
     return (
       <div className={`w-80 border-l border-gray-200 bg-white flex flex-col ${className}`}>
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
