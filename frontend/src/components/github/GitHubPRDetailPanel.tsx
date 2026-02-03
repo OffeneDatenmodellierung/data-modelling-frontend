@@ -3,7 +3,7 @@
  * Comprehensive view of a single pull request with comments, reviews, files, and actions
  */
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   useGitHubStore,
   selectIsConnected,
@@ -130,12 +130,16 @@ export const GitHubPRDetailPanel: React.FC<GitHubPRDetailPanelProps> = ({
     setPRDetailsError,
   ]);
 
+  // Track which PR we've loaded to prevent duplicate loads
+  const loadedPRRef = useRef<number | null>(null);
+
   // Load details when PR changes
   // Note: We intentionally exclude loadDetails from dependencies to prevent infinite loops.
   // The loadDetails callback is recreated when connection changes, but we only want to
   // trigger loading when selectedPR.number actually changes.
   useEffect(() => {
-    if (selectedPR) {
+    if (selectedPR && selectedPR.number !== loadedPRRef.current) {
+      loadedPRRef.current = selectedPR.number;
       loadDetails();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
