@@ -25,6 +25,8 @@ export interface PRFileDiffViewerProps {
   onRemovePendingComment?: (id: string) => void;
   className?: string;
   defaultExpanded?: boolean;
+  /** Hide the file header (useful when already wrapped by another component showing the header) */
+  hideHeader?: boolean;
 }
 
 type ViewMode = 'unified' | 'split';
@@ -40,8 +42,9 @@ export const PRFileDiffViewer: React.FC<PRFileDiffViewerProps> = ({
   onRemovePendingComment,
   className = '',
   defaultExpanded = false,
+  hideHeader = false,
 }) => {
-  const [expanded, setExpanded] = useState(defaultExpanded);
+  const [expanded, setExpanded] = useState(defaultExpanded || hideHeader);
   const [viewMode, setViewMode] = useState<ViewMode>('unified');
   const [commentingLine, setCommentingLine] = useState<{
     line: number;
@@ -122,37 +125,39 @@ export const PRFileDiffViewer: React.FC<PRFileDiffViewerProps> = ({
 
   return (
     <div className={`border border-gray-200 rounded-lg overflow-hidden ${className}`}>
-      {/* File Header */}
-      <button
-        onClick={() => setExpanded(!expanded)}
-        className="w-full px-3 py-2 flex items-center gap-2 bg-gray-50 hover:bg-gray-100 text-left border-b border-gray-200"
-      >
-        <svg
-          className={`w-4 h-4 text-gray-400 transition-transform ${expanded ? 'rotate-90' : ''}`}
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
+      {/* File Header - only show if not hidden */}
+      {!hideHeader && (
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="w-full px-3 py-2 flex items-center gap-2 bg-gray-50 hover:bg-gray-100 text-left border-b border-gray-200"
         >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-        </svg>
+          <svg
+            className={`w-4 h-4 text-gray-400 transition-transform ${expanded ? 'rotate-90' : ''}`}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
 
-        <span className={`px-1.5 py-0.5 text-xs rounded ${getStatusColor()}`}>{file.status}</span>
+          <span className={`px-1.5 py-0.5 text-xs rounded ${getStatusColor()}`}>{file.status}</span>
 
-        <span className="flex-1 font-mono text-sm text-gray-900 truncate">
-          {file.previous_filename ? (
-            <>
-              <span className="text-gray-400">{file.previous_filename}</span>
-              <span className="mx-1">→</span>
-              {file.filename}
-            </>
-          ) : (
-            file.filename
-          )}
-        </span>
+          <span className="flex-1 font-mono text-sm text-gray-900 truncate">
+            {file.previous_filename ? (
+              <>
+                <span className="text-gray-400">{file.previous_filename}</span>
+                <span className="mx-1">→</span>
+                {file.filename}
+              </>
+            ) : (
+              file.filename
+            )}
+          </span>
 
-        <span className="text-xs text-green-600">+{file.additions}</span>
-        <span className="text-xs text-red-600">-{file.deletions}</span>
-      </button>
+          <span className="text-xs text-green-600">+{file.additions}</span>
+          <span className="text-xs text-red-600">-{file.deletions}</span>
+        </button>
+      )}
 
       {/* Diff Content */}
       {expanded && (

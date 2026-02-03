@@ -811,6 +811,7 @@ const FileCard: React.FC<{
             onAddComment={handleAddComment}
             onRemovePendingComment={onRemoveComment}
             defaultExpanded={true}
+            hideHeader={true}
           />
         </div>
       )}
