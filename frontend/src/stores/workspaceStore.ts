@@ -64,6 +64,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
   persist(
     (set, get) => {
       let autoSaveTimer: NodeJS.Timeout | null = null;
+      let debouncedSaveTimer: NodeJS.Timeout | null = null;
 
       return {
         workspaces: [],
@@ -111,7 +112,33 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             get().stopAutoSave();
           }
         },
-        setPendingChanges: (pending) => set({ pendingChanges: pending }),
+        setPendingChanges: (pending) => {
+          set({ pendingChanges: pending });
+
+          // In GitHub repo mode, trigger a debounced auto-save to write changes quickly
+          if (pending) {
+            // Clear any existing debounced timer
+            if (debouncedSaveTimer) {
+              clearTimeout(debouncedSaveTimer);
+            }
+
+            // Debounce: wait 2 seconds after the last change before saving
+            debouncedSaveTimer = setTimeout(async () => {
+              try {
+                // Check if we're in GitHub repo mode
+                const { useGitHubRepoStore } = await import('@/stores/githubRepoStore');
+                const githubRepoWorkspace = useGitHubRepoStore.getState().workspace;
+
+                if (githubRepoWorkspace && get().pendingChanges) {
+                  console.log('[WorkspaceStore] Debounced save triggered for GitHub repo mode');
+                  await get().autoSave();
+                }
+              } catch (error) {
+                console.error('[WorkspaceStore] Debounced save failed:', error);
+              }
+            }, 2000);
+          }
+        },
         markSaved: () => set({ pendingChanges: false, lastSavedAt: new Date().toISOString() }),
 
         // CRUD Operations
