@@ -805,7 +805,10 @@ export const selectCanSwitchBack = (state: GitHubState) => state.previousBranch 
 // Pending review selectors
 export const selectPendingReview = (state: GitHubState) => state.pendingReview;
 
-export const selectPendingComments = (state: GitHubState) => state.pendingReview?.comments ?? [];
+// Use a stable empty array reference to prevent infinite re-renders
+const EMPTY_PENDING_COMMENTS: never[] = [];
+export const selectPendingComments = (state: GitHubState) =>
+  state.pendingReview?.comments ?? EMPTY_PENDING_COMMENTS;
 
 export const selectPendingCommentCount = (state: GitHubState) =>
   state.pendingReview?.comments.length ?? 0;
