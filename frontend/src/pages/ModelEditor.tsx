@@ -41,9 +41,8 @@ import { SketchPanel } from '@/components/sketch/SketchPanel';
 import { GitPanel, GitStatusIndicator } from '@/components/git';
 import { gitService } from '@/services/git/gitService';
 import { GitHubUserMenu, GitHubAuthDialog, GitHubRepoSelector } from '@/components/github';
-import { PRListPanel } from '@/components/github/PRListPanel';
-import { GitHubPRDetailPanel } from '@/components/github/GitHubPRDetailPanel';
-import { useGitHubStore, selectShowPRListPanel, selectSelectedPR } from '@/stores/githubStore';
+
+import { useGitHubStore } from '@/stores/githubStore';
 import { useGitHubRepoStore } from '@/stores/githubRepoStore';
 import { isElectron } from '@/services/platform/platform';
 import type { SharedResourceReference } from '@/types/domain';
@@ -107,11 +106,6 @@ const ModelEditor: React.FC = () => {
 
   // Initialize help panel keyboard shortcuts (F1, Cmd+?)
   useHelpPanel();
-
-  // GitHub PR review state
-  const showPRListPanel = useGitHubStore(selectShowPRListPanel);
-  const selectedPR = useGitHubStore(selectSelectedPR);
-  const setShowPRListPanel = useGitHubStore((state) => state.setShowPRListPanel);
 
   // Handle shared resource selection
   const handleSharedResourcesSelected = (sharedResources: SharedResourceReference[]) => {
@@ -899,36 +893,11 @@ const ModelEditor: React.FC = () => {
 
           {/* Git Status, GitHub, Settings and History buttons */}
           <div className="flex items-center gap-2 ml-auto">
-            {/* Git Status Indicator (Electron only) */}
-            {isElectron() && <GitStatusIndicator />}
+            {/* Git Status Indicator (works in both Electron and GitHub repo mode) */}
+            <GitStatusIndicator />
 
-            {/* GitHub User Menu and PR Panel Toggle (Browser mode) */}
-            {!isElectron() && (
-              <>
-                <button
-                  onClick={() => setShowPRListPanel(!showPRListPanel)}
-                  className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                    showPRListPanel
-                      ? 'bg-blue-100 text-blue-700 hover:bg-blue-200'
-                      : 'text-gray-700 bg-gray-100 hover:bg-gray-200'
-                  }`}
-                  title="Toggle Pull Requests Panel"
-                >
-                  <svg
-                    className="w-4 h-4 inline-block mr-1"
-                    fill="currentColor"
-                    viewBox="0 0 16 16"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M5 3.254V3.25v.005a.75.75 0 110-.005v.004zm.45 1.9a2.25 2.25 0 10-1.95.218v5.256a2.25 2.25 0 101.5 0V7.123A5.735 5.735 0 009.25 9h1.378a2.251 2.251 0 100-1.5H9.25a4.25 4.25 0 01-3.8-2.346zM12.75 9a.75.75 0 100-1.5.75.75 0 000 1.5zm-8.5 4.5a.75.75 0 100-1.5.75.75 0 000 1.5z"
-                    />
-                  </svg>
-                  PRs
-                </button>
-                <GitHubUserMenu />
-              </>
-            )}
+            {/* GitHub User Menu (Browser mode only) */}
+            {!isElectron() && <GitHubUserMenu />}
 
             {/* Validation Warnings */}
             <ValidationWarnings />
@@ -975,28 +944,6 @@ const ModelEditor: React.FC = () => {
 
       {/* Main Content */}
       <div className="flex-1 flex overflow-hidden">
-        {/* PR List Panel (collapsible sidebar) */}
-        {showPRListPanel && (
-          <div className="w-80 border-r border-gray-200 bg-white flex-shrink-0 overflow-hidden">
-            <PRListPanel
-              onSelectPR={(pr) => {
-                useGitHubStore.getState().setSelectedPR(pr);
-              }}
-            />
-          </div>
-        )}
-
-        {/* PR Detail Panel (shows when PR is selected) */}
-        {selectedPR && (
-          <div className="w-[600px] border-r border-gray-200 bg-white flex-shrink-0 overflow-hidden">
-            <GitHubPRDetailPanel
-              onClose={() => {
-                useGitHubStore.getState().setSelectedPR(null);
-              }}
-            />
-          </div>
-        )}
-
         {/* Canvas or Panel based on view mode */}
         <div className="flex-1 relative">
           {selectedDomainId && workspaceId && currentView === 'decisions' && (

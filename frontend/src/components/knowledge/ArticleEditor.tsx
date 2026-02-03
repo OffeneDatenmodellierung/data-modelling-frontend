@@ -140,6 +140,10 @@ export const ArticleEditor: React.FC<ArticleEditorProps> = ({
       errors.type = 'Article type is required';
     }
 
+    if (formData.authors.length === 0) {
+      errors.authors = 'At least one author is required';
+    }
+
     setValidationErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -414,7 +418,7 @@ export const ArticleEditor: React.FC<ArticleEditorProps> = ({
               htmlFor="article-authors"
               className="block text-sm font-medium text-gray-700 mb-1"
             >
-              Authors
+              Authors <span className="text-red-500">*</span>
             </label>
             <div className="flex items-center gap-2 mb-2">
               <input
@@ -457,10 +461,15 @@ export const ArticleEditor: React.FC<ArticleEditorProps> = ({
                   </button>
                 </span>
               ))}
-              {formData.authors.length === 0 && (
+              {formData.authors.length === 0 && !validationErrors.authors && (
                 <span className="text-xs text-gray-400 italic">No authors</span>
               )}
             </div>
+            {validationErrors.authors && (
+              <p className="mt-1 text-sm text-red-600" role="alert">
+                {validationErrors.authors}
+              </p>
+            )}
           </div>
 
           {/* Reviewers */}
