@@ -25,7 +25,9 @@ import {
   selectPendingChanges,
   selectSyncStatus,
 } from '@/stores/githubRepoStore';
+import { offlineQueueService } from '@/services/github/offlineQueueService';
 import type { PendingChange } from '@/types/github-repo';
+import * as Diff from 'diff';
 
 type TabType = 'changes' | 'history' | 'remotes' | 'prs' | 'advanced';
 
@@ -88,7 +90,67 @@ export const GitPanel: React.FC<GitPanelProps> = ({ className = '' }) => {
   const [validationErrorCount, setValidationErrorCount] = useState(0);
   const [validationWarningCount, setValidationWarningCount] = useState(0);
 
+  // GitHub repo mode: selected pending change for diff viewing
+  const [selectedPendingChange, setSelectedPendingChange] = useState<PendingChange | null>(null);
+  const [pendingChangeDiff, setPendingChangeDiff] = useState<string | null>(null);
+  const [isLoadingPendingDiff, setIsLoadingPendingDiff] = useState(false);
+
   const isRemoteOperationInProgress = isFetching || isPulling || isPushing;
+
+  // Generate diff when a pending change is selected
+  const handleSelectPendingChange = useCallback(
+    async (change: PendingChange) => {
+      // Toggle off if already selected
+      if (selectedPendingChange?.id === change.id) {
+        setSelectedPendingChange(null);
+        setPendingChangeDiff(null);
+        return;
+      }
+
+      setSelectedPendingChange(change);
+      setIsLoadingPendingDiff(true);
+      setPendingChangeDiff(null);
+
+      try {
+        const workspaceId = githubRepoWorkspace?.id;
+        if (!workspaceId) return;
+
+        // Get the original cached content
+        const cachedFile = await offlineQueueService.getCachedFile(workspaceId, change.path);
+        const originalContent = cachedFile?.content || '';
+        const newContent = change.content || '';
+
+        // Generate unified diff with context lines
+        const diff = Diff.createPatch(
+          change.path,
+          originalContent,
+          newContent,
+          'original',
+          'modified',
+          { context: 5 } // 5 lines of context
+        );
+
+        setPendingChangeDiff(diff);
+      } catch (error) {
+        console.error('[GitPanel] Failed to generate diff:', error);
+        setPendingChangeDiff(null);
+      } finally {
+        setIsLoadingPendingDiff(false);
+      }
+    },
+    [selectedPendingChange, githubRepoWorkspace]
+  );
+
+  // Clear selected pending change when changes list updates
+  useEffect(() => {
+    if (selectedPendingChange) {
+      const stillExists = pendingChanges.some((c) => c.id === selectedPendingChange.id);
+      if (!stillExists) {
+        setSelectedPendingChange(null);
+        setPendingChangeDiff(null);
+      }
+    }
+  }, [pendingChanges, selectedPendingChange]);
 
   // Load history when switching to history tab
   useEffect(() => {
@@ -458,7 +520,19 @@ export const GitPanel: React.FC<GitPanelProps> = ({ className = '' }) => {
                     {pendingChanges.map((change: PendingChange) => (
                       <li
                         key={change.id}
-                        className="px-3 py-2 flex items-center gap-2 hover:bg-gray-50"
+                        className={`px-3 py-2 flex items-center gap-2 hover:bg-gray-50 cursor-pointer ${
+                          selectedPendingChange?.id === change.id
+                            ? 'bg-blue-50 border-l-2 border-blue-500'
+                            : ''
+                        }`}
+                        onClick={() => handleSelectPendingChange(change)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            handleSelectPendingChange(change);
+                          }
+                        }}
+                        role="button"
+                        tabIndex={0}
                       >
                         <span
                           className={`w-5 h-5 flex items-center justify-center rounded text-xs font-bold ${
@@ -486,6 +560,17 @@ export const GitPanel: React.FC<GitPanelProps> = ({ className = '' }) => {
                   </ul>
                 )}
               </div>
+
+              {/* Diff viewer for selected pending change */}
+              {selectedPendingChange && (
+                <div className="h-64 border-t border-gray-200 overflow-hidden flex flex-col">
+                  <DiffViewer
+                    diff={pendingChangeDiff || ''}
+                    isLoading={isLoadingPendingDiff}
+                    fileName={selectedPendingChange.path}
+                  />
+                </div>
+              )}
 
               {/* Sync section for GitHub repo mode */}
               {pendingChanges.length > 0 && (
