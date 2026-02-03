@@ -99,6 +99,11 @@ export interface GitHubRepoState {
 
   // Actions - Reset
   reset: () => void;
+
+  // Actions - Cache management
+  purgeBranchCache: (branch: string) => Promise<void>;
+  purgeAllStaleBranches: () => Promise<{ purged: string[]; errors: string[] }>;
+  listCachedBranches: () => Promise<string[]>;
 }
 
 // ============================================================================
@@ -852,6 +857,90 @@ export const useGitHubRepoStore = create<GitHubRepoState>()(
           ...initialState,
           isOnline: navigator.onLine,
         });
+      },
+
+      // ========================================================================
+      // Cache Management
+      // ========================================================================
+
+      listCachedBranches: async () => {
+        const { workspace } = get();
+        if (!workspace) return [];
+
+        // List all workspaces from IndexedDB and filter by owner/repo
+        const allWorkspaces = await offlineQueueService.listWorkspaces();
+        const branches = allWorkspaces
+          .filter((w) => w.owner === workspace.owner && w.repo === workspace.repo)
+          .map((w) => w.branch);
+
+        return [...new Set(branches)]; // Remove duplicates
+      },
+
+      purgeBranchCache: async (branch: string) => {
+        const { workspace } = get();
+        if (!workspace) throw new Error('No workspace open');
+
+        // Generate workspace ID for the branch to purge
+        const workspaceIdToPurge = generateWorkspaceId(
+          workspace.owner,
+          workspace.repo,
+          branch,
+          workspace.workspacePath
+        );
+
+        // Delete the workspace and its cache
+        await offlineQueueService.deleteWorkspace(workspaceIdToPurge);
+
+        // Also remove from recent workspaces
+        await offlineQueueService.removeRecentWorkspace(workspaceIdToPurge);
+
+        console.log(`[GitHubRepoStore] Purged cache for branch: ${branch}`);
+      },
+
+      purgeAllStaleBranches: async () => {
+        const { workspace, isOnline } = get();
+        if (!workspace) throw new Error('No workspace open');
+        if (!isOnline) throw new Error('Cannot check remote branches while offline');
+
+        const purged: string[] = [];
+        const errors: string[] = [];
+
+        try {
+          // Get list of branches from remote
+          const remoteBranches = await githubApi.listBranches(workspace.owner, workspace.repo);
+          const remoteBranchNames = new Set(remoteBranches.map((b) => b.name));
+
+          // Get all cached workspaces for this repo
+          const allWorkspaces = await offlineQueueService.listWorkspaces();
+          const cachedForThisRepo = allWorkspaces.filter(
+            (w) => w.owner === workspace.owner && w.repo === workspace.repo
+          );
+
+          // Find and purge branches that no longer exist on remote
+          for (const cachedWorkspace of cachedForThisRepo) {
+            if (!remoteBranchNames.has(cachedWorkspace.branch)) {
+              try {
+                await offlineQueueService.deleteWorkspace(cachedWorkspace.id);
+                await offlineQueueService.removeRecentWorkspace(cachedWorkspace.id);
+                purged.push(cachedWorkspace.branch);
+                console.log(
+                  `[GitHubRepoStore] Purged stale branch cache: ${cachedWorkspace.branch}`
+                );
+              } catch (err) {
+                errors.push(cachedWorkspace.branch);
+                console.error(
+                  `[GitHubRepoStore] Failed to purge branch ${cachedWorkspace.branch}:`,
+                  err
+                );
+              }
+            }
+          }
+        } catch (err) {
+          console.error('[GitHubRepoStore] Failed to fetch remote branches:', err);
+          throw new Error('Failed to fetch remote branches to compare');
+        }
+
+        return { purged, errors };
       },
     }),
     { name: 'github-repo-store' }
