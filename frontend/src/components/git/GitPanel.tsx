@@ -675,21 +675,20 @@ export const GitPanel: React.FC<GitPanelProps> = ({ className = '' }) => {
                           {stagedChanges.map((change: PendingChange) => (
                             <li
                               key={change.id}
-                              className={`px-3 py-2 flex items-center gap-2 hover:bg-gray-50 cursor-pointer ${
+                              className={`px-3 py-2 flex items-center gap-2 hover:bg-gray-50 ${
                                 selectedPendingChange?.id === change.id
                                   ? 'bg-blue-50 border-l-2 border-blue-500'
                                   : ''
                               }`}
-                              onClick={() => handleSelectPendingChange(change)}
                             >
                               <button
                                 type="button"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  e.preventDefault();
+                                  console.log('[GitPanel] Unstage button clicked for:', change.id);
                                   unstageChange(change.id);
                                 }}
-                                className="w-4 h-4 rounded border border-gray-300 bg-green-600 flex items-center justify-center cursor-pointer hover:bg-green-700 focus:ring-2 focus:ring-green-500 focus:ring-offset-1"
+                                className="w-5 h-5 rounded border-2 border-green-600 bg-green-600 flex items-center justify-center cursor-pointer hover:bg-green-700 hover:border-green-700 focus:ring-2 focus:ring-green-500 flex-shrink-0"
                                 title="Unstage this change"
                               >
                                 <svg
@@ -704,27 +703,32 @@ export const GitPanel: React.FC<GitPanelProps> = ({ className = '' }) => {
                                   />
                                 </svg>
                               </button>
-                              <span
-                                className={`w-5 h-5 flex items-center justify-center rounded text-xs font-bold flex-shrink-0 ${
-                                  change.action === 'create'
-                                    ? 'text-green-600 bg-green-100'
+                              <div
+                                className="flex-1 flex items-center gap-2 cursor-pointer"
+                                onClick={() => handleSelectPendingChange(change)}
+                              >
+                                <span
+                                  className={`w-5 h-5 flex items-center justify-center rounded text-xs font-bold flex-shrink-0 ${
+                                    change.action === 'create'
+                                      ? 'text-green-600 bg-green-100'
+                                      : change.action === 'update'
+                                        ? 'text-yellow-600 bg-yellow-100'
+                                        : 'text-red-600 bg-red-100'
+                                  }`}
+                                >
+                                  {change.action === 'create'
+                                    ? '+'
                                     : change.action === 'update'
-                                      ? 'text-yellow-600 bg-yellow-100'
-                                      : 'text-red-600 bg-red-100'
-                                }`}
-                              >
-                                {change.action === 'create'
-                                  ? '+'
-                                  : change.action === 'update'
-                                    ? '~'
-                                    : '-'}
-                              </span>
-                              <span
-                                className="flex-1 text-sm text-gray-700 truncate"
-                                title={change.path}
-                              >
-                                {change.path}
-                              </span>
+                                      ? '~'
+                                      : '-'}
+                                </span>
+                                <span
+                                  className="flex-1 text-sm text-gray-700 truncate"
+                                  title={change.path}
+                                >
+                                  {change.path}
+                                </span>
+                              </div>
                             </li>
                           ))}
                         </ul>
@@ -749,44 +753,48 @@ export const GitPanel: React.FC<GitPanelProps> = ({ className = '' }) => {
                           {unstagedChanges.map((change: PendingChange) => (
                             <li
                               key={change.id}
-                              className={`px-3 py-2 flex items-center gap-2 hover:bg-gray-50 cursor-pointer ${
+                              className={`px-3 py-2 flex items-center gap-2 hover:bg-gray-50 ${
                                 selectedPendingChange?.id === change.id
                                   ? 'bg-blue-50 border-l-2 border-blue-500'
                                   : ''
                               }`}
-                              onClick={() => handleSelectPendingChange(change)}
                             >
                               <button
                                 type="button"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  e.preventDefault();
+                                  console.log('[GitPanel] Stage button clicked for:', change.id);
                                   stageChange(change.id);
                                 }}
-                                className="w-4 h-4 rounded border border-gray-300 bg-white flex items-center justify-center cursor-pointer hover:border-blue-500 hover:bg-blue-50 focus:ring-2 focus:ring-blue-500 focus:ring-offset-1"
+                                className="w-5 h-5 rounded border-2 border-gray-400 bg-white flex items-center justify-center cursor-pointer hover:border-blue-500 hover:bg-blue-50 focus:ring-2 focus:ring-blue-500 flex-shrink-0"
                                 title="Stage this change"
                               />
-                              <span
-                                className={`w-5 h-5 flex items-center justify-center rounded text-xs font-bold flex-shrink-0 ${
-                                  change.action === 'create'
-                                    ? 'text-green-600 bg-green-100'
+                              <div
+                                className="flex-1 flex items-center gap-2 cursor-pointer"
+                                onClick={() => handleSelectPendingChange(change)}
+                              >
+                                <span
+                                  className={`w-5 h-5 flex items-center justify-center rounded text-xs font-bold flex-shrink-0 ${
+                                    change.action === 'create'
+                                      ? 'text-green-600 bg-green-100'
+                                      : change.action === 'update'
+                                        ? 'text-yellow-600 bg-yellow-100'
+                                        : 'text-red-600 bg-red-100'
+                                  }`}
+                                >
+                                  {change.action === 'create'
+                                    ? '+'
                                     : change.action === 'update'
-                                      ? 'text-yellow-600 bg-yellow-100'
-                                      : 'text-red-600 bg-red-100'
-                                }`}
-                              >
-                                {change.action === 'create'
-                                  ? '+'
-                                  : change.action === 'update'
-                                    ? '~'
-                                    : '-'}
-                              </span>
-                              <span
-                                className="flex-1 text-sm text-gray-700 truncate"
-                                title={change.path}
-                              >
-                                {change.path}
-                              </span>
+                                      ? '~'
+                                      : '-'}
+                                </span>
+                                <span
+                                  className="flex-1 text-sm text-gray-700 truncate"
+                                  title={change.path}
+                                >
+                                  {change.path}
+                                </span>
+                              </div>
                             </li>
                           ))}
                         </ul>
