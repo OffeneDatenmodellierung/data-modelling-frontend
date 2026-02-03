@@ -839,7 +839,8 @@ export const selectWorkspacePath = (state: GitHubRepoState) => {
   return state.workspace?.workspacePath || '';
 };
 
-// Staging selectors
+// Staging selectors - these return derived values
+// Note: Components using array selectors should use shallow comparison or useMemo
 export const selectStagedChanges = (state: GitHubRepoState) =>
   state.pendingChanges.filter((c) => c.staged);
 

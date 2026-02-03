@@ -3,7 +3,7 @@
  * Main panel for version control operations (Option A from design)
  */
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useGitStore } from '@/stores/gitStore';
 import { gitService } from '@/services/git/gitService';
 import { runWorkspaceValidation } from '@/utils/workspaceValidation';
@@ -24,10 +24,8 @@ import {
   useGitHubRepoStore,
   selectPendingChanges,
   selectSyncStatus,
-  selectStagedChanges,
-  selectUnstagedChanges,
-  selectHasStagedChanges,
 } from '@/stores/githubRepoStore';
+import { useShallow } from 'zustand/react/shallow';
 import { offlineQueueService } from '@/services/github/offlineQueueService';
 import type { PendingChange } from '@/types/github-repo';
 import * as Diff from 'diff';
@@ -64,19 +62,25 @@ export const GitPanel: React.FC<GitPanelProps> = ({ className = '' }) => {
   const githubRepoWorkspace = useGitHubRepoStore((state) => state.workspace);
   const isGitHubRepoMode = githubRepoWorkspace !== null;
 
-  // GitHub repo mode pending changes
+  // GitHub repo mode pending changes - use shallow comparison for array
   const pendingChanges = useGitHubRepoStore(selectPendingChanges);
-  const stagedChanges = useGitHubRepoStore(selectStagedChanges);
-  const unstagedChanges = useGitHubRepoStore(selectUnstagedChanges);
-  const hasStagedChanges = useGitHubRepoStore(selectHasStagedChanges);
   const syncStatus = useGitHubRepoStore(selectSyncStatus);
   const isSyncing = syncStatus === 'syncing';
 
-  // Staging actions
-  const stageChange = useGitHubRepoStore((state) => state.stageChange);
-  const unstageChange = useGitHubRepoStore((state) => state.unstageChange);
-  const stageAllChanges = useGitHubRepoStore((state) => state.stageAllChanges);
-  const unstageAllChanges = useGitHubRepoStore((state) => state.unstageAllChanges);
+  // Derive staged/unstaged from pendingChanges to avoid selector re-render issues
+  const stagedChanges = useMemo(() => pendingChanges.filter((c) => c.staged), [pendingChanges]);
+  const unstagedChanges = useMemo(() => pendingChanges.filter((c) => !c.staged), [pendingChanges]);
+  const hasStagedChanges = stagedChanges.length > 0;
+
+  // Staging actions - use shallow to get multiple actions in one subscription
+  const { stageChange, unstageChange, stageAllChanges, unstageAllChanges } = useGitHubRepoStore(
+    useShallow((state) => ({
+      stageChange: state.stageChange,
+      unstageChange: state.unstageChange,
+      stageAllChanges: state.stageAllChanges,
+      unstageAllChanges: state.unstageAllChanges,
+    }))
+  );
 
   // In GitHub repo mode, default to PRs tab since local git features aren't available
   const [activeTab, setActiveTab] = useState<TabType>(isGitHubRepoMode ? 'prs' : 'changes');
