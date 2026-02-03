@@ -24,6 +24,9 @@ import {
   useGitHubRepoStore,
   selectPendingChanges,
   selectSyncStatus,
+  selectStagedChanges,
+  selectUnstagedChanges,
+  selectHasStagedChanges,
 } from '@/stores/githubRepoStore';
 import { offlineQueueService } from '@/services/github/offlineQueueService';
 import type { PendingChange } from '@/types/github-repo';
@@ -63,8 +66,17 @@ export const GitPanel: React.FC<GitPanelProps> = ({ className = '' }) => {
 
   // GitHub repo mode pending changes
   const pendingChanges = useGitHubRepoStore(selectPendingChanges);
+  const stagedChanges = useGitHubRepoStore(selectStagedChanges);
+  const unstagedChanges = useGitHubRepoStore(selectUnstagedChanges);
+  const hasStagedChanges = useGitHubRepoStore(selectHasStagedChanges);
   const syncStatus = useGitHubRepoStore(selectSyncStatus);
   const isSyncing = syncStatus === 'syncing';
+
+  // Staging actions
+  const stageChange = useGitHubRepoStore((state) => state.stageChange);
+  const unstageChange = useGitHubRepoStore((state) => state.unstageChange);
+  const stageAllChanges = useGitHubRepoStore((state) => state.stageAllChanges);
+  const unstageAllChanges = useGitHubRepoStore((state) => state.unstageAllChanges);
 
   // In GitHub repo mode, default to PRs tab since local git features aren't available
   const [activeTab, setActiveTab] = useState<TabType>(isGitHubRepoMode ? 'prs' : 'changes');
@@ -492,7 +504,7 @@ export const GitPanel: React.FC<GitPanelProps> = ({ className = '' }) => {
       <div className="flex-1 overflow-hidden flex flex-col">
         {activeTab === 'changes' ? (
           isGitHubRepoMode ? (
-            /* GitHub Repo Mode - Show pending changes */
+            /* GitHub Repo Mode - Show pending changes with staging */
             <>
               <div className="flex-1 overflow-y-auto">
                 {pendingChanges.length === 0 ? (
@@ -516,48 +528,133 @@ export const GitPanel: React.FC<GitPanelProps> = ({ className = '' }) => {
                     </p>
                   </div>
                 ) : (
-                  <ul className="divide-y divide-gray-100">
-                    {pendingChanges.map((change: PendingChange) => (
-                      <li
-                        key={change.id}
-                        className={`px-3 py-2 flex items-center gap-2 hover:bg-gray-50 cursor-pointer ${
-                          selectedPendingChange?.id === change.id
-                            ? 'bg-blue-50 border-l-2 border-blue-500'
-                            : ''
-                        }`}
-                        onClick={() => handleSelectPendingChange(change)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' || e.key === ' ') {
-                            handleSelectPendingChange(change);
-                          }
-                        }}
-                        role="button"
-                        tabIndex={0}
-                      >
-                        <span
-                          className={`w-5 h-5 flex items-center justify-center rounded text-xs font-bold ${
-                            change.action === 'create'
-                              ? 'text-green-600 bg-green-100'
-                              : change.action === 'update'
-                                ? 'text-yellow-600 bg-yellow-100'
-                                : 'text-red-600 bg-red-100'
-                          }`}
-                        >
-                          {change.action === 'create'
-                            ? '+'
-                            : change.action === 'update'
-                              ? '~'
-                              : '-'}
-                        </span>
-                        <span className="flex-1 text-sm text-gray-700 truncate" title={change.path}>
-                          {change.path}
-                        </span>
-                        <span className="text-xs text-gray-400">
-                          {new Date(change.timestamp).toLocaleTimeString()}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
+                  <div className="divide-y divide-gray-200">
+                    {/* Staged Changes Section */}
+                    {stagedChanges.length > 0 && (
+                      <div>
+                        <div className="px-3 py-2 bg-green-50 border-b border-green-200 flex items-center justify-between">
+                          <span className="text-xs font-medium text-green-700">
+                            Staged Changes ({stagedChanges.length})
+                          </span>
+                          <button
+                            onClick={() => unstageAllChanges()}
+                            className="text-xs text-green-600 hover:text-green-800"
+                          >
+                            Unstage All
+                          </button>
+                        </div>
+                        <ul className="divide-y divide-gray-100">
+                          {stagedChanges.map((change: PendingChange) => (
+                            <li
+                              key={change.id}
+                              className={`px-3 py-2 flex items-center gap-2 hover:bg-gray-50 ${
+                                selectedPendingChange?.id === change.id
+                                  ? 'bg-blue-50 border-l-2 border-blue-500'
+                                  : ''
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={true}
+                                onChange={() => unstageChange(change.id)}
+                                className="w-4 h-4 text-green-600 rounded border-gray-300 focus:ring-green-500"
+                                title="Unstage this change"
+                              />
+                              <button
+                                className="flex-1 flex items-center gap-2 text-left"
+                                onClick={() => handleSelectPendingChange(change)}
+                              >
+                                <span
+                                  className={`w-5 h-5 flex items-center justify-center rounded text-xs font-bold ${
+                                    change.action === 'create'
+                                      ? 'text-green-600 bg-green-100'
+                                      : change.action === 'update'
+                                        ? 'text-yellow-600 bg-yellow-100'
+                                        : 'text-red-600 bg-red-100'
+                                  }`}
+                                >
+                                  {change.action === 'create'
+                                    ? '+'
+                                    : change.action === 'update'
+                                      ? '~'
+                                      : '-'}
+                                </span>
+                                <span
+                                  className="flex-1 text-sm text-gray-700 truncate"
+                                  title={change.path}
+                                >
+                                  {change.path}
+                                </span>
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {/* Unstaged Changes Section */}
+                    {unstagedChanges.length > 0 && (
+                      <div>
+                        <div className="px-3 py-2 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
+                          <span className="text-xs font-medium text-gray-600">
+                            Changes ({unstagedChanges.length})
+                          </span>
+                          <button
+                            onClick={() => stageAllChanges()}
+                            className="text-xs text-blue-600 hover:text-blue-800"
+                          >
+                            Stage All
+                          </button>
+                        </div>
+                        <ul className="divide-y divide-gray-100">
+                          {unstagedChanges.map((change: PendingChange) => (
+                            <li
+                              key={change.id}
+                              className={`px-3 py-2 flex items-center gap-2 hover:bg-gray-50 ${
+                                selectedPendingChange?.id === change.id
+                                  ? 'bg-blue-50 border-l-2 border-blue-500'
+                                  : ''
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={false}
+                                onChange={() => stageChange(change.id)}
+                                className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                                title="Stage this change"
+                              />
+                              <button
+                                className="flex-1 flex items-center gap-2 text-left"
+                                onClick={() => handleSelectPendingChange(change)}
+                              >
+                                <span
+                                  className={`w-5 h-5 flex items-center justify-center rounded text-xs font-bold ${
+                                    change.action === 'create'
+                                      ? 'text-green-600 bg-green-100'
+                                      : change.action === 'update'
+                                        ? 'text-yellow-600 bg-yellow-100'
+                                        : 'text-red-600 bg-red-100'
+                                  }`}
+                                >
+                                  {change.action === 'create'
+                                    ? '+'
+                                    : change.action === 'update'
+                                      ? '~'
+                                      : '-'}
+                                </span>
+                                <span
+                                  className="flex-1 text-sm text-gray-700 truncate"
+                                  title={change.path}
+                                >
+                                  {change.path}
+                                </span>
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
 
@@ -572,8 +669,8 @@ export const GitPanel: React.FC<GitPanelProps> = ({ className = '' }) => {
                 </div>
               )}
 
-              {/* Sync section for GitHub repo mode */}
-              {pendingChanges.length > 0 && (
+              {/* Commit section for GitHub repo mode - only when there are staged changes */}
+              {hasStagedChanges && (
                 <div className="border-t border-gray-200 p-3">
                   <textarea
                     value={commitMessage}
@@ -592,7 +689,9 @@ export const GitPanel: React.FC<GitPanelProps> = ({ className = '' }) => {
                       disabled={!commitMessage.trim() || isSyncing}
                       className="flex-1 px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      {isSyncing ? 'Syncing...' : 'Commit & Push'}
+                      {isSyncing
+                        ? 'Committing...'
+                        : `Commit ${stagedChanges.length} file${stagedChanges.length !== 1 ? 's' : ''}`}
                     </button>
                   </div>
                 </div>

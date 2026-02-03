@@ -85,6 +85,12 @@ export interface GitHubRepoState {
   clearError: () => void;
   clearDetectedWorkspaces: () => void;
 
+  // Actions - Staging
+  stageChange: (changeId: string) => Promise<void>;
+  unstageChange: (changeId: string) => Promise<void>;
+  stageAllChanges: () => Promise<void>;
+  unstageAllChanges: () => Promise<void>;
+
   // Actions - Reset
   reset: () => void;
 }
@@ -334,12 +340,33 @@ export const useGitHubRepoStore = create<GitHubRepoState>()(
       },
 
       writeFile: async (path: string, content: string) => {
-        const { workspace } = get();
+        const { workspace, pendingChanges } = get();
         if (!workspace) throw new Error('No workspace open');
 
         // Get the current SHA if we have it cached
         const cached = await offlineQueueService.getCachedFile(workspace.id, path);
         const isNewFile = !cached;
+
+        // Check if content has actually changed
+        // Compare against cached content (original from GitHub) or existing pending change
+        const existingPendingChange = pendingChanges.find(
+          (c) => c.path === path && c.workspaceId === workspace.id
+        );
+
+        // If content matches the cached version (no change from original), remove any pending change
+        if (cached && content === cached.content) {
+          if (existingPendingChange) {
+            await offlineQueueService.removePendingChange(existingPendingChange.id);
+            const updatedChanges = await offlineQueueService.getPendingChanges(workspace.id);
+            set({ pendingChanges: updatedChanges });
+          }
+          return; // No change needed
+        }
+
+        // If content matches existing pending change, no update needed
+        if (existingPendingChange && content === existingPendingChange.content) {
+          return; // Already have this change queued
+        }
 
         // Create pending change (with relative path)
         const change: PendingChange = {
@@ -511,19 +538,22 @@ export const useGitHubRepoStore = create<GitHubRepoState>()(
           set({ syncStatus: 'offline' });
           return;
         }
-        if (pendingChanges.length === 0) return;
+
+        // Only commit staged changes
+        const stagedChanges = pendingChanges.filter((c) => c.staged);
+        if (stagedChanges.length === 0) return;
 
         set({ syncStatus: 'syncing' });
 
         try {
-          // Convert pending changes to file changes with full paths
-          const fileChanges: FileChange[] = pendingChanges.map((change) => ({
+          // Convert staged changes to file changes with full paths
+          const fileChanges: FileChange[] = stagedChanges.map((change) => ({
             path: getFullPath(workspace.workspacePath, change.path),
             action: change.action,
             content: change.content,
           }));
 
-          // Commit all changes at once
+          // Commit staged changes
           await githubContentsService.commitMultipleFiles(
             workspace.owner,
             workspace.repo,
@@ -532,11 +562,13 @@ export const useGitHubRepoStore = create<GitHubRepoState>()(
             workspace.branch
           );
 
-          // Clear pending changes
-          await offlineQueueService.clearPendingChanges(workspace.id);
+          // Remove only the staged changes from pending
+          for (const change of stagedChanges) {
+            await offlineQueueService.removePendingChange(change.id);
+          }
 
-          // Refresh cache with new SHAs
-          for (const change of pendingChanges) {
+          // Refresh cache with new SHAs for committed files
+          for (const change of stagedChanges) {
             if (change.action !== 'delete' && change.content) {
               const fullPath = getFullPath(workspace.workspacePath, change.path);
               const file = await githubContentsService.getFile(
@@ -555,8 +587,10 @@ export const useGitHubRepoStore = create<GitHubRepoState>()(
             }
           }
 
+          // Reload pending changes (there may be unstaged ones remaining)
+          const remainingChanges = await offlineQueueService.getPendingChanges(workspace.id);
           set({
-            pendingChanges: [],
+            pendingChanges: remainingChanges,
             syncStatus: 'idle',
           });
 
@@ -684,6 +718,68 @@ export const useGitHubRepoStore = create<GitHubRepoState>()(
         set({ detectedWorkspaces: [] });
       },
 
+      // ========================================================================
+      // Staging Actions
+      // ========================================================================
+
+      stageChange: async (changeId: string) => {
+        const { workspace, pendingChanges } = get();
+        if (!workspace) return;
+
+        const change = pendingChanges.find((c) => c.id === changeId);
+        if (!change) return;
+
+        const updatedChange: PendingChange = { ...change, staged: true };
+        await offlineQueueService.addPendingChange(updatedChange);
+
+        const updatedChanges = await offlineQueueService.getPendingChanges(workspace.id);
+        set({ pendingChanges: updatedChanges });
+      },
+
+      unstageChange: async (changeId: string) => {
+        const { workspace, pendingChanges } = get();
+        if (!workspace) return;
+
+        const change = pendingChanges.find((c) => c.id === changeId);
+        if (!change) return;
+
+        const updatedChange: PendingChange = { ...change, staged: false };
+        await offlineQueueService.addPendingChange(updatedChange);
+
+        const updatedChanges = await offlineQueueService.getPendingChanges(workspace.id);
+        set({ pendingChanges: updatedChanges });
+      },
+
+      stageAllChanges: async () => {
+        const { workspace, pendingChanges } = get();
+        if (!workspace) return;
+
+        for (const change of pendingChanges) {
+          if (!change.staged) {
+            const updatedChange: PendingChange = { ...change, staged: true };
+            await offlineQueueService.addPendingChange(updatedChange);
+          }
+        }
+
+        const updatedChanges = await offlineQueueService.getPendingChanges(workspace.id);
+        set({ pendingChanges: updatedChanges });
+      },
+
+      unstageAllChanges: async () => {
+        const { workspace, pendingChanges } = get();
+        if (!workspace) return;
+
+        for (const change of pendingChanges) {
+          if (change.staged) {
+            const updatedChange: PendingChange = { ...change, staged: false };
+            await offlineQueueService.addPendingChange(updatedChange);
+          }
+        }
+
+        const updatedChanges = await offlineQueueService.getPendingChanges(workspace.id);
+        set({ pendingChanges: updatedChanges });
+      },
+
       reset: () => {
         set({
           ...initialState,
@@ -742,3 +838,19 @@ export const selectWorkspaceBranch = (state: GitHubRepoState) => {
 export const selectWorkspacePath = (state: GitHubRepoState) => {
   return state.workspace?.workspacePath || '';
 };
+
+// Staging selectors
+export const selectStagedChanges = (state: GitHubRepoState) =>
+  state.pendingChanges.filter((c) => c.staged);
+
+export const selectUnstagedChanges = (state: GitHubRepoState) =>
+  state.pendingChanges.filter((c) => !c.staged);
+
+export const selectStagedChangeCount = (state: GitHubRepoState) =>
+  state.pendingChanges.filter((c) => c.staged).length;
+
+export const selectUnstagedChangeCount = (state: GitHubRepoState) =>
+  state.pendingChanges.filter((c) => !c.staged).length;
+
+export const selectHasStagedChanges = (state: GitHubRepoState) =>
+  state.pendingChanges.some((c) => c.staged);

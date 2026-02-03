@@ -36,6 +36,7 @@ export interface PendingChange {
   content?: string;
   timestamp: Date;
   baseSha?: string; // For updates, the SHA of the file when we read it
+  staged?: boolean; // Whether this change is staged for commit
 }
 
 export interface FileCache {
