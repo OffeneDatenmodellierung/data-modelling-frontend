@@ -867,8 +867,25 @@ const ModelEditor: React.FC = () => {
             </div>
           )}
 
-          {selectedDomainId && (
-            <>
+          {/* Spacer to push right-side items */}
+          <div className="flex-1" />
+
+          {/* Right side controls */}
+          <div className="flex items-center gap-2">
+            {/* Git Status Indicator (works in both Electron and GitHub repo mode) */}
+            <GitStatusIndicator />
+
+            {/* GitHub User Menu (Browser mode only) */}
+            {!isElectron() && <GitHubUserMenu />}
+
+            {/* Validation Warnings */}
+            <ValidationWarnings />
+
+            {/* Save/Exit Controls (Online indicator, pending count, Sync/Commit buttons, Exit) */}
+            <SaveExitControls />
+
+            {/* Refresh button - before Help/Settings */}
+            {selectedDomainId && (
               <button
                 onClick={() => {
                   // Force a re-render by incrementing the refresh key
@@ -893,29 +910,7 @@ const ModelEditor: React.FC = () => {
                 </svg>
                 Refresh
               </button>
-              <button
-                onClick={() => setShowSharedResourcePicker(true)}
-                className="px-3 py-1.5 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 whitespace-nowrap"
-                title="Share resources from other domains"
-              >
-                Share Resources
-              </button>
-            </>
-          )}
-
-          {/* Spacer to push right-side items */}
-          <div className="flex-1" />
-
-          {/* Git Status, GitHub, Settings, History, and Save/Exit buttons */}
-          <div className="flex items-center gap-2">
-            {/* Git Status Indicator (works in both Electron and GitHub repo mode) */}
-            <GitStatusIndicator />
-
-            {/* GitHub User Menu (Browser mode only) */}
-            {!isElectron() && <GitHubUserMenu />}
-
-            {/* Validation Warnings */}
-            <ValidationWarnings />
+            )}
 
             {/* Help Button */}
             <HelpButton />
@@ -936,14 +931,11 @@ const ModelEditor: React.FC = () => {
                 History
               </button>
             )}
-
-            {/* Save/Exit Controls - moved to top row */}
-            <SaveExitControls />
           </div>
         </div>
       </div>
 
-      {/* Secondary toolbar: Domain, View mode, Filter, BPMN links */}
+      {/* Secondary toolbar: Domain, View mode, Filter, Share Resources, BPMN links */}
       <div className="bg-gray-50 border-b border-gray-200 px-4 py-2 flex items-center gap-4">
         <DomainSelector workspaceId={workspaceId ?? ''} />
         {selectedDomainId && (
@@ -955,6 +947,13 @@ const ModelEditor: React.FC = () => {
                 placeholder="Filter by tags (e.g., env:production, product:food)"
               />
             </div>
+            <button
+              onClick={() => setShowSharedResourcePicker(true)}
+              className="px-3 py-1.5 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 whitespace-nowrap"
+              title="Share resources from other domains"
+            >
+              Share Resources
+            </button>
             <BPMNProcessLinks domainId={selectedDomainId} />
           </>
         )}
