@@ -32,6 +32,8 @@ export interface GitHubRepoState {
 
   // Branch tracking
   previousBranch: string | null;
+  /** Counter that increments on branch switch - used to trigger canvas reload */
+  branchSwitchCounter: number;
 
   // Sync state
   syncStatus: SyncStatus;
@@ -131,6 +133,7 @@ function getFullPath(workspacePath: string, relativePath: string): string {
 const initialState = {
   workspace: null as GitHubRepoWorkspace | null,
   previousBranch: null as string | null,
+  branchSwitchCounter: 0,
   syncStatus: 'idle' as SyncStatus,
   syncError: null as SyncError | null,
   pendingChanges: [] as PendingChange[],
@@ -657,7 +660,7 @@ export const useGitHubRepoStore = create<GitHubRepoState>()(
       // ========================================================================
 
       switchBranch: async (branch: string, storePrevious: boolean = false) => {
-        const { workspace } = get();
+        const { workspace, branchSwitchCounter } = get();
         if (!workspace) throw new Error('No workspace open');
 
         // Store current branch before switching (for switch back functionality)
@@ -673,10 +676,13 @@ export const useGitHubRepoStore = create<GitHubRepoState>()(
           workspace.workspacePath,
           workspace.workspaceName
         );
+
+        // Increment branch switch counter to trigger canvas reload
+        set({ branchSwitchCounter: branchSwitchCounter + 1 });
       },
 
       switchBack: async () => {
-        const { workspace, previousBranch } = get();
+        const { workspace, previousBranch, branchSwitchCounter } = get();
         if (!workspace || !previousBranch) return;
 
         // Clear previous branch before switching
@@ -690,6 +696,9 @@ export const useGitHubRepoStore = create<GitHubRepoState>()(
           workspace.workspacePath,
           workspace.workspaceName
         );
+
+        // Increment branch switch counter to trigger canvas reload
+        set({ branchSwitchCounter: branchSwitchCounter + 1 });
       },
 
       createBranch: async (name: string, fromBranch?: string) => {
@@ -896,6 +905,8 @@ export const selectWorkspaceBranch = (state: GitHubRepoState) => {
 export const selectPreviousBranch = (state: GitHubRepoState) => state.previousBranch;
 
 export const selectCanSwitchBack = (state: GitHubRepoState) => state.previousBranch !== null;
+
+export const selectBranchSwitchCounter = (state: GitHubRepoState) => state.branchSwitchCounter;
 
 export const selectWorkspacePath = (state: GitHubRepoState) => {
   return state.workspace?.workspacePath || '';

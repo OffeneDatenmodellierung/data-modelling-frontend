@@ -812,6 +812,123 @@ const ModelEditor: React.FC = () => {
     isGitHubRepoInitialized,
   ]);
 
+  // Watch for branch switches in GitHub repo mode and reload workspace content
+  const branchSwitchCounter = useGitHubRepoStore((state) => state.branchSwitchCounter);
+  const previousBranchSwitchCounterRef = React.useRef(branchSwitchCounter);
+
+  useEffect(() => {
+    // Skip initial render and only react to actual changes
+    if (previousBranchSwitchCounterRef.current === branchSwitchCounter) {
+      return;
+    }
+    previousBranchSwitchCounterRef.current = branchSwitchCounter;
+
+    // Only reload if we're in GitHub repo mode
+    if (!workspaceId?.startsWith('github/')) {
+      return;
+    }
+
+    const reloadWorkspaceContent = async () => {
+      const githubRepoState = useGitHubRepoStore.getState();
+      const { workspace: githubWorkspace } = githubRepoState;
+
+      if (!githubWorkspace) {
+        console.log('[ModelEditor] No GitHub workspace to reload');
+        return;
+      }
+
+      console.log('[ModelEditor] Branch switched, reloading workspace content...', {
+        branch: githubWorkspace.branch,
+        branchSwitchCounter,
+      });
+
+      setIsLoading(true);
+
+      try {
+        // Import the V2 loader for loading workspace from GitHub files
+        const { WorkspaceV2Loader } = await import('@/services/storage/workspaceV2Loader');
+        const { githubContentsService } = await import('@/services/github/githubContentsService');
+
+        // Get the list of files in the workspace
+        const files = await githubContentsService.getWorkspaceFiles(
+          githubWorkspace.owner,
+          githubWorkspace.repo,
+          githubWorkspace.workspacePath,
+          githubWorkspace.branch
+        );
+
+        // Load the content of each file
+        const fileContents: Array<{ name: string; content: string }> = [];
+        for (const filePath of files) {
+          try {
+            const content = await githubRepoState.readFile(filePath);
+            const fileName = filePath.split('/').pop() || filePath;
+            fileContents.push({ name: fileName, content });
+          } catch (err) {
+            console.warn(`[ModelEditor] Failed to read file ${filePath}:`, err);
+          }
+        }
+
+        // Use the V2 loader to parse the workspace content
+        const loadedWorkspace = (await WorkspaceV2Loader.loadFromStringFiles(fileContents)) as any;
+
+        console.log('[ModelEditor] Reloaded workspace after branch switch:', {
+          name: loadedWorkspace.name,
+          tablesCount: loadedWorkspace.tables?.length || 0,
+          domainsCount: loadedWorkspace.domains?.length || 0,
+        });
+
+        // Set the loaded data into the model store
+        if (loadedWorkspace.tables) {
+          setTables(loadedWorkspace.tables);
+        }
+        if (loadedWorkspace.relationships) {
+          setRelationships(loadedWorkspace.relationships);
+        }
+        if (loadedWorkspace.systems) {
+          setSystems(loadedWorkspace.systems);
+        }
+        if (loadedWorkspace.products) {
+          setProducts(loadedWorkspace.products);
+        }
+        if (loadedWorkspace.assets) {
+          setComputeAssets(loadedWorkspace.assets);
+        }
+        if (loadedWorkspace.domains && loadedWorkspace.domains.length > 0) {
+          setDomains(loadedWorkspace.domains);
+        }
+
+        // Increment canvas refresh key to force re-render
+        setCanvasRefreshKey((prev) => prev + 1);
+
+        addToast({
+          type: 'info',
+          message: `Switched to branch: ${githubWorkspace.branch}`,
+        });
+      } catch (error) {
+        console.error('[ModelEditor] Failed to reload workspace after branch switch:', error);
+        addToast({
+          type: 'error',
+          message: 'Failed to reload workspace content',
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    reloadWorkspaceContent();
+  }, [
+    branchSwitchCounter,
+    workspaceId,
+    setTables,
+    setRelationships,
+    setSystems,
+    setProducts,
+    setComputeAssets,
+    setDomains,
+    addToast,
+  ]);
+
   if (isLoading || isInitializingGitHubRepo) {
     return (
       <div className="flex items-center justify-center h-screen">
