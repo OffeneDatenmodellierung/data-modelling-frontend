@@ -131,11 +131,15 @@ export const GitHubPRDetailPanel: React.FC<GitHubPRDetailPanelProps> = ({
   ]);
 
   // Load details when PR changes
+  // Note: We intentionally exclude loadDetails from dependencies to prevent infinite loops.
+  // The loadDetails callback is recreated when connection changes, but we only want to
+  // trigger loading when selectedPR.number actually changes.
   useEffect(() => {
     if (selectedPR) {
       loadDetails();
     }
-  }, [selectedPR?.number, loadDetails]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedPR?.number]);
 
   // Submit a comment
   const handleSubmitComment = async () => {
