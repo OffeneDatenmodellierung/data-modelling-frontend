@@ -72,7 +72,8 @@ export const GitPanel: React.FC<GitPanelProps> = ({ className = '' }) => {
   const isGitHubAuthenticated = useGitHubStore(selectIsAuthenticated);
 
   // Check if we're in GitHub repo mode (opened from URL)
-  const githubRepoWorkspace = useGitHubRepoStore((state) => state.workspace);
+  // Use useShallow to prevent unnecessary re-renders when workspace object reference changes
+  const githubRepoWorkspace = useGitHubRepoStore(useShallow((state) => state.workspace));
   const isGitHubRepoMode = githubRepoWorkspace !== null;
 
   // GitHub repo mode pending changes - use shallow comparison for array

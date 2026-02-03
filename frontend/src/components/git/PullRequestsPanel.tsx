@@ -61,16 +61,24 @@ export const PullRequestsPanel: React.FC<PullRequestsPanelProps> = ({ className 
   );
 
   // Also check githubRepoStore for connection info (used when opening from URL)
-  const repoWorkspace = useGitHubRepoStore(useShallow((state) => state.workspace));
+  // Extract primitive values to avoid object reference issues
+  const repoWorkspace = useGitHubRepoStore(
+    useShallow((state) => ({
+      owner: state.workspace?.owner ?? null,
+      repo: state.workspace?.repo ?? null,
+      branch: state.workspace?.branch ?? null,
+      hasWorkspace: state.workspace !== null,
+    }))
+  );
 
   // Check authentication from both store and auth service directly
   // (auth service may have a valid token before store is initialized)
   const isAuthenticated = isAuthenticatedFromStore || githubAuth.isAuthenticated();
 
-  // Use connection from either store
+  // Use connection from either store - memoize based on primitive values
   const connection = useMemo(() => {
     if (connectionFromStore) return connectionFromStore;
-    if (repoWorkspace) {
+    if (repoWorkspace.hasWorkspace && repoWorkspace.owner && repoWorkspace.repo) {
       return {
         owner: repoWorkspace.owner,
         repo: repoWorkspace.repo,
@@ -78,9 +86,15 @@ export const PullRequestsPanel: React.FC<PullRequestsPanelProps> = ({ className 
       };
     }
     return null;
-  }, [connectionFromStore, repoWorkspace]);
+  }, [
+    connectionFromStore,
+    repoWorkspace.hasWorkspace,
+    repoWorkspace.owner,
+    repoWorkspace.repo,
+    repoWorkspace.branch,
+  ]);
 
-  const isConnected = isConnectedFromStore || repoWorkspace !== null;
+  const isConnected = isConnectedFromStore || repoWorkspace.hasWorkspace;
 
   const [filter, setFilter] = useState<PRFilter>('open');
 
