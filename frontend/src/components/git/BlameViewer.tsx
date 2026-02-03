@@ -325,6 +325,7 @@ export const BlameDialog: React.FC<BlameDialogProps> = ({ isOpen, filePath, onCl
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
+      {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- Modal backdrop */}
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
       <div className="relative bg-white rounded-lg shadow-xl w-full max-w-4xl mx-4 h-[80vh] flex flex-col">
         <BlameViewer filePath={filePath} onClose={onClose} className="h-full" />

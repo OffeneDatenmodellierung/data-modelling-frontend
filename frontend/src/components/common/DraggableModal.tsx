@@ -253,6 +253,7 @@ export const DraggableModal: React.FC<DraggableModalProps> = ({
       )}
 
       {/* Draggable Modal */}
+      {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- Modal content, click stops propagation */}
       <div
         ref={modalRef}
         className={`fixed bg-white rounded-lg shadow-2xl ${dimensions ? '' : sizeClasses[size]} ${dimensions ? '' : 'max-h-[90vh]'} flex flex-col pointer-events-auto`}

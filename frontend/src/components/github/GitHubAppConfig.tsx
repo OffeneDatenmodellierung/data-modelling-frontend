@@ -150,10 +150,14 @@ export const GitHubAppConfigManager: React.FC<GitHubAppConfigProps> = ({
       {isAdding && (
         <div className="p-4 bg-white border border-gray-200 rounded-md space-y-3">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label
+              htmlFor="github-app-name"
+              className="block text-sm font-medium text-gray-700 mb-1"
+            >
               App Name <span className="text-red-500">*</span>
             </label>
             <input
+              id="github-app-name"
               type="text"
               value={newConfig.appName || ''}
               onChange={(e) => setNewConfig({ ...newConfig, appName: e.target.value })}
@@ -163,10 +167,14 @@ export const GitHubAppConfigManager: React.FC<GitHubAppConfigProps> = ({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label
+              htmlFor="github-client-id"
+              className="block text-sm font-medium text-gray-700 mb-1"
+            >
               Client ID <span className="text-red-500">*</span>
             </label>
             <input
+              id="github-client-id"
               type="text"
               value={newConfig.clientId || ''}
               onChange={(e) => setNewConfig({ ...newConfig, clientId: e.target.value })}
@@ -179,10 +187,14 @@ export const GitHubAppConfigManager: React.FC<GitHubAppConfigProps> = ({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label
+              htmlFor="github-app-description"
+              className="block text-sm font-medium text-gray-700 mb-1"
+            >
               Description (optional)
             </label>
             <input
+              id="github-app-description"
               type="text"
               value={newConfig.description || ''}
               onChange={(e) => setNewConfig({ ...newConfig, description: e.target.value })}

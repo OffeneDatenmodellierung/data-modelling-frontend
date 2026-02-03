@@ -444,12 +444,15 @@ export const DatabaseSettings: React.FC<DatabaseSettingsProps> = ({
 
             <div className="flex items-center justify-between">
               <div>
-                <label className="text-sm font-medium text-gray-700">Auto-sync on load</label>
+                <label htmlFor="db-auto-sync" className="text-sm font-medium text-gray-700">
+                  Auto-sync on load
+                </label>
                 <p className="text-xs text-gray-500">
                   Automatically sync YAML files to database when opening workspace
                 </p>
               </div>
               <input
+                id="db-auto-sync"
                 type="checkbox"
                 checked={config.sync.auto_sync}
                 onChange={(e) =>
@@ -463,10 +466,13 @@ export const DatabaseSettings: React.FC<DatabaseSettingsProps> = ({
 
             <div className="flex items-center justify-between">
               <div>
-                <label className="text-sm font-medium text-gray-700">Sync on save</label>
+                <label htmlFor="db-sync-on-save" className="text-sm font-medium text-gray-700">
+                  Sync on save
+                </label>
                 <p className="text-xs text-gray-500">Sync changes to database when saving</p>
               </div>
               <input
+                id="db-sync-on-save"
                 type="checkbox"
                 checked={config.sync.sync_on_save}
                 onChange={(e) =>
@@ -480,12 +486,15 @@ export const DatabaseSettings: React.FC<DatabaseSettingsProps> = ({
 
             <div className="flex items-center justify-between">
               <div>
-                <label className="text-sm font-medium text-gray-700">Watch for changes</label>
+                <label htmlFor="db-watch-changes" className="text-sm font-medium text-gray-700">
+                  Watch for changes
+                </label>
                 <p className="text-xs text-gray-500">
                   Automatically sync when files change on disk
                 </p>
               </div>
               <input
+                id="db-watch-changes"
                 type="checkbox"
                 checked={config.sync.watch}
                 onChange={(e) =>
@@ -529,10 +538,13 @@ export const DatabaseSettings: React.FC<DatabaseSettingsProps> = ({
 
             <div className="flex items-center justify-between">
               <div>
-                <label className="text-sm font-medium text-gray-700">Enable Git hooks</label>
+                <label htmlFor="db-git-hooks" className="text-sm font-medium text-gray-700">
+                  Enable Git hooks
+                </label>
                 <p className="text-xs text-gray-500">Automatically sync on Git operations</p>
               </div>
               <input
+                id="db-git-hooks"
                 type="checkbox"
                 checked={config.git.hooks_enabled}
                 onChange={(e) =>
@@ -547,8 +559,11 @@ export const DatabaseSettings: React.FC<DatabaseSettingsProps> = ({
             {config.git.hooks_enabled && (
               <div className="ml-4 space-y-3 border-l-2 border-gray-200 pl-4">
                 <div className="flex items-center justify-between">
-                  <label className="text-sm text-gray-600">Pre-commit (export to YAML)</label>
+                  <label htmlFor="db-pre-commit" className="text-sm text-gray-600">
+                    Pre-commit (export to YAML)
+                  </label>
                   <input
+                    id="db-pre-commit"
                     type="checkbox"
                     checked={config.git.pre_commit}
                     onChange={(e) =>
@@ -561,8 +576,11 @@ export const DatabaseSettings: React.FC<DatabaseSettingsProps> = ({
                 </div>
 
                 <div className="flex items-center justify-between">
-                  <label className="text-sm text-gray-600">Post-checkout (sync to DB)</label>
+                  <label htmlFor="db-post-checkout" className="text-sm text-gray-600">
+                    Post-checkout (sync to DB)
+                  </label>
                   <input
+                    id="db-post-checkout"
                     type="checkbox"
                     checked={config.git.post_checkout}
                     onChange={(e) =>
@@ -575,8 +593,11 @@ export const DatabaseSettings: React.FC<DatabaseSettingsProps> = ({
                 </div>
 
                 <div className="flex items-center justify-between">
-                  <label className="text-sm text-gray-600">Post-merge (sync to DB)</label>
+                  <label htmlFor="db-post-merge" className="text-sm text-gray-600">
+                    Post-merge (sync to DB)
+                  </label>
                   <input
+                    id="db-post-merge"
                     type="checkbox"
                     checked={config.git.post_merge}
                     onChange={(e) =>

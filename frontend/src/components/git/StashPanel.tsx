@@ -200,6 +200,7 @@ export const StashPanel: React.FC<StashPanelProps> = ({ className = '' }) => {
       {/* Save Stash Dialog */}
       {showSaveDialog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
+          {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- Modal backdrop, keyboard handled by Escape */}
           <div className="absolute inset-0 bg-black/50" onClick={() => setShowSaveDialog(false)} />
           <div className="relative bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
             <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
@@ -223,10 +224,14 @@ export const StashPanel: React.FC<StashPanelProps> = ({ className = '' }) => {
                 Save your current changes to a stash and restore a clean working directory.
               </p>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label
+                  htmlFor="stash-message"
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                >
                   Message (optional)
                 </label>
                 <input
+                  id="stash-message"
                   type="text"
                   value={stashMessage}
                   onChange={(e) => setStashMessage(e.target.value)}
@@ -234,8 +239,9 @@ export const StashPanel: React.FC<StashPanelProps> = ({ className = '' }) => {
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
-              <label className="flex items-center gap-2">
+              <label htmlFor="include-untracked" className="flex items-center gap-2">
                 <input
+                  id="include-untracked"
                   type="checkbox"
                   checked={includeUntracked}
                   onChange={(e) => setIncludeUntracked(e.target.checked)}
@@ -243,8 +249,9 @@ export const StashPanel: React.FC<StashPanelProps> = ({ className = '' }) => {
                 />
                 <span className="text-sm text-gray-700">Include untracked files</span>
               </label>
-              <label className="flex items-center gap-2">
+              <label htmlFor="keep-index" className="flex items-center gap-2">
                 <input
+                  id="keep-index"
                   type="checkbox"
                   checked={keepIndex}
                   onChange={(e) => setKeepIndex(e.target.checked)}
@@ -275,6 +282,7 @@ export const StashPanel: React.FC<StashPanelProps> = ({ className = '' }) => {
       {/* Delete Stash Confirmation */}
       {showDeleteConfirm !== null && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
+          {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- Modal backdrop */}
           <div
             className="absolute inset-0 bg-black/50"
             onClick={() => setShowDeleteConfirm(null)}
@@ -325,6 +333,7 @@ export const StashPanel: React.FC<StashPanelProps> = ({ className = '' }) => {
       {/* Clear All Stashes Confirmation */}
       {showClearConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
+          {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- Modal backdrop */}
           <div
             className="absolute inset-0 bg-black/50"
             onClick={() => setShowClearConfirm(false)}
@@ -402,6 +411,9 @@ const StashItem: React.FC<StashItemProps> = ({
     <div
       className={`px-3 py-2 hover:bg-gray-50 cursor-pointer transition-colors ${isSelected ? 'bg-blue-50' : ''}`}
       onClick={onView}
+      onKeyDown={(e) => e.key === 'Enter' && onView()}
+      role="button"
+      tabIndex={0}
     >
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
@@ -432,6 +444,7 @@ const StashItem: React.FC<StashItemProps> = ({
           </button>
           {showMenu && (
             <>
+              {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- Menu backdrop */}
               <div
                 className="fixed inset-0 z-10"
                 onClick={(e) => {

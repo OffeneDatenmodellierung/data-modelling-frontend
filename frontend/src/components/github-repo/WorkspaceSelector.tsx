@@ -439,10 +439,14 @@ export const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = ({
 
             <div className="space-y-3">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label
+                  htmlFor="new-workspace-path"
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                >
                   Workspace folder (leave empty for root)
                 </label>
                 <input
+                  id="new-workspace-path"
                   type="text"
                   value={newWorkspacePath}
                   onChange={(e) => setNewWorkspacePath(e.target.value)}
@@ -451,10 +455,14 @@ export const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = ({
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label
+                  htmlFor="new-workspace-name"
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                >
                   Workspace name
                 </label>
                 <input
+                  id="new-workspace-name"
                   type="text"
                   value={newWorkspaceName}
                   onChange={(e) => setNewWorkspaceName(e.target.value)}
@@ -679,10 +687,14 @@ export const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = ({
           ) : (
             <div className="space-y-3 p-3 bg-gray-50 rounded-lg">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label
+                  htmlFor="create-workspace-path"
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                >
                   Workspace folder
                 </label>
                 <input
+                  id="create-workspace-path"
                   type="text"
                   value={newWorkspacePath}
                   onChange={(e) => setNewWorkspacePath(e.target.value)}
@@ -691,10 +703,14 @@ export const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = ({
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label
+                  htmlFor="create-workspace-name"
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                >
                   Workspace name
                 </label>
                 <input
+                  id="create-workspace-name"
                   type="text"
                   value={newWorkspaceName}
                   onChange={(e) => setNewWorkspaceName(e.target.value)}

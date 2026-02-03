@@ -1297,7 +1297,7 @@ export const TableEditor: React.FC<TableEditorProps> = ({ tableId, workspaceId, 
 
         <div>
           <div className="flex items-center justify-between mb-1">
-            <label className="block text-sm font-medium text-gray-700">Columns</label>
+            <span className="block text-sm font-medium text-gray-700">Columns</span>
             <button
               onClick={handleAddColumn}
               className="px-2 py-0.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -1372,7 +1372,7 @@ export const TableEditor: React.FC<TableEditorProps> = ({ tableId, workspaceId, 
                     </button>
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Columns</label>
+                    <span className="block text-xs font-medium text-gray-700 mb-1">Columns</span>
                     <div className="space-y-1 max-h-32 overflow-y-auto border border-gray-200 rounded p-2 bg-gray-50">
                       {columns.map((column) => (
                         <label

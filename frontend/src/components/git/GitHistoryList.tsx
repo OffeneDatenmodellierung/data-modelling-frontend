@@ -42,6 +42,9 @@ export const GitHistoryList: React.FC<GitHistoryListProps> = ({
           <div
             key={commit.hash}
             onClick={() => handleCommitClick(commit)}
+            onKeyDown={(e) => e.key === 'Enter' && handleCommitClick(commit)}
+            role="button"
+            tabIndex={0}
             className={`px-3 py-2.5 cursor-pointer hover:bg-gray-50 ${
               isSelected ? 'bg-blue-50' : ''
             }`}

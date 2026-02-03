@@ -213,8 +213,11 @@ export const PRListPanel: React.FC<PRListPanelProps> = ({ className = '', onSele
         {showFilters && (
           <div className="mt-2 p-2 bg-gray-100 rounded-md space-y-2">
             <div className="flex items-center gap-2">
-              <label className="text-xs text-gray-600">Sort:</label>
+              <label htmlFor="pr-sort-field" className="text-xs text-gray-600">
+                Sort:
+              </label>
               <select
+                id="pr-sort-field"
                 value={sortField}
                 onChange={(e) => setSortField(e.target.value as SortField)}
                 className="flex-1 text-xs border border-gray-300 rounded px-2 py-1"

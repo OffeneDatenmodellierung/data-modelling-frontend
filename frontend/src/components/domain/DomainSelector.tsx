@@ -324,6 +324,9 @@ export const DomainSelector: React.FC<DomainSelectorProps> = ({ workspaceId }) =
                         isSelected ? 'bg-blue-50' : ''
                       }`}
                       onClick={() => handleSelectDomain(domain.id)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleSelectDomain(domain.id)}
+                      role="button"
+                      tabIndex={0}
                     >
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">

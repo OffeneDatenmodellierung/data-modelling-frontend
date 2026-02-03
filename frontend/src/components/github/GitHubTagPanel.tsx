@@ -452,8 +452,14 @@ const CreateTagDialog: React.FC<CreateTagDialogProps> = ({ onClose, onCreated })
           {error && <div className="p-3 bg-red-50 text-red-700 text-sm rounded-lg">{error}</div>}
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Tag name</label>
+            <label
+              htmlFor="github-tag-name"
+              className="block text-sm font-medium text-gray-700 mb-1"
+            >
+              Tag name
+            </label>
             <input
+              id="github-tag-name"
               type="text"
               value={tagName}
               onChange={(e) => setTagName(e.target.value)}
@@ -463,8 +469,14 @@ const CreateTagDialog: React.FC<CreateTagDialogProps> = ({ onClose, onCreated })
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Target commit</label>
+            <label
+              htmlFor="github-tag-target"
+              className="block text-sm font-medium text-gray-700 mb-1"
+            >
+              Target commit
+            </label>
             <input
+              id="github-tag-target"
               type="text"
               value={targetSha}
               onChange={(e) => setTargetSha(e.target.value)}
@@ -491,8 +503,14 @@ const CreateTagDialog: React.FC<CreateTagDialogProps> = ({ onClose, onCreated })
 
           {isAnnotated && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Message</label>
+              <label
+                htmlFor="github-tag-message"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
+                Message
+              </label>
               <textarea
+                id="github-tag-message"
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 placeholder="Tag message..."

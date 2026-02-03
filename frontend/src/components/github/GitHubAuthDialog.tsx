@@ -149,6 +149,7 @@ export const GitHubAuthDialog: React.FC<GitHubAuthDialogProps> = ({ className = 
   return (
     <div className={`fixed inset-0 z-50 flex items-center justify-center ${className}`}>
       {/* Backdrop */}
+      {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- Modal backdrop */}
       <div className="absolute inset-0 bg-black/50" onClick={handleClose} />
 
       {/* Dialog */}
@@ -483,9 +484,9 @@ export const GitHubAuthDialog: React.FC<GitHubAuthDialogProps> = ({ className = 
 
               {/* App Selection */}
               <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <span className="block text-sm font-medium text-gray-700 mb-2">
                   Select GitHub App
-                </label>
+                </span>
                 <div className="space-y-2">
                   {availableApps.map((app) => (
                     <label

@@ -125,6 +125,7 @@ export const DecisionWorkflow: React.FC<DecisionWorkflowProps> = ({
           return (
             <React.Fragment key={status}>
               {/* Status Node */}
+              {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions -- Hover container for status node */}
               <div
                 className="flex flex-col items-center"
                 onMouseEnter={() => canTransition && setHoveredStatus(status)}

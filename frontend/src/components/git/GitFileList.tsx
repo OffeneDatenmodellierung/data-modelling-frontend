@@ -63,6 +63,9 @@ export const GitFileList: React.FC<GitFileListProps> = ({ files, selectedFile, o
               <div
                 key={file.path}
                 onClick={() => handleFileClick(file.path)}
+                onKeyDown={(e) => e.key === 'Enter' && handleFileClick(file.path)}
+                role="button"
+                tabIndex={0}
                 className={`flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-gray-50 group ${
                   isSelected ? 'bg-blue-50' : ''
                 }`}

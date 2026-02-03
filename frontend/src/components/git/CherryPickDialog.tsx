@@ -63,6 +63,7 @@ export const CherryPickDialog: React.FC<CherryPickDialogProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
+      {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- Modal backdrop */}
       <div
         className="absolute inset-0 bg-black/50"
         onClick={() => !hasConflicts && onOpenChange(false)}

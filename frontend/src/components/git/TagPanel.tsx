@@ -237,6 +237,7 @@ export const TagPanel: React.FC<TagPanelProps> = ({ className = '' }) => {
       {/* Create Tag Dialog */}
       {showCreateDialog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
+          {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- Modal backdrop */}
           <div
             className="absolute inset-0 bg-black/50"
             onClick={() => setShowCreateDialog(false)}
@@ -260,10 +261,11 @@ export const TagPanel: React.FC<TagPanelProps> = ({ className = '' }) => {
             </div>
             <div className="p-4 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="tag-name" className="block text-sm font-medium text-gray-700 mb-1">
                   Tag Name <span className="text-red-500">*</span>
                 </label>
                 <input
+                  id="tag-name"
                   type="text"
                   value={tagName}
                   onChange={(e) => setTagName(e.target.value)}
@@ -277,8 +279,9 @@ export const TagPanel: React.FC<TagPanelProps> = ({ className = '' }) => {
                 </p>
               </div>
 
-              <label className="flex items-center gap-2">
+              <label htmlFor="create-annotated" className="flex items-center gap-2">
                 <input
+                  id="create-annotated"
                   type="checkbox"
                   checked={createAnnotated}
                   onChange={(e) => setCreateAnnotated(e.target.checked)}
@@ -289,8 +292,14 @@ export const TagPanel: React.FC<TagPanelProps> = ({ className = '' }) => {
 
               {createAnnotated && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Message</label>
+                  <label
+                    htmlFor="tag-message"
+                    className="block text-sm font-medium text-gray-700 mb-1"
+                  >
+                    Message
+                  </label>
                   <textarea
+                    id="tag-message"
                     value={tagMessage}
                     onChange={(e) => setTagMessage(e.target.value)}
                     placeholder="Release notes or description..."
@@ -329,6 +338,7 @@ export const TagPanel: React.FC<TagPanelProps> = ({ className = '' }) => {
       {/* Delete Tag Confirmation */}
       {showDeleteConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
+          {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- Modal backdrop */}
           <div
             className="absolute inset-0 bg-black/50"
             onClick={() => setShowDeleteConfirm(null)}
@@ -409,6 +419,9 @@ const TagItem: React.FC<TagItemProps> = ({
     <div
       className={`px-3 py-2 hover:bg-gray-50 cursor-pointer transition-colors ${isSelected ? 'bg-blue-50' : ''}`}
       onClick={onSelect}
+      onKeyDown={(e) => e.key === 'Enter' && onSelect()}
+      role="button"
+      tabIndex={0}
     >
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
@@ -449,6 +462,7 @@ const TagItem: React.FC<TagItemProps> = ({
           </button>
           {showMenu && (
             <>
+              {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- Menu backdrop */}
               <div
                 className="fixed inset-0 z-10"
                 onClick={(e) => {

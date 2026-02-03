@@ -125,7 +125,7 @@ export const PRReviewSubmitDialog: React.FC<PRReviewSubmitDialogProps> = ({
 
         {/* Review event selection */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Review Action</label>
+          <span className="block text-sm font-medium text-gray-700 mb-2">Review Action</span>
           <div className="space-y-2">
             <label className="flex items-start gap-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
               <input

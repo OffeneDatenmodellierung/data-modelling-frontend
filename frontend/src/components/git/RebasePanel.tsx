@@ -121,6 +121,7 @@ export const RebasePanel: React.FC<RebasePanelProps> = ({ className = '' }) => {
       {/* Start Rebase Dialog */}
       {showStartDialog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
+          {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- Modal backdrop */}
           <div className="absolute inset-0 bg-black/50" onClick={() => setShowStartDialog(false)} />
           <div className="relative bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
             <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
@@ -161,8 +162,14 @@ export const RebasePanel: React.FC<RebasePanelProps> = ({ className = '' }) => {
               </p>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Rebase onto</label>
+                <label
+                  htmlFor="rebase-target-branch"
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                >
+                  Rebase onto
+                </label>
                 <select
+                  id="rebase-target-branch"
                   value={upstream}
                   onChange={(e) => setUpstream(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"

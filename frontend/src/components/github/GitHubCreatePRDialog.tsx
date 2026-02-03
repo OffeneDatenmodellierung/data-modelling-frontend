@@ -125,6 +125,7 @@ export const GitHubCreatePRDialog: React.FC<GitHubCreatePRDialogProps> = ({
   return (
     <div className={`fixed inset-0 z-50 flex items-center justify-center ${className}`}>
       {/* Backdrop */}
+      {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- Modal backdrop */}
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
 
       {/* Dialog */}
@@ -150,8 +151,14 @@ export const GitHubCreatePRDialog: React.FC<GitHubCreatePRDialogProps> = ({
           <div className="mb-4 flex items-center gap-2">
             {/* Head branch */}
             <div className="flex-1">
-              <label className="block text-xs font-medium text-gray-700 mb-1">From</label>
+              <label
+                htmlFor="pr-head-branch"
+                className="block text-xs font-medium text-gray-700 mb-1"
+              >
+                From
+              </label>
               <select
+                id="pr-head-branch"
                 value={headBranch}
                 onChange={(e) => setHeadBranch(e.target.value)}
                 disabled={isLoadingBranches}
@@ -185,8 +192,14 @@ export const GitHubCreatePRDialog: React.FC<GitHubCreatePRDialogProps> = ({
 
             {/* Base branch */}
             <div className="flex-1">
-              <label className="block text-xs font-medium text-gray-700 mb-1">Into</label>
+              <label
+                htmlFor="pr-base-branch"
+                className="block text-xs font-medium text-gray-700 mb-1"
+              >
+                Into
+              </label>
               <select
+                id="pr-base-branch"
                 value={baseBranch}
                 onChange={(e) => setBaseBranch(e.target.value)}
                 disabled={isLoadingBranches}

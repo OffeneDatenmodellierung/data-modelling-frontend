@@ -83,6 +83,7 @@ export const Dialog: React.FC<DialogProps> = ({
 
       {/* Dialog container */}
       <div className="flex min-h-full items-center justify-center p-4">
+        {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events -- Dialog content, click stops propagation */}
         <div
           ref={dialogRef}
           className={`relative bg-white rounded-lg shadow-xl ${sizeClasses[size]} w-full`}

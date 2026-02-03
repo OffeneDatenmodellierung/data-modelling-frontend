@@ -399,10 +399,14 @@ export const RepoSelector: React.FC<RepoSelectorProps> = ({
         {mode === 'url' && (
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label
+                htmlFor="repo-url-input"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
                 Repository URL or owner/repo
               </label>
               <input
+                id="repo-url-input"
                 type="text"
                 value={repoUrl}
                 onChange={(e) => {

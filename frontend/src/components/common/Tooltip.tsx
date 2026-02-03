@@ -129,6 +129,7 @@ export const Tooltip: React.FC<TooltipProps> = ({
   }, []);
 
   return (
+    // eslint-disable-next-line jsx-a11y/no-static-element-interactions -- Tooltip wrapper for mouse/focus events
     <div
       ref={triggerRef}
       className="relative inline-block"

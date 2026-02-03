@@ -133,10 +133,14 @@ export const TransformationLinkDialog: React.FC<TransformationLinkDialogProps> =
         {/* BPMN Process Selection */}
         {bpmnProcess && (
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label
+              htmlFor="bpmn-element-select"
+              className="block text-sm font-medium text-gray-700 mb-1"
+            >
               BPMN Process Element (Optional)
             </label>
             <select
+              id="bpmn-element-select"
               value={bpmnElementId}
               onChange={(e) => setBpmnElementId(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -183,7 +187,10 @@ export const TransformationLinkDialog: React.FC<TransformationLinkDialogProps> =
             {Object.keys(metadata).length > 0 && (
               <div className="space-y-1">
                 {Object.entries(metadata).map(([key, value]) => (
-                  <div key={key} className="flex items-center justify-between bg-gray-50 rounded p-2">
+                  <div
+                    key={key}
+                    className="flex items-center justify-between bg-gray-50 rounded p-2"
+                  >
                     <span className="text-sm">
                       <span className="font-medium">{key}:</span> {value}
                     </span>
@@ -219,4 +226,3 @@ export const TransformationLinkDialog: React.FC<TransformationLinkDialogProps> =
     </DraggableModal>
   );
 };
-

@@ -145,6 +145,7 @@ export const ImportDatabaseDialog: React.FC<ImportDatabaseDialogProps> = ({
         {/* File Upload Area */}
         <div>
           <span className="block text-sm font-medium text-gray-700 mb-2">Select File</span>
+          {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions -- Drop zone for file upload */}
           <div
             onDrop={handleDrop}
             onDragOver={handleDragOver}
