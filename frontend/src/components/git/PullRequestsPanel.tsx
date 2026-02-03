@@ -105,11 +105,15 @@ export const PullRequestsPanel: React.FC<PullRequestsPanelProps> = ({ className 
   }, [connection, filter, setPullRequests, setLoadingPRs, setPRError]);
 
   // Load PRs when filter changes or connection established
+  // Note: We intentionally exclude loadPullRequests from dependencies to prevent infinite loops.
+  // The loadPullRequests callback is recreated when connection changes, but we only want to
+  // trigger loading when isConnected or filter actually changes, not when the callback reference changes.
   useEffect(() => {
     if (isConnected) {
       loadPullRequests();
     }
-  }, [isConnected, filter, loadPullRequests]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isConnected, filter]);
 
   // Handle PR click
   const handlePRClick = useCallback(

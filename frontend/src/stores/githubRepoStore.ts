@@ -692,10 +692,6 @@ export const useGitHubRepoStore = create<GitHubRepoState>()(
             workspace.workspacePath
           );
 
-          console.log(
-            `[GitHubRepoStore] Copying ${pendingChanges.length} pending changes from ${oldWorkspaceId} to ${newWorkspaceId}`
-          );
-
           // Copy each pending change to the new workspace ID
           for (const change of pendingChanges) {
             const copiedChange: PendingChange = {
@@ -758,25 +754,16 @@ export const useGitHubRepoStore = create<GitHubRepoState>()(
       // ========================================================================
 
       stageChange: async (changeId: string) => {
-        console.log('[GitHubRepoStore] stageChange called for:', changeId);
         const { workspace, pendingChanges } = get();
-        if (!workspace) {
-          console.log('[GitHubRepoStore] stageChange: no workspace');
-          return;
-        }
+        if (!workspace) return;
 
         const change = pendingChanges.find((c) => c.id === changeId);
-        if (!change) {
-          console.log('[GitHubRepoStore] stageChange: change not found');
-          return;
-        }
+        if (!change) return;
 
-        console.log('[GitHubRepoStore] stageChange: found change, staging it');
         const updatedChange: PendingChange = { ...change, staged: true };
         await offlineQueueService.addPendingChange(updatedChange);
 
         const updatedChanges = await offlineQueueService.getPendingChanges(workspace.id);
-        console.log('[GitHubRepoStore] stageChange: updated changes count:', updatedChanges.length);
         set({ pendingChanges: updatedChanges });
       },
 

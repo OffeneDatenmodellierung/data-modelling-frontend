@@ -28,7 +28,9 @@ import {
 } from '@/stores/githubRepoStore';
 import { useShallow } from 'zustand/react/shallow';
 import { offlineQueueService } from '@/services/github/offlineQueueService';
+import { githubApi } from '@/services/github/githubApi';
 import type { PendingChange } from '@/types/github-repo';
+import type { GitHubBranch } from '@/types/github';
 import * as Diff from 'diff';
 
 // Constants for panel resizing
@@ -74,35 +76,14 @@ export const GitPanel: React.FC<GitPanelProps> = ({ className = '' }) => {
   const isGitHubRepoMode = githubRepoWorkspace !== null;
 
   // GitHub repo mode pending changes - use shallow comparison for array
-  const pendingChanges = useGitHubRepoStore(selectPendingChanges);
+  const pendingChanges = useGitHubRepoStore(useShallow(selectPendingChanges));
   const syncStatus = useGitHubRepoStore(selectSyncStatus);
   const isSyncing = syncStatus === 'syncing';
 
   // Derive staged/unstaged from pendingChanges to avoid selector re-render issues
-  const stagedChanges = useMemo(() => {
-    const staged = pendingChanges.filter((c) => c.staged);
-    console.log(
-      '[GitPanel] stagedChanges computed:',
-      staged.length,
-      staged.map((c) => ({ id: c.id, staged: c.staged }))
-    );
-    return staged;
-  }, [pendingChanges]);
-  const unstagedChanges = useMemo(() => {
-    const unstaged = pendingChanges.filter((c) => !c.staged);
-    console.log('[GitPanel] unstagedChanges computed:', unstaged.length);
-    return unstaged;
-  }, [pendingChanges]);
+  const stagedChanges = useMemo(() => pendingChanges.filter((c) => c.staged), [pendingChanges]);
+  const unstagedChanges = useMemo(() => pendingChanges.filter((c) => !c.staged), [pendingChanges]);
   const hasStagedChanges = stagedChanges.length > 0;
-
-  // Debug: log when pendingChanges updates
-  useEffect(() => {
-    console.log(
-      '[GitPanel] pendingChanges updated:',
-      pendingChanges.length,
-      pendingChanges.map((c) => ({ id: c.id, staged: c.staged }))
-    );
-  }, [pendingChanges]);
 
   // Staging actions - use shallow to get multiple actions in one subscription
   const { stageChange, unstageChange, stageAllChanges, unstageAllChanges } = useGitHubRepoStore(
@@ -145,6 +126,13 @@ export const GitPanel: React.FC<GitPanelProps> = ({ className = '' }) => {
 
   // GitHub repo mode: branch creation dialog
   const [showGitHubBranchDialog, setShowGitHubBranchDialog] = useState(false);
+
+  // GitHub repo mode: branch switching
+  const [showBranchDropdown, setShowBranchDropdown] = useState(false);
+  const [branches, setBranches] = useState<GitHubBranch[]>([]);
+  const [isLoadingBranches, setIsLoadingBranches] = useState(false);
+  const [isSwitchingBranch, setIsSwitchingBranch] = useState(false);
+  const branchDropdownRef = useRef<HTMLDivElement>(null);
 
   // Panel resizing (horizontal)
   const [panelWidth, setPanelWidth] = useState(DEFAULT_PANEL_WIDTH);
@@ -318,6 +306,71 @@ export const GitPanel: React.FC<GitPanelProps> = ({ className = '' }) => {
       useGitStore.getState().setShowCreateBranchDialog(true);
     }
   }, [isGitHubRepoMode]);
+
+  // Load branches for GitHub repo mode
+  const loadBranches = useCallback(async () => {
+    if (!githubRepoWorkspace) return;
+    setIsLoadingBranches(true);
+    try {
+      const branchList = await githubApi.listBranches(
+        githubRepoWorkspace.owner,
+        githubRepoWorkspace.repo,
+        { per_page: 100 }
+      );
+      setBranches(branchList);
+    } catch (error) {
+      console.error('[GitPanel] Failed to load branches:', error);
+    } finally {
+      setIsLoadingBranches(false);
+    }
+  }, [githubRepoWorkspace]);
+
+  // Toggle branch dropdown and load branches if needed
+  const handleToggleBranchDropdown = useCallback(() => {
+    if (!showBranchDropdown) {
+      loadBranches();
+    }
+    setShowBranchDropdown(!showBranchDropdown);
+  }, [showBranchDropdown, loadBranches]);
+
+  // Switch to a different branch
+  const handleSwitchBranch = useCallback(
+    async (branchName: string) => {
+      if (!githubRepoWorkspace || branchName === githubRepoWorkspace.branch) {
+        setShowBranchDropdown(false);
+        return;
+      }
+
+      setIsSwitchingBranch(true);
+      setShowBranchDropdown(false);
+
+      try {
+        await useGitHubRepoStore.getState().switchBranch(branchName);
+      } catch (error) {
+        console.error('[GitPanel] Failed to switch branch:', error);
+      } finally {
+        setIsSwitchingBranch(false);
+      }
+    },
+    [githubRepoWorkspace]
+  );
+
+  // Close branch dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (branchDropdownRef.current && !branchDropdownRef.current.contains(event.target as Node)) {
+        setShowBranchDropdown(false);
+      }
+    };
+
+    if (showBranchDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showBranchDropdown]);
 
   // Handle panel resize (horizontal)
   const handleResizeStart = useCallback((e: React.MouseEvent) => {
@@ -496,26 +549,135 @@ export const GitPanel: React.FC<GitPanelProps> = ({ className = '' }) => {
       <div className="px-4 py-2 bg-gray-50 border-b border-gray-200 relative">
         <div className="flex items-center justify-between">
           {isGitHubRepoMode ? (
-            /* GitHub Repo Mode - simplified branch display */
-            <div className="flex items-center gap-2 text-sm">
-              <svg
-                className="w-4 h-4 text-gray-500"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
+            /* GitHub Repo Mode - branch selector dropdown */
+            <div className="relative" ref={branchDropdownRef}>
+              <button
+                onClick={handleToggleBranchDropdown}
+                disabled={isSwitchingBranch}
+                className="flex items-center gap-2 text-sm hover:bg-gray-100 rounded px-2 py-1 -ml-2 disabled:opacity-50"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M13 10V3L4 14h7v7l9-11h-7z"
-                />
-              </svg>
-              <span className="font-medium text-gray-700">{currentBranch || 'HEAD'}</span>
-              {isProtectedBranch && (
-                <span className="px-1.5 py-0.5 text-xs bg-amber-100 text-amber-700 rounded">
-                  protected
-                </span>
+                {isSwitchingBranch ? (
+                  <svg
+                    className="w-4 h-4 text-gray-500 animate-spin"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                    />
+                  </svg>
+                ) : (
+                  <svg
+                    className="w-4 h-4 text-gray-500"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M13 10V3L4 14h7v7l9-11h-7z"
+                    />
+                  </svg>
+                )}
+                <span className="font-medium text-gray-700">{currentBranch || 'HEAD'}</span>
+                {isProtectedBranch && (
+                  <span className="px-1.5 py-0.5 text-xs bg-amber-100 text-amber-700 rounded">
+                    protected
+                  </span>
+                )}
+                <svg
+                  className={`w-4 h-4 text-gray-400 transition-transform ${showBranchDropdown ? 'rotate-180' : ''}`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M19 9l-7 7-7-7"
+                  />
+                </svg>
+              </button>
+
+              {/* Branch dropdown menu */}
+              {showBranchDropdown && (
+                <div className="absolute top-full left-0 mt-1 w-64 bg-white border border-gray-200 rounded-md shadow-lg z-50 max-h-80 overflow-y-auto">
+                  {isLoadingBranches ? (
+                    <div className="flex items-center justify-center py-4">
+                      <svg
+                        className="w-5 h-5 text-gray-400 animate-spin"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                      >
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                        />
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                        />
+                      </svg>
+                    </div>
+                  ) : branches.length === 0 ? (
+                    <div className="px-3 py-2 text-sm text-gray-500">No branches found</div>
+                  ) : (
+                    <ul className="py-1">
+                      {branches.map((branch) => (
+                        <li key={branch.name}>
+                          <button
+                            onClick={() => handleSwitchBranch(branch.name)}
+                            className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-100 flex items-center gap-2 ${
+                              branch.name === currentBranch
+                                ? 'bg-blue-50 text-blue-700'
+                                : 'text-gray-700'
+                            }`}
+                          >
+                            {branch.name === currentBranch && (
+                              <svg
+                                className="w-4 h-4 text-blue-600"
+                                fill="currentColor"
+                                viewBox="0 0 20 20"
+                              >
+                                <path
+                                  fillRule="evenodd"
+                                  d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                  clipRule="evenodd"
+                                />
+                              </svg>
+                            )}
+                            <span className={branch.name === currentBranch ? '' : 'ml-6'}>
+                              {branch.name}
+                            </span>
+                            {(branch.name === 'main' || branch.name === 'master') && (
+                              <span className="ml-auto px-1.5 py-0.5 text-xs bg-amber-100 text-amber-700 rounded">
+                                protected
+                              </span>
+                            )}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
               )}
             </div>
           ) : (
@@ -747,7 +909,6 @@ export const GitPanel: React.FC<GitPanelProps> = ({ className = '' }) => {
                                 type="button"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  console.log('[GitPanel] Unstage button clicked for:', change.id);
                                   unstageChange(change.id);
                                 }}
                                 className="w-5 h-5 rounded border-2 border-green-600 bg-green-600 flex items-center justify-center cursor-pointer hover:bg-green-700 hover:border-green-700 focus:ring-2 focus:ring-green-500 flex-shrink-0"
@@ -825,7 +986,6 @@ export const GitPanel: React.FC<GitPanelProps> = ({ className = '' }) => {
                                 type="button"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  console.log('[GitPanel] Stage button clicked for:', change.id);
                                   stageChange(change.id);
                                 }}
                                 className="w-5 h-5 rounded border-2 border-gray-400 bg-white flex items-center justify-center cursor-pointer hover:border-blue-500 hover:bg-blue-50 focus:ring-2 focus:ring-blue-500 flex-shrink-0"
