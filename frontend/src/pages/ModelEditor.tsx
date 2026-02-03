@@ -512,6 +512,24 @@ const ModelEditor: React.FC = () => {
             setDMNDecisions(loadedWorkspace.dmnDecisions);
           }
 
+          // Set knowledge articles and decision records to their respective stores
+          if (loadedWorkspace.knowledgeArticles && loadedWorkspace.knowledgeArticles.length > 0) {
+            const { useKnowledgeStore } = await import('@/stores/knowledgeStore');
+            useKnowledgeStore.getState().setArticles(loadedWorkspace.knowledgeArticles);
+            console.log(
+              '[ModelEditor] Set knowledge articles:',
+              loadedWorkspace.knowledgeArticles.length
+            );
+          }
+          if (loadedWorkspace.decisionRecords && loadedWorkspace.decisionRecords.length > 0) {
+            const { useDecisionStore } = await import('@/stores/decisionStore');
+            useDecisionStore.getState().setDecisions(loadedWorkspace.decisionRecords);
+            console.log(
+              '[ModelEditor] Set decision records:',
+              loadedWorkspace.decisionRecords.length
+            );
+          }
+
           // Set domains - ensure we always have at least one domain
           let domainToSelect: string | null = null;
 
