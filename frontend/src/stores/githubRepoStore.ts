@@ -666,7 +666,7 @@ export const useGitHubRepoStore = create<GitHubRepoState>()(
       },
 
       createBranch: async (name: string, fromBranch?: string) => {
-        const { workspace, isOnline } = get();
+        const { workspace, isOnline, pendingChanges } = get();
         if (!workspace) throw new Error('No workspace open');
         if (!isOnline) throw new Error('Cannot create branch while offline');
 
@@ -680,6 +680,46 @@ export const useGitHubRepoStore = create<GitHubRepoState>()(
           ref: `refs/heads/${name}`,
           sha: branch.commit.sha,
         });
+
+        // Before switching, copy pending changes to the new branch's workspace ID
+        // This ensures changes made on the current branch are carried over
+        if (pendingChanges.length > 0) {
+          const oldWorkspaceId = workspace.id;
+          const newWorkspaceId = generateWorkspaceId(
+            workspace.owner,
+            workspace.repo,
+            name,
+            workspace.workspacePath
+          );
+
+          console.log(
+            `[GitHubRepoStore] Copying ${pendingChanges.length} pending changes from ${oldWorkspaceId} to ${newWorkspaceId}`
+          );
+
+          // Copy each pending change to the new workspace ID
+          for (const change of pendingChanges) {
+            const copiedChange: PendingChange = {
+              ...change,
+              id: `change-${Date.now()}-${Math.random().toString(36).substr(2, 7)}`,
+              workspaceId: newWorkspaceId,
+              // Keep staged status so user doesn't have to re-stage
+            };
+            await offlineQueueService.addPendingChange(copiedChange);
+          }
+
+          // Also copy the file cache so diffs work correctly
+          const cachedFiles = await offlineQueueService.getCachedFiles(oldWorkspaceId);
+          for (const file of cachedFiles) {
+            const copiedFile = {
+              ...file,
+              workspaceId: newWorkspaceId,
+            };
+            await offlineQueueService.cacheFile(copiedFile);
+          }
+
+          // Clear changes from the old workspace since we're moving to the new branch
+          await offlineQueueService.clearPendingChanges(oldWorkspaceId);
+        }
 
         // Switch to the new branch
         await get().switchBranch(name);
