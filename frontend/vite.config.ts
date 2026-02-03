@@ -46,8 +46,9 @@ export default defineConfig({
   server: {
     port: 5173,
     headers: {
+      // CSP updated to allow GitHub API and CDN connections for dev mode
       'Content-Security-Policy':
-        "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; worker-src 'self' blob:;",
+        "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; worker-src 'self' blob: https://cdn.jsdelivr.net; connect-src 'self' https://api.github.com https://raw.githubusercontent.com https://*.githubusercontent.com;",
       'Cross-Origin-Opener-Policy': 'same-origin',
       'Cross-Origin-Embedder-Policy': 'require-corp',
     },
