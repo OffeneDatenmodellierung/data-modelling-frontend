@@ -568,6 +568,25 @@ const ModelEditor: React.FC = () => {
             tablesCount: finalState.tables.length,
           });
 
+          // Add workspace to workspaceStore and set as current for auto-save to work
+          const githubWorkspaceObj = {
+            id: workspaceId,
+            name: githubWorkspace.workspaceName,
+            owner_id: 'github', // Placeholder for GitHub repo mode
+            created_at: new Date().toISOString(),
+            last_modified_at: new Date().toISOString(),
+          };
+
+          // Check if workspace already exists, if not add it
+          const existingWorkspace = useWorkspaceStore
+            .getState()
+            .workspaces.find((w) => w.id === workspaceId);
+          if (!existingWorkspace) {
+            useWorkspaceStore.getState().addWorkspace(githubWorkspaceObj);
+          }
+          useWorkspaceStore.getState().setCurrentWorkspace(workspaceId);
+          console.log('[ModelEditor] Set current workspace for GitHub repo mode:', workspaceId);
+
           addToast({
             type: 'success',
             message: `Loaded GitHub workspace: ${githubWorkspace.workspaceName}`,
