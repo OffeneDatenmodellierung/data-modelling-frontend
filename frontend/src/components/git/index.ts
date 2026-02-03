@@ -17,3 +17,5 @@ export { BlameViewer, BlameDialog } from './BlameViewer';
 export { PullRequestsPanel } from './PullRequestsPanel';
 // Cache Management (GitHub repo mode)
 export { CacheManagementPanel } from './CacheManagementPanel';
+// Branch Merge (GitHub repo mode)
+export { BranchMergePanel } from './BranchMergePanel';

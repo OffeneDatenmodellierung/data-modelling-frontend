@@ -1127,6 +1127,46 @@ export async function updatePullRequestBranch(
 }
 
 // ============================================================================
+// Branch Merge API
+// ============================================================================
+
+export interface MergeBranchParams {
+  /** The name of the base branch that the head will be merged into */
+  base: string;
+  /** The head to merge. Can be a branch name or a commit SHA */
+  head: string;
+  /** Commit message for the merge commit */
+  commit_message?: string;
+}
+
+export interface MergeBranchResult {
+  sha: string;
+  merged: boolean;
+  message: string;
+}
+
+/**
+ * Merge a branch into another branch
+ * This performs a merge via the GitHub API (like "git merge")
+ *
+ * Common use cases:
+ * - Update main with changes from a feature branch
+ * - Update a feature branch with changes from main
+ */
+export async function mergeBranches(
+  owner: string,
+  repo: string,
+  params: MergeBranchParams
+): Promise<MergeBranchResult> {
+  const response = await apiRequest<MergeBranchResult>('POST', `/repos/${owner}/${repo}/merges`, {
+    base: params.base,
+    head: params.head,
+    commit_message: params.commit_message,
+  });
+  return response.data;
+}
+
+// ============================================================================
 // Export API object
 // ============================================================================
 
@@ -1191,6 +1231,8 @@ export const githubApi = {
   // PR Conflicts
   getPRConflictInfo,
   updatePullRequestBranch,
+  // Branch merging
+  mergeBranches,
   // Rate Limit
   getRateLimit,
   isRateLimited,

@@ -20,6 +20,7 @@ import { RebasePanel, RebaseStatusIndicator } from './RebasePanel';
 import { TagPanel } from './TagPanel';
 import { PullRequestsPanel } from './PullRequestsPanel';
 import { CacheManagementPanel } from './CacheManagementPanel';
+import { BranchMergePanel } from './BranchMergePanel';
 import { ValidationConfirmDialog } from '@/components/common/ValidationConfirmDialog';
 import { useGitHubStore, selectIsAuthenticated } from '@/stores/githubStore';
 import {
@@ -1219,6 +1220,13 @@ export const GitPanel: React.FC<GitPanelProps> = ({ className = '' }) => {
           <div className="flex-1 overflow-y-auto">
             {/* Cherry-pick conflict panel */}
             <CherryPickConflictPanel className="px-3 pt-3" />
+
+            {/* Branch Merge Panel (GitHub repo mode only) */}
+            {isGitHubRepoMode && (
+              <div className="border-b">
+                <BranchMergePanel />
+              </div>
+            )}
 
             {/* Cache Management Panel (GitHub repo mode only) */}
             {isGitHubRepoMode && (
