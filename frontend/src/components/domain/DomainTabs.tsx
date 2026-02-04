@@ -9,6 +9,7 @@ import { useUIStore } from '@/stores/uiStore';
 import { useWorkspaceStore } from '@/stores/workspaceStore';
 import { useDecisionStore } from '@/stores/decisionStore';
 import { useKnowledgeStore } from '@/stores/knowledgeStore';
+import { useSketchStore } from '@/stores/sketchStore';
 import { workspaceService } from '@/services/api/workspaceService';
 import { useSDKModeStore } from '@/services/sdk/sdkMode';
 import { HelpText } from '@/components/common/HelpText';
@@ -44,6 +45,7 @@ export const DomainTabs: React.FC<DomainTabsProps> = ({ workspaceId }) => {
   const { mode } = useSDKModeStore();
   const { decisions } = useDecisionStore();
   const { articles } = useKnowledgeStore();
+  const { sketches } = useSketchStore();
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showBPMNEditor, setShowBPMNEditor] = useState(false);
   const [editingProcessId, setEditingProcessId] = useState<string | null>(null);
@@ -368,7 +370,8 @@ export const DomainTabs: React.FC<DomainTabsProps> = ({ workspaceId }) => {
           bpmnProcesses,
           dmnDecisions,
           articles,
-          decisions
+          decisions,
+          sketches
         );
 
         addToast({
@@ -401,7 +404,8 @@ export const DomainTabs: React.FC<DomainTabsProps> = ({ workspaceId }) => {
           bpmnProcesses,
           dmnDecisions,
           articles,
-          decisions
+          decisions,
+          sketches
         );
 
         addToast({

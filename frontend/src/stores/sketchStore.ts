@@ -149,6 +149,14 @@ export const useSketchStore = create<SketchState>()(
         import('@/stores/workspaceStore').then(({ useWorkspaceStore }) => {
           useWorkspaceStore.getState().setPendingChanges(true);
         });
+        // Sync to GitHub if in repo mode
+        import('@/utils/githubRepoSync')
+          .then(({ syncSketchToGitHub }) => {
+            syncSketchToGitHub(sketch).catch(console.error);
+          })
+          .catch(() => {
+            // Not in GitHub mode or module not available
+          });
       },
 
       updateSketchInStore: (sketchId, updates) => {
@@ -169,9 +177,21 @@ export const useSketchStore = create<SketchState>()(
         import('@/stores/workspaceStore').then(({ useWorkspaceStore }) => {
           useWorkspaceStore.getState().setPendingChanges(true);
         });
+        // Sync to GitHub if in repo mode
+        if (updatedSketch) {
+          import('@/utils/githubRepoSync')
+            .then(({ syncSketchToGitHub }) => {
+              syncSketchToGitHub(updatedSketch).catch(console.error);
+            })
+            .catch(() => {
+              // Not in GitHub mode or module not available
+            });
+        }
       },
 
       removeSketch: (sketchId) => {
+        // Get sketch before removal for GitHub sync
+        const sketchToRemove = get().sketches.find((s) => s.id === sketchId);
         const sketches = get().sketches.filter((s) => s.id !== sketchId);
         const filter = get().filter;
         const selectedSketch = get().selectedSketch;
@@ -185,6 +205,16 @@ export const useSketchStore = create<SketchState>()(
         import('@/stores/workspaceStore').then(({ useWorkspaceStore }) => {
           useWorkspaceStore.getState().setPendingChanges(true);
         });
+        // Delete from GitHub if in repo mode
+        if (sketchToRemove) {
+          import('@/utils/githubRepoSync')
+            .then(({ deleteSketchFromGitHub }) => {
+              deleteSketchFromGitHub(sketchToRemove).catch(console.error);
+            })
+            .catch(() => {
+              // Not in GitHub mode or module not available
+            });
+        }
       },
 
       // High-level creation

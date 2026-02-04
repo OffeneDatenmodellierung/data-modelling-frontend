@@ -542,9 +542,11 @@ export const useWorkspaceStore = create<WorkspaceState>()(
 
                 if (workspacePath) {
                   try {
-                    // Get KB articles and decision records
+                    // Get KB articles, decision records, and sketches
                     const { articles } = knowledgeStoreModule.useKnowledgeStore.getState();
                     const { decisions } = decisionStoreModule.useDecisionStore.getState();
+                    const sketchStoreModule = await import('@/stores/sketchStore');
+                    const { sketches } = sketchStoreModule.useSketchStore.getState();
 
                     // Save workspace in V2 format (flat files)
                     await electronFileServiceModule.electronFileService.saveWorkspaceV2(
@@ -559,7 +561,8 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                       bpmnProcesses,
                       dmnDecisions,
                       articles,
-                      decisions
+                      decisions,
+                      sketches
                     );
 
                     set({ pendingChanges: false, lastSavedAt: new Date().toISOString() });
@@ -795,6 +798,8 @@ export const useWorkspaceStore = create<WorkspaceState>()(
 
               const { articles } = knowledgeStoreModule.useKnowledgeStore.getState();
               const { decisions } = decisionStoreModule.useDecisionStore.getState();
+              const sketchStoreModule = await import('@/stores/sketchStore');
+              const { sketches } = sketchStoreModule.useSketchStore.getState();
 
               // Save workspace in V2 format (prompts for directory or falls back to ZIP)
               await localFileService.saveWorkspaceV2(
@@ -808,7 +813,8 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                 bpmnProcesses,
                 dmnDecisions,
                 articles,
-                decisions
+                decisions,
+                sketches
               );
 
               set({ pendingChanges: false, lastSavedAt: new Date().toISOString() });

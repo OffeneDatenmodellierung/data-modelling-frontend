@@ -209,6 +209,7 @@ The SDK 2.1.0 release includes these capabilities:
   - Status workflow: draft → review → published → archived
   - Link sketches to tables, systems, decisions, and knowledge articles
   - Export to PNG, SVG, and JSON formats
+  - **v3.0.1**: Fixed sketch persistence to disk and GitHub sync
 
 - **Decision Logs (MADR)**: Architecture Decision Records following the MADR format
   - Status workflow: Draft → Proposed → Accepted/Rejected → Superseded

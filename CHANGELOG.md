@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.1] - 2026-02-04
+
+### Fixed
+- **Sketch Persistence**: Fixed sketches not being saved to disk or synced to GitHub
+  - Added `syncSketchToGitHub()` and `deleteSketchFromGitHub()` functions to `githubRepoSync.ts`
+  - Updated `sketchStore.ts` to call sync functions on add, update, and remove operations
+  - Fixed `workspaceStore.ts` to pass sketches to `saveWorkspaceV2()` in auto-save and manual save
+  - Fixed `DomainTabs.tsx` to include sketches when saving workspace
+
 ## [Unreleased]
 
 ### Added

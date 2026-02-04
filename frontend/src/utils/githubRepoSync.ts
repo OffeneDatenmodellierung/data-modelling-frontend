@@ -12,6 +12,8 @@ import * as yaml from 'js-yaml';
 import type { KnowledgeArticle } from '@/types/knowledge';
 import type { Decision } from '@/types/decision';
 import type { Domain } from '@/types/domain';
+import type { Sketch } from '@/types/sketch';
+import { toSDKSchema as sketchToSDKSchema } from '@/types/sketch';
 
 /**
  * Check if we're in GitHub repo mode
@@ -209,5 +211,83 @@ export async function deleteDecisionRecordFromGitHub(decision: Decision): Promis
     console.log(`[GitHubRepoSync] Deleted decision record: ${filePath}`);
   } catch (error) {
     console.warn(`[GitHubRepoSync] Failed to delete decision record: ${filePath}`, error);
+  }
+}
+
+/**
+ * Sync a sketch to GitHub repo
+ */
+export async function syncSketchToGitHub(sketch: Sketch): Promise<void> {
+  if (!(await isGitHubRepoMode())) return;
+
+  const { useGitHubRepoStore } = await import('@/stores/githubRepoStore');
+  const workspaceName = await getWorkspaceName();
+  const domainName = await getDomainName(sketch.domain_id);
+
+  // Generate filename using sketch title or number
+  const sketchName = FileMigration.sanitizeFileName(
+    sketch.title || sketch.name || `sketch_${sketch.number || sketch.id}`
+  );
+  let fileName: string;
+
+  if (domainName) {
+    fileName = FileMigration.generateFileName(
+      workspaceName,
+      domainName,
+      sketchName,
+      undefined,
+      'sketch.yaml'
+    );
+  } else {
+    // Global sketch (no domain)
+    fileName = `${workspaceName}_global_${sketchName}.sketch.yaml`;
+  }
+
+  // Convert to SDK schema format and generate YAML content
+  const sdkSketch = sketchToSDKSchema(sketch);
+  const content = yaml.dump(sdkSketch, { lineWidth: -1, noRefs: true });
+
+  // Write to GitHub repo store
+  const filePath = `sketches/${fileName}`;
+  await useGitHubRepoStore.getState().writeFile(filePath, content);
+
+  console.log(`[GitHubRepoSync] Synced sketch: ${filePath}`);
+}
+
+/**
+ * Delete a sketch from GitHub repo
+ */
+export async function deleteSketchFromGitHub(sketch: Sketch): Promise<void> {
+  if (!(await isGitHubRepoMode())) return;
+
+  const { useGitHubRepoStore } = await import('@/stores/githubRepoStore');
+  const workspaceName = await getWorkspaceName();
+  const domainName = await getDomainName(sketch.domain_id);
+
+  // Generate filename (same logic as sync)
+  const sketchName = FileMigration.sanitizeFileName(
+    sketch.title || sketch.name || `sketch_${sketch.number || sketch.id}`
+  );
+  let fileName: string;
+
+  if (domainName) {
+    fileName = FileMigration.generateFileName(
+      workspaceName,
+      domainName,
+      sketchName,
+      undefined,
+      'sketch.yaml'
+    );
+  } else {
+    fileName = `${workspaceName}_global_${sketchName}.sketch.yaml`;
+  }
+
+  const filePath = `sketches/${fileName}`;
+
+  try {
+    await useGitHubRepoStore.getState().deleteFile(filePath);
+    console.log(`[GitHubRepoSync] Deleted sketch: ${filePath}`);
+  } catch (error) {
+    console.warn(`[GitHubRepoSync] Failed to delete sketch: ${filePath}`, error);
   }
 }
