@@ -498,7 +498,7 @@ export class WorkspaceV2Saver {
 
   /**
    * Convert internal Workspace format to WorkspaceV2
-   * Matches SDK workspace-schema.json format
+   * Matches SDK workspace-schema.json format (SDK 2.3.0+)
    */
   private static convertToWorkspaceV2(
     workspace: Workspace,
@@ -526,22 +526,52 @@ export class WorkspaceV2Saver {
           name: domain.name,
           // Optional fields
           description: domain.description,
+          // Domain owner (SDK 2.3.0+)
+          ...(domain.owner && { owner: domain.owner }),
+          // Systems with full SDK 2.3.0+ fields
           systems: domainSystems.map((s) => ({
             id: s.id,
             name: s.name,
             description: s.description,
+            // SDK 2.3.0+ system fields
+            ...(s.system_type && { system_type: s.system_type }),
+            ...(s.connection_string && { connection_string: s.connection_string }),
             // Include table and asset IDs for system-resource linkage
             ...(s.table_ids && s.table_ids.length > 0 && { table_ids: s.table_ids }),
             ...(s.asset_ids && s.asset_ids.length > 0 && { asset_ids: s.asset_ids }),
+            // SDK 2.3.0+ DataFlow metadata fields
+            ...((s as any).owner && { owner: (s as any).owner }),
+            ...((s as any).sla && (s as any).sla.length > 0 && { sla: (s as any).sla }),
+            ...((s as any).contact_details && { contact_details: (s as any).contact_details }),
+            ...((s as any).infrastructure_type && {
+              infrastructure_type: (s as any).infrastructure_type,
+            }),
+            ...((s as any).notes && { notes: (s as any).notes }),
+            ...((s as any).version && { version: (s as any).version }),
           })),
           // Include view-specific positions for nodes (tables, systems, assets) per canvas view
           ...(domain.view_positions &&
             Object.keys(domain.view_positions).length > 0 && {
               view_positions: domain.view_positions,
             }),
+          // SDK 2.3.0+ domain resource management fields
+          ...(domain.shared_resources &&
+            domain.shared_resources.length > 0 && {
+              shared_resources: domain.shared_resources,
+            }),
+          // Transformation links for ETL view (stored on domain, not BPMN)
+          ...((domain as any).transformation_links &&
+            (domain as any).transformation_links.length > 0 && {
+              transformation_links: (domain as any).transformation_links,
+            }),
+          // Table visibility settings
+          ...((domain as any).table_visibility &&
+            (domain as any).table_visibility.length > 0 && {
+              table_visibility: (domain as any).table_visibility,
+            }),
         };
       }),
-      // Include all relationships at workspace level
+      // Include all relationships at workspace level with SDK 2.3.0+ fields
       relationships: allRelationships.map((rel) => ({
         id: rel.id,
         // Use source_table_id/target_table_id if available (deprecated fields), otherwise use source_id/target_id
@@ -554,13 +584,47 @@ export class WorkspaceV2Saver {
             : rel.type === 'one-to-many'
               ? 'one_to_many'
               : 'many_to_many',
-        notes: rel.description,
+        notes: rel.description || rel.notes,
         color: rel.color,
+        owner: rel.owner,
         // Connection point handles for edge positioning on canvas
         ...(rel.source_handle && { source_handle: rel.source_handle }),
         ...(rel.target_handle && { target_handle: rel.target_handle }),
+        // SDK 2.3.0+ relationship fields
+        ...(rel.source_key && { source_key: rel.source_key }),
+        ...(rel.target_key && { target_key: rel.target_key }),
+        ...(rel.label && { label: rel.label }),
+        ...(rel.flow_direction && { flow_direction: rel.flow_direction }),
+        ...(rel.infrastructure_type && { infrastructure_type: rel.infrastructure_type as string }),
+        // Map SDK relationship_type enum to V2 snake_case format
+        ...(rel.relationship_type && {
+          relationship_type: this.mapRelationshipType(rel.relationship_type),
+        }),
+        ...(rel.foreign_key_details && { foreign_key_details: rel.foreign_key_details }),
+        ...(rel.etl_job_metadata && { etl_job_metadata: rel.etl_job_metadata }),
+        ...(rel.visual_metadata && { visual_metadata: rel.visual_metadata }),
+        ...(rel.contact_details && { contact_details: rel.contact_details }),
+        ...(rel.sla && rel.sla.length > 0 && { sla: rel.sla }),
       })),
     };
+  }
+
+  /**
+   * Map SDK relationship type enum to V2 snake_case format
+   */
+  private static mapRelationshipType(
+    type: string
+  ): 'foreign_key' | 'data_flow' | 'dependency' | 'etl' | undefined {
+    // Handle both camelCase (SDK enum) and snake_case formats
+    const typeMap: Record<string, 'foreign_key' | 'data_flow' | 'dependency' | 'etl'> = {
+      foreignKey: 'foreign_key',
+      foreign_key: 'foreign_key',
+      dataFlow: 'data_flow',
+      data_flow: 'data_flow',
+      dependency: 'dependency',
+      etl: 'etl',
+    };
+    return typeMap[type];
   }
 
   /**

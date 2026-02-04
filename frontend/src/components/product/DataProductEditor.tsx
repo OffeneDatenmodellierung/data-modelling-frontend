@@ -9,7 +9,13 @@ import { useModelStore } from '@/stores/modelStore';
 import { useUIStore } from '@/stores/uiStore';
 import { odpsService } from '@/services/sdk/odpsService';
 import { sdkLoader } from '@/services/sdk/sdkLoader';
-import type { DataProduct, ODPSInputPort, ODPSOutputPort, ODPSSupport } from '@/types/odps';
+import type {
+  DataProduct,
+  ODPSInputPort,
+  ODPSOutputPort,
+  ODPSSupport,
+  ODPSStatus,
+} from '@/types/odps';
 
 export interface DataProductEditorProps {
   product?: DataProduct;
@@ -34,7 +40,7 @@ export const DataProductEditor: React.FC<DataProductEditorProps> = ({
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [status, setStatus] = useState<'draft' | 'published' | 'deprecated'>('draft');
+  const [status, setStatus] = useState<ODPSStatus>('draft');
   const [team, setTeam] = useState('');
   const [linkedTables, setLinkedTables] = useState<string[]>([]);
   const [inputPorts, setInputPorts] = useState<ODPSInputPort[]>([]);

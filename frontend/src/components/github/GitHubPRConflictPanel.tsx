@@ -1,17 +1,21 @@
 /**
  * GitHub PR Conflict Panel Component
  * Display conflict status and update branch functionality for pull requests
+ * Supports both local git mode (useGitHubStore) and repo mode (useGitHubRepoStore)
  */
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import {
   useGitHubStore,
   selectIsConnected,
   selectPRConflictInfo,
   selectIsLoadingConflictInfo,
 } from '@/stores/githubStore';
+import { useGitHubRepoStore } from '@/stores/githubRepoStore';
+import { useShallow } from 'zustand/react/shallow';
 import { githubApi } from '@/services/github/githubApi';
 import type { GitHubPullRequest, GitHubPRConflictInfo } from '@/types/github';
+import { MergeConflictResolver, type ConflictFile } from '../git/MergeConflictResolver';
 
 export interface GitHubPRConflictPanelProps {
   pullRequest: GitHubPullRequest;
@@ -19,22 +23,65 @@ export interface GitHubPRConflictPanelProps {
   onUpdated?: () => void;
 }
 
+interface ConflictResolutionState {
+  files: ConflictFile[];
+  currentFileIndex: number;
+  resolvedFiles: Map<string, string>;
+}
+
 export const GitHubPRConflictPanel: React.FC<GitHubPRConflictPanelProps> = ({
   pullRequest,
   className = '',
   onUpdated,
 }) => {
-  const isConnected = useGitHubStore(selectIsConnected);
-  const connection = useGitHubStore((state) => state.connection);
-  const conflictInfo = useGitHubStore(selectPRConflictInfo(pullRequest.number));
+  // Local git mode state
+  const isConnectedFromLocalStore = useGitHubStore(selectIsConnected);
+  const connectionFromLocalStore = useGitHubStore((state) => state.connection);
+  const conflictInfoFromStore = useGitHubStore(selectPRConflictInfo(pullRequest.number));
   const isLoadingGlobal = useGitHubStore(selectIsLoadingConflictInfo);
-
   const setPRConflictInfo = useGitHubStore((state) => state.setPRConflictInfo);
   const setLoadingConflictInfo = useGitHubStore((state) => state.setLoadingConflictInfo);
+
+  // Repo mode state
+  const repoWorkspace = useGitHubRepoStore(
+    useShallow((state) => ({
+      owner: state.workspace?.owner ?? null,
+      repo: state.workspace?.repo ?? null,
+      branch: state.workspace?.branch ?? null,
+      hasWorkspace: state.workspace !== null,
+    }))
+  );
+
+  // Determine effective connection (prefer local store, fallback to repo workspace)
+  const connection = useMemo(() => {
+    if (connectionFromLocalStore) return connectionFromLocalStore;
+    if (repoWorkspace.hasWorkspace && repoWorkspace.owner && repoWorkspace.repo) {
+      return {
+        owner: repoWorkspace.owner,
+        repo: repoWorkspace.repo,
+        branch: repoWorkspace.branch,
+      };
+    }
+    return null;
+  }, [connectionFromLocalStore, repoWorkspace]);
+
+  const isConnected = isConnectedFromLocalStore || repoWorkspace.hasWorkspace;
+
+  // Local state for conflict info (used in repo mode when store doesn't have it)
+  const [localConflictInfo, setLocalConflictInfo] = useState<GitHubPRConflictInfo | null>(null);
+  const conflictInfo = conflictInfoFromStore || localConflictInfo;
 
   const [isLoading, setIsLoading] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Conflict resolution state
+  const [conflictResolution, setConflictResolution] = useState<ConflictResolutionState | null>(
+    null
+  );
+  const [showConflictResolver, setShowConflictResolver] = useState(false);
+  const [isLoadingConflicts, setIsLoadingConflicts] = useState(false);
+  const [isCommitting, setIsCommitting] = useState(false);
 
   // Load conflict info
   const loadConflictInfo = useCallback(async () => {
@@ -50,14 +97,26 @@ export const GitHubPRConflictPanel: React.FC<GitHubPRConflictPanelProps> = ({
         connection.repo,
         pullRequest.number
       );
-      setPRConflictInfo(pullRequest.number, info);
+
+      // Store in appropriate place
+      if (connectionFromLocalStore) {
+        setPRConflictInfo(pullRequest.number, info);
+      } else {
+        setLocalConflictInfo(info);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load conflict info');
     } finally {
       setIsLoading(false);
       setLoadingConflictInfo(false);
     }
-  }, [connection, pullRequest.number, setPRConflictInfo, setLoadingConflictInfo]);
+  }, [
+    connection,
+    connectionFromLocalStore,
+    pullRequest.number,
+    setPRConflictInfo,
+    setLoadingConflictInfo,
+  ]);
 
   // Load on mount
   useEffect(() => {
@@ -66,7 +125,7 @@ export const GitHubPRConflictPanel: React.FC<GitHubPRConflictPanelProps> = ({
     }
   }, [isConnected, conflictInfo, loadConflictInfo]);
 
-  // Update branch
+  // Update branch (when no conflicts, just behind)
   const handleUpdateBranch = useCallback(async () => {
     if (!connection) return;
 
@@ -88,6 +147,211 @@ export const GitHubPRConflictPanel: React.FC<GitHubPRConflictPanelProps> = ({
       setIsUpdating(false);
     }
   }, [connection, pullRequest.number, loadConflictInfo, onUpdated]);
+
+  // Load conflicting files for resolution
+  const loadConflictingFiles = useCallback(async () => {
+    if (!connection) return;
+
+    setIsLoadingConflicts(true);
+    setError(null);
+
+    try {
+      // First, check if we have known conflicting files from the conflict info
+      let filesToResolve: string[] = [];
+
+      if (conflictInfo?.conflictingFiles && conflictInfo.conflictingFiles.length > 0) {
+        // Use the known conflicting files
+        filesToResolve = conflictInfo.conflictingFiles;
+      } else {
+        // Fallback: Get files that were modified in BOTH branches
+        // by comparing head to base AND looking for files with status 'modified'
+        const comparison = await githubApi.compareBranches(
+          connection.owner,
+          connection.repo,
+          pullRequest.base.ref,
+          pullRequest.head.ref
+        );
+
+        // Only consider files that are modified (not added/removed) as potential conflicts
+        // Files that are added only exist in one branch, removed files only exist in the other
+        // True conflicts occur when the same file is modified differently in both branches
+        const modifiedFiles = (comparison.files || []).filter(
+          (f) => f.status === 'modified' || f.status === 'changed'
+        );
+
+        if (modifiedFiles.length === 0) {
+          setError(
+            'Could not identify conflicting files. The conflict may involve added/deleted files. Please resolve locally using:\n\ngit checkout ' +
+              pullRequest.head.ref +
+              '\ngit merge ' +
+              pullRequest.base.ref
+          );
+          setIsLoadingConflicts(false);
+          return;
+        }
+
+        filesToResolve = modifiedFiles.map((f) => f.filename);
+      }
+
+      if (filesToResolve.length === 0) {
+        setError('No conflicting files identified. Please resolve conflicts locally.');
+        setIsLoadingConflicts(false);
+        return;
+      }
+
+      // Fetch content for each conflicting file from both branches
+      const conflictFiles: ConflictFile[] = [];
+
+      for (const filename of filesToResolve) {
+        try {
+          // Get content from base branch (theirs - what we're merging into)
+          let baseContent = '';
+          let baseExists = true;
+          try {
+            const baseResult = await githubApi.getFileContentAsString(
+              connection.owner,
+              connection.repo,
+              filename,
+              pullRequest.base.ref
+            );
+            baseContent = baseResult.content;
+          } catch {
+            // File doesn't exist in base (new file in PR)
+            baseContent = '';
+            baseExists = false;
+          }
+
+          // Get content from head branch (ours - PR branch)
+          let headContent = '';
+          let headExists = true;
+          try {
+            const headResult = await githubApi.getFileContentAsString(
+              connection.owner,
+              connection.repo,
+              filename,
+              pullRequest.head.ref
+            );
+            headContent = headResult.content;
+          } catch {
+            // File doesn't exist in head (deleted in PR)
+            headContent = '';
+            headExists = false;
+          }
+
+          // Add to conflict files if they differ
+          if (baseContent !== headContent) {
+            conflictFiles.push({
+              path: filename,
+              oursContent: headContent, // PR branch is "ours"
+              theirsContent: baseContent, // Base branch is "theirs"
+              // Store metadata about existence for UI
+              oursExists: headExists,
+              theirsExists: baseExists,
+            } as ConflictFile);
+          }
+        } catch (err) {
+          console.warn(`Could not load file ${filename} for conflict resolution:`, err);
+        }
+      }
+
+      if (conflictFiles.length === 0) {
+        setError('Could not load conflicting files. Please resolve conflicts locally.');
+        setIsLoadingConflicts(false);
+        return;
+      }
+
+      setConflictResolution({
+        files: conflictFiles,
+        currentFileIndex: 0,
+        resolvedFiles: new Map(),
+      });
+      setShowConflictResolver(true);
+    } catch (err) {
+      console.error('Failed to load conflicting files:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load conflicting files');
+    } finally {
+      setIsLoadingConflicts(false);
+    }
+  }, [connection, pullRequest, conflictInfo]);
+
+  // Handle file resolution
+  const handleFileResolved = useCallback(
+    (resolvedContent: string) => {
+      if (!conflictResolution) return;
+
+      const currentFile = conflictResolution.files[conflictResolution.currentFileIndex];
+      if (!currentFile) return;
+
+      const newResolvedFiles = new Map(conflictResolution.resolvedFiles);
+      newResolvedFiles.set(currentFile.path, resolvedContent);
+
+      // Move to next file or finish
+      if (conflictResolution.currentFileIndex < conflictResolution.files.length - 1) {
+        setConflictResolution({
+          ...conflictResolution,
+          currentFileIndex: conflictResolution.currentFileIndex + 1,
+          resolvedFiles: newResolvedFiles,
+        });
+      } else {
+        // All files resolved - commit them
+        commitResolvedFiles(newResolvedFiles);
+      }
+    },
+    [conflictResolution]
+  );
+
+  // Commit resolved files to the PR branch
+  const commitResolvedFiles = useCallback(
+    async (resolvedFiles: Map<string, string>) => {
+      if (!connection) return;
+
+      setShowConflictResolver(false);
+      setIsCommitting(true);
+      setError(null);
+
+      try {
+        // Commit each resolved file to the PR's head branch
+        for (const [path, content] of resolvedFiles) {
+          // Get the current file SHA from the head branch
+          const fileContent = await githubApi.getContent(
+            connection.owner,
+            connection.repo,
+            path,
+            pullRequest.head.ref
+          );
+
+          if (Array.isArray(fileContent)) {
+            throw new Error(`Path "${path}" is a directory`);
+          }
+
+          // Update the file on the head branch
+          await githubApi.createOrUpdateFile(connection.owner, connection.repo, path, {
+            message: `Resolve merge conflict in ${path}`,
+            content: btoa(unescape(encodeURIComponent(content))), // Handle UTF-8 properly
+            sha: fileContent.sha,
+            branch: pullRequest.head.ref,
+          });
+        }
+
+        // Reload conflict info
+        await loadConflictInfo();
+        onUpdated?.();
+      } catch (err) {
+        console.error('Failed to commit resolved files:', err);
+        setError(err instanceof Error ? err.message : 'Failed to commit resolved files');
+      } finally {
+        setIsCommitting(false);
+        setConflictResolution(null);
+      }
+    },
+    [connection, pullRequest.head.ref, loadConflictInfo, onUpdated]
+  );
+
+  // Cancel conflict resolution
+  const handleCancelConflictResolution = useCallback(() => {
+    setShowConflictResolver(false);
+    setConflictResolution(null);
+  }, []);
 
   if (!isConnected) {
     return null;
@@ -154,6 +418,67 @@ export const GitHubPRConflictPanel: React.FC<GitHubPRConflictPanelProps> = ({
     }
   };
 
+  // Show conflict resolver modal
+  if (showConflictResolver && conflictResolution) {
+    const currentFile = conflictResolution.files[conflictResolution.currentFileIndex];
+    if (!currentFile) {
+      return null;
+    }
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div className="w-[90vw] h-[85vh] bg-white rounded-lg shadow-xl overflow-hidden flex flex-col">
+          {/* Modal header */}
+          <div className="px-4 py-3 bg-gray-100 border-b flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-medium text-gray-700">
+                Resolving conflicts: {conflictResolution.currentFileIndex + 1} of{' '}
+                {conflictResolution.files.length}
+              </span>
+              <div className="flex gap-1">
+                {conflictResolution.files.map((_, idx) => (
+                  <span
+                    key={idx}
+                    className={`w-2 h-2 rounded-full ${
+                      idx < conflictResolution.currentFileIndex
+                        ? 'bg-green-500'
+                        : idx === conflictResolution.currentFileIndex
+                          ? 'bg-blue-500'
+                          : 'bg-gray-300'
+                    }`}
+                  />
+                ))}
+              </div>
+            </div>
+            <button
+              onClick={handleCancelConflictResolution}
+              className="text-gray-500 hover:text-gray-700"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+            </button>
+          </div>
+
+          {/* Conflict resolver */}
+          <div className="flex-1 overflow-hidden">
+            <MergeConflictResolver
+              file={currentFile}
+              oursBranch={pullRequest.head.ref}
+              theirsBranch={pullRequest.base.ref}
+              onResolve={handleFileResolved}
+              onCancel={handleCancelConflictResolution}
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={`${className}`}>
       {isLoading || isLoadingGlobal ? (
@@ -174,6 +499,25 @@ export const GitHubPRConflictPanel: React.FC<GitHubPRConflictPanelProps> = ({
             />
           </svg>
           <span className="text-sm text-gray-500">Checking merge status...</span>
+        </div>
+      ) : isCommitting ? (
+        <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 rounded-lg border border-blue-200">
+          <svg className="w-4 h-4 animate-spin text-blue-500" fill="none" viewBox="0 0 24 24">
+            <circle
+              className="opacity-25"
+              cx="12"
+              cy="12"
+              r="10"
+              stroke="currentColor"
+              strokeWidth="4"
+            />
+            <path
+              className="opacity-75"
+              fill="currentColor"
+              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+            />
+          </svg>
+          <span className="text-sm text-blue-600">Committing resolved files...</span>
         </div>
       ) : error ? (
         <div className="flex items-center justify-between px-3 py-2 bg-red-50 rounded-lg border border-red-200">
@@ -237,7 +581,7 @@ export const GitHubPRConflictPanel: React.FC<GitHubPRConflictPanelProps> = ({
             </div>
           )}
 
-          {/* Update branch button */}
+          {/* Update branch button (when behind but no conflicts) */}
           {conflictInfo.behindBy > 0 && !conflictInfo.hasConflicts && (
             <div className="mt-3">
               <button
@@ -284,16 +628,52 @@ export const GitHubPRConflictPanel: React.FC<GitHubPRConflictPanelProps> = ({
             </div>
           )}
 
-          {/* Conflict resolution hint */}
+          {/* Conflict resolution button */}
           {conflictInfo.hasConflicts && (
-            <div className="mt-3 p-2 bg-red-100 rounded text-xs text-red-700">
-              <p className="font-medium">Resolve conflicts locally:</p>
-              <code className="block mt-1 p-1 bg-red-200 rounded font-mono text-xs">
-                git checkout {pullRequest.head.ref}
-                <br />
-                git merge {pullRequest.base.ref}
-              </code>
-              <p className="mt-1">Then push the resolved changes.</p>
+            <div className="mt-3 space-y-2">
+              <button
+                onClick={loadConflictingFiles}
+                disabled={isLoadingConflicts}
+                className="w-full px-3 py-1.5 text-sm bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {isLoadingConflicts ? (
+                  <>
+                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      />
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      />
+                    </svg>
+                    Loading conflicts...
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 16 16">
+                      <path d="M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0zM4.5 7.5a.5.5 0 0 0 0 1h5.793l-2.147 2.146a.5.5 0 0 0 .708.708l3-3a.5.5 0 0 0 0-.708l-3-3a.5.5 0 1 0-.708.708L10.293 7.5H4.5z" />
+                    </svg>
+                    Resolve Conflicts
+                  </>
+                )}
+              </button>
+
+              <div className="p-2 bg-red-100 rounded text-xs text-red-700">
+                <p className="font-medium">Or resolve locally:</p>
+                <code className="block mt-1 p-1 bg-red-200 rounded font-mono text-xs">
+                  git checkout {pullRequest.head.ref}
+                  <br />
+                  git merge {pullRequest.base.ref}
+                </code>
+                <p className="mt-1">Then push the resolved changes.</p>
+              </div>
             </div>
           )}
         </div>

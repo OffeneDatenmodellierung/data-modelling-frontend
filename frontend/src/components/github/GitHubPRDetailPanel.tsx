@@ -251,8 +251,26 @@ export const GitHubPRDetailPanel: React.FC<GitHubPRDetailPanelProps> = ({
       );
       updatePR(updatedPR);
       setShowMergeOptions(false);
-    } catch (err) {
-      setPRDetailsError(err instanceof Error ? err.message : 'Failed to merge PR');
+    } catch (err: unknown) {
+      // Check for specific error types
+      const errorMessage = err instanceof Error ? err.message : 'Failed to merge PR';
+
+      // GitHub returns 405 Method Not Allowed when PR has conflicts
+      // and 409 Conflict for merge conflicts
+      if (
+        errorMessage.includes('405') ||
+        errorMessage.includes('Method Not Allowed') ||
+        errorMessage.includes('409') ||
+        errorMessage.includes('conflict')
+      ) {
+        setPRDetailsError(
+          'Cannot merge: This PR has conflicts that must be resolved first. Use the "Resolve Conflicts" button above.'
+        );
+        // Reload details to refresh conflict status
+        loadDetails();
+      } else {
+        setPRDetailsError(errorMessage);
+      }
     } finally {
       setIsMerging(false);
     }

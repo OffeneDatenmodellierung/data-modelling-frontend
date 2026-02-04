@@ -355,6 +355,62 @@ export async function getContent(
   return response.data;
 }
 
+/**
+ * Get decoded file content as a string from a specific branch
+ */
+export async function getFileContentAsString(
+  owner: string,
+  repo: string,
+  path: string,
+  ref?: string
+): Promise<{ content: string; sha: string }> {
+  const content = await getContent(owner, repo, path, ref);
+
+  if (Array.isArray(content)) {
+    throw new Error(`Path "${path}" is a directory, not a file`);
+  }
+
+  if (content.type !== 'file') {
+    throw new Error(`Path "${path}" is not a file (type: ${content.type})`);
+  }
+
+  if (!content.content) {
+    throw new Error(`File "${path}" has no content`);
+  }
+
+  // Decode base64 content
+  const decodedContent = atob(content.content.replace(/\n/g, ''));
+  return { content: decodedContent, sha: content.sha };
+}
+
+/**
+ * Get file contents from two branches for conflict resolution
+ */
+export async function getConflictFileContents(
+  owner: string,
+  repo: string,
+  path: string,
+  oursBranch: string,
+  theirsBranch: string
+): Promise<{
+  oursContent: string;
+  oursSha: string;
+  theirsContent: string;
+  theirsSha: string;
+}> {
+  const [oursResult, theirsResult] = await Promise.all([
+    getFileContentAsString(owner, repo, path, oursBranch),
+    getFileContentAsString(owner, repo, path, theirsBranch),
+  ]);
+
+  return {
+    oursContent: oursResult.content,
+    oursSha: oursResult.sha,
+    theirsContent: theirsResult.content,
+    theirsSha: theirsResult.sha,
+  };
+}
+
 export async function createOrUpdateFile(
   owner: string,
   repo: string,
@@ -1061,6 +1117,7 @@ async function graphqlRequest<T>(
 
 /**
  * Get detailed conflict information for a pull request
+ * Detects conflicting files by finding files modified in both branches since their merge base
  */
 export async function getPRConflictInfo(
   owner: string,
@@ -1070,27 +1127,57 @@ export async function getPRConflictInfo(
   // Get the PR details
   const pr = await getPullRequest(owner, repo, pullNumber);
 
-  // Compare base and head to get ahead/behind info
+  // Compare base and head to get ahead/behind info and merge base
   let aheadBy = 0;
   let behindBy = 0;
+  let mergeBaseSha: string | undefined;
+  let filesChangedInPR: string[] = [];
 
   try {
-    const comparison = await compareBranches(owner, repo, pr.base.ref, pr.head.ref);
-    aheadBy = comparison.ahead_by;
-    behindBy = comparison.behind_by;
+    // This gives us: base...head comparison (three-dot)
+    // The response includes merge_base_commit which is the common ancestor
+    const comparison = await apiRequest<{
+      status: string;
+      ahead_by: number;
+      behind_by: number;
+      merge_base_commit: { sha: string };
+      files?: Array<{ filename: string; status: string }>;
+    }>('GET', `/repos/${owner}/${repo}/compare/${pr.base.ref}...${pr.head.ref}`);
+
+    aheadBy = comparison.data.ahead_by;
+    behindBy = comparison.data.behind_by;
+    mergeBaseSha = comparison.data.merge_base_commit?.sha;
+    filesChangedInPR = (comparison.data.files || []).map((f) => f.filename);
   } catch {
     // Comparison might fail if branches are unrelated
   }
 
   const hasConflicts = pr.mergeable === false || pr.mergeable_state === 'dirty';
 
-  // Get conflicting files if there are conflicts
+  // Detect conflicting files if there are conflicts
   let conflictingFiles: string[] | undefined;
-  if (hasConflicts) {
-    // GitHub doesn't directly expose conflicting files via API
-    // We can try to get them via the merge status check
-    // For now, we'll leave this undefined as GitHub doesn't expose this easily
-    conflictingFiles = undefined;
+  if (hasConflicts && mergeBaseSha) {
+    try {
+      // Compare merge_base to base branch to find files changed in base since PR was created
+      // Files that appear in BOTH comparisons are potential conflicts
+      const baseComparison = await apiRequest<{
+        files?: Array<{ filename: string; status: string }>;
+      }>('GET', `/repos/${owner}/${repo}/compare/${mergeBaseSha}...${pr.base.ref}`);
+
+      const filesChangedInBase = new Set((baseComparison.data.files || []).map((f) => f.filename));
+
+      // Find intersection - files changed in both branches
+      conflictingFiles = filesChangedInPR.filter((f) => filesChangedInBase.has(f));
+
+      // If we found conflicts, great! If not, the conflict might be due to
+      // file additions/deletions or other edge cases
+      if (conflictingFiles.length === 0) {
+        conflictingFiles = undefined;
+      }
+    } catch (err) {
+      console.warn('Could not determine conflicting files:', err);
+      conflictingFiles = undefined;
+    }
   }
 
   return {
@@ -1187,6 +1274,8 @@ export const githubApi = {
   getCommit,
   // Content
   getContent,
+  getFileContentAsString,
+  getConflictFileContents,
   createOrUpdateFile,
   deleteFile,
   // Pull Request - Basic

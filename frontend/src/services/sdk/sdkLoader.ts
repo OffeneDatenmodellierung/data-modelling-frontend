@@ -8,18 +8,21 @@
 import init, * as sdkModule from '@offenedatenmodellierung/data-modelling-sdk';
 
 // Minimum required SDK version
-const MIN_SDK_VERSION = '2.0.6';
+const MIN_SDK_VERSION = '2.3.0';
 
-// Required SDK 2.0.6+ methods - only the essential ODCS V2 methods
+// Required SDK 2.3.0+ methods - core methods that must be present
 // Other methods (ODPS, CADS, etc.) are optional and checked at runtime
 const REQUIRED_METHODS = [
   // Core ODCS methods
   'parse_odcs_yaml',
   // ODCS V2 methods (native ODCSContract with lossless round-trip) - required for SDK 2.0.6+
   'parse_odcs_yaml_v2',
+  // Workspace methods with relationship support - required for SDK 2.3.0+
+  'parse_workspace_yaml',
+  'export_workspace_to_yaml',
 ];
 
-// SDK module type definition (SDK 2.0.6+)
+// SDK module type definition (SDK 2.3.0+)
 export interface SDKModule {
   init(): Promise<void>;
 
@@ -121,7 +124,13 @@ export interface SDKModule {
   export_decision_to_markdown(decision_json: string): string;
   export_decision_to_branded_markdown(decision_json: string, branding_json?: string | null): string;
   export_decision_to_pdf(decision_json: string, branding_json?: string | null): string;
-  create_decision(number: number, title: string, context: string, decision: string): string;
+  create_decision(
+    number: number,
+    title: string,
+    context: string,
+    decision: string,
+    author: string
+  ): string;
   create_decision_index(): string;
   add_decision_to_index(index_json: string, decision_json: string, filename: string): string;
 

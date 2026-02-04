@@ -8,6 +8,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **SDK 2.3.0 Support**: Updated to data-modelling-sdk 2.3.0
+  - Extended `InfrastructureType` enum with 150+ infrastructure types covering message queues, streaming platforms, orchestration tools, data processing frameworks, cloud data platforms, ETL/ELT tools, and more
+  - Added ODPS DataProduct fields: `tenant`, `management_ports`, `owner`, `roles`, `servers`, `service_levels`, `pricing`, `terms`, `links`, `team_members`
+  - Updated workspace schema with new SystemV2, DomainV2, RelationshipV2 fields
+  - Decision `create_decision` now requires mandatory `author` parameter (SDK 2.3.0 breaking change)
+
+### Changed
+- **Test Infrastructure**: Improved test reliability and isolation
+  - Added `.catch()` handlers to dynamic imports in stores to prevent unhandled rejections during test teardown
+  - Added global mocks for `apiClient`, `workspaceService`, and `githubRepoSync` in test setup
+  - Configured Vitest with `pool: 'forks'` and `isolate: true` for better test isolation
+
+### Added
 - **PR Review Workflow**: Complete pull request review workflow with inline comments
   - PR List Panel: Sidebar panel for browsing and filtering PRs with status indicators
   - Enhanced Diff Viewer: Line numbers, click-to-comment, inline comment threads

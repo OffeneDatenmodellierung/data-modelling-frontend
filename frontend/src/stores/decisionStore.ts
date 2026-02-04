@@ -142,13 +142,21 @@ export const useDecisionStore = create<DecisionState>()(
           filteredDecisions: applyFilter(decisions, filter),
         });
         // Sync to GitHub repo if in GitHub mode
-        import('@/utils/githubRepoSync').then(({ syncDecisionRecordToGitHub }) => {
-          syncDecisionRecordToGitHub(decision).catch(console.error);
-        });
+        import('@/utils/githubRepoSync')
+          .then(({ syncDecisionRecordToGitHub }) => {
+            syncDecisionRecordToGitHub(decision).catch(console.error);
+          })
+          .catch(() => {
+            /* Module not available in test environment */
+          });
         // Mark workspace as having pending changes
-        import('@/stores/workspaceStore').then(({ useWorkspaceStore }) => {
-          useWorkspaceStore.getState().setPendingChanges(true);
-        });
+        import('@/stores/workspaceStore')
+          .then(({ useWorkspaceStore }) => {
+            useWorkspaceStore.getState().setPendingChanges(true);
+          })
+          .catch(() => {
+            /* Module not available in test environment */
+          });
       },
 
       updateDecisionInStore: (decisionId, updates) => {
@@ -167,14 +175,22 @@ export const useDecisionStore = create<DecisionState>()(
         });
         // Sync to GitHub repo if in GitHub mode
         if (updatedDecision) {
-          import('@/utils/githubRepoSync').then(({ syncDecisionRecordToGitHub }) => {
-            syncDecisionRecordToGitHub(updatedDecision).catch(console.error);
-          });
+          import('@/utils/githubRepoSync')
+            .then(({ syncDecisionRecordToGitHub }) => {
+              syncDecisionRecordToGitHub(updatedDecision).catch(console.error);
+            })
+            .catch(() => {
+              /* Module not available in test environment */
+            });
         }
         // Mark workspace as having pending changes
-        import('@/stores/workspaceStore').then(({ useWorkspaceStore }) => {
-          useWorkspaceStore.getState().setPendingChanges(true);
-        });
+        import('@/stores/workspaceStore')
+          .then(({ useWorkspaceStore }) => {
+            useWorkspaceStore.getState().setPendingChanges(true);
+          })
+          .catch(() => {
+            /* Module not available in test environment */
+          });
       },
 
       removeDecision: (decisionId) => {
@@ -191,14 +207,22 @@ export const useDecisionStore = create<DecisionState>()(
         });
         // Delete from GitHub repo if in GitHub mode
         if (decisionToRemove) {
-          import('@/utils/githubRepoSync').then(({ deleteDecisionRecordFromGitHub }) => {
-            deleteDecisionRecordFromGitHub(decisionToRemove).catch(console.error);
-          });
+          import('@/utils/githubRepoSync')
+            .then(({ deleteDecisionRecordFromGitHub }) => {
+              deleteDecisionRecordFromGitHub(decisionToRemove).catch(console.error);
+            })
+            .catch(() => {
+              /* Module not available in test environment */
+            });
         }
         // Mark workspace as having pending changes
-        import('@/stores/workspaceStore').then(({ useWorkspaceStore }) => {
-          useWorkspaceStore.getState().setPendingChanges(true);
-        });
+        import('@/stores/workspaceStore')
+          .then(({ useWorkspaceStore }) => {
+            useWorkspaceStore.getState().setPendingChanges(true);
+          })
+          .catch(() => {
+            /* Module not available in test environment */
+          });
       },
 
       // SDK-backed operations

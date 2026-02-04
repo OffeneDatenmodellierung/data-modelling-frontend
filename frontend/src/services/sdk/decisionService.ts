@@ -392,12 +392,14 @@ class DecisionService {
 
   /**
    * Create a new decision using SDK
+   * SDK 2.3.0+ requires author as mandatory 5th parameter
    */
   async createDecisionViaSDK(
     number: number,
     title: string,
     context: string,
-    decisionText: string
+    decisionText: string,
+    author: string
   ): Promise<Decision | null> {
     if (!this.isSupported()) {
       return null;
@@ -409,7 +411,7 @@ class DecisionService {
     }
 
     try {
-      const resultJson = sdk.create_decision(number, title, context, decisionText);
+      const resultJson = sdk.create_decision(number, title, context, decisionText, author);
       const sdkDecision = JSON.parse(resultJson);
 
       // Check for SDK error responses (can be 'error' or 'error_type')

@@ -29,7 +29,7 @@ Creates data architectures, models, and flow diagrams entirely offline with full
 - simple-git for Git operations
 
 ### WASM Modules
-- **data-modelling-sdk 2.1.0**: YAML parsing, validation, ODCS/ODPS/CADS format support, Knowledge Base, Decision Records, Sketches, stable YAML key ordering
+- **data-modelling-sdk 2.3.0**: YAML parsing, validation, ODCS/ODPS/CADS format support, Knowledge Base, Decision Records, Sketches, stable YAML key ordering, workspace relationships, 150+ infrastructure types
 - **DuckDB-WASM 1.32.0**: In-browser SQL database
 
 ## Key Features

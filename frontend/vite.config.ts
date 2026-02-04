@@ -98,6 +98,10 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: './tests/setup.ts',
+    // Use forks pool for better isolation and to prevent "Closing rpc while fetch was pending" errors
+    pool: 'forks',
+    // Ensure tests are isolated to prevent module teardown race conditions
+    isolate: true,
     exclude: [
       '**/node_modules/**',
       '**/dist/**',

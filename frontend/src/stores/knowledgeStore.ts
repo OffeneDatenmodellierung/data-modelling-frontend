@@ -173,12 +173,20 @@ export const useKnowledgeStore = create<KnowledgeState>()(
           filteredArticles: applyFilter(articles, filter),
         });
         // Sync to GitHub repo if in GitHub mode, otherwise mark as pending changes
-        import('@/utils/githubRepoSync').then(({ syncKnowledgeArticleToGitHub }) => {
-          syncKnowledgeArticleToGitHub(article).catch(console.error);
-        });
-        import('@/stores/workspaceStore').then(({ useWorkspaceStore }) => {
-          useWorkspaceStore.getState().setPendingChanges(true);
-        });
+        import('@/utils/githubRepoSync')
+          .then(({ syncKnowledgeArticleToGitHub }) => {
+            syncKnowledgeArticleToGitHub(article).catch(console.error);
+          })
+          .catch(() => {
+            /* Module not available in test environment */
+          });
+        import('@/stores/workspaceStore')
+          .then(({ useWorkspaceStore }) => {
+            useWorkspaceStore.getState().setPendingChanges(true);
+          })
+          .catch(() => {
+            /* Module not available in test environment */
+          });
       },
 
       updateArticleInStore: (articleId, updates) => {
@@ -197,14 +205,22 @@ export const useKnowledgeStore = create<KnowledgeState>()(
         });
         // Sync to GitHub repo if in GitHub mode
         if (updatedArticle) {
-          import('@/utils/githubRepoSync').then(({ syncKnowledgeArticleToGitHub }) => {
-            syncKnowledgeArticleToGitHub(updatedArticle).catch(console.error);
-          });
+          import('@/utils/githubRepoSync')
+            .then(({ syncKnowledgeArticleToGitHub }) => {
+              syncKnowledgeArticleToGitHub(updatedArticle).catch(console.error);
+            })
+            .catch(() => {
+              /* Module not available in test environment */
+            });
         }
         // Mark workspace as having pending changes
-        import('@/stores/workspaceStore').then(({ useWorkspaceStore }) => {
-          useWorkspaceStore.getState().setPendingChanges(true);
-        });
+        import('@/stores/workspaceStore')
+          .then(({ useWorkspaceStore }) => {
+            useWorkspaceStore.getState().setPendingChanges(true);
+          })
+          .catch(() => {
+            /* Module not available in test environment */
+          });
       },
 
       removeArticle: (articleId) => {
@@ -221,14 +237,22 @@ export const useKnowledgeStore = create<KnowledgeState>()(
         });
         // Delete from GitHub repo if in GitHub mode
         if (articleToRemove) {
-          import('@/utils/githubRepoSync').then(({ deleteKnowledgeArticleFromGitHub }) => {
-            deleteKnowledgeArticleFromGitHub(articleToRemove).catch(console.error);
-          });
+          import('@/utils/githubRepoSync')
+            .then(({ deleteKnowledgeArticleFromGitHub }) => {
+              deleteKnowledgeArticleFromGitHub(articleToRemove).catch(console.error);
+            })
+            .catch(() => {
+              /* Module not available in test environment */
+            });
         }
         // Mark workspace as having pending changes
-        import('@/stores/workspaceStore').then(({ useWorkspaceStore }) => {
-          useWorkspaceStore.getState().setPendingChanges(true);
-        });
+        import('@/stores/workspaceStore')
+          .then(({ useWorkspaceStore }) => {
+            useWorkspaceStore.getState().setPendingChanges(true);
+          })
+          .catch(() => {
+            /* Module not available in test environment */
+          });
       },
 
       // SDK-backed operations
