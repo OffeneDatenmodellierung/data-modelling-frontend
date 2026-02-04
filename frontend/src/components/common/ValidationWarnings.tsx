@@ -1,0 +1,344 @@
+/**
+ * Validation Warnings Component
+ *
+ * Displays validation issues from imports and provides a way to view/dismiss them.
+ * Shows as a small indicator that expands to show full details.
+ */
+
+import React, { useState, useMemo, useCallback } from 'react';
+import { useShallow } from 'zustand/shallow';
+import {
+  useValidationStore,
+  type ValidationIssue,
+  type ResourceType,
+  type ValidationState,
+} from '@/stores/validationStore';
+import { useModelStore } from '@/stores/modelStore';
+import { runWorkspaceValidation } from '@/utils/workspaceValidation';
+
+interface ValidationWarningsProps {
+  className?: string;
+}
+
+const resourceTypeLabels: Record<ResourceType, string> = {
+  table: 'Table',
+  relationship: 'Relationship',
+  system: 'System',
+  product: 'Product',
+  compute_asset: 'Compute Asset',
+  knowledge_article: 'Knowledge Article',
+  decision_record: 'Decision Record',
+  bpmn_process: 'BPMN Process',
+  dmn_decision: 'DMN Decision',
+  domain: 'Domain',
+  workspace: 'Workspace',
+};
+
+export const ValidationWarnings: React.FC<ValidationWarningsProps> = ({ className = '' }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [isValidating, setIsValidating] = useState(false);
+
+  // Use useShallow for shallow comparison to prevent unnecessary re-renders
+  const { issues, clearAllIssues, removeIssue, lastValidatedAt, isValidatingStore } =
+    useValidationStore(
+      useShallow((state: ValidationState) => ({
+        issues: state.issues,
+        clearAllIssues: state.clearAllIssues,
+        removeIssue: state.removeIssue,
+        lastValidatedAt: state.lastValidatedAt,
+        isValidatingStore: state.isValidating,
+      }))
+    );
+
+  // Get removeRelationship from model store for fixing dangling relationships
+  const removeRelationship = useModelStore((state) => state.removeRelationship);
+
+  // Compute derived values with useMemo to avoid recalculating on every render
+  const activeIssues = useMemo(() => issues.filter((i: ValidationIssue) => i.isActive), [issues]);
+
+  const errorCount = useMemo(
+    () => activeIssues.filter((i: ValidationIssue) => i.severity === 'error').length,
+    [activeIssues]
+  );
+
+  const warningCount = useMemo(
+    () => activeIssues.filter((i: ValidationIssue) => i.severity === 'warning').length,
+    [activeIssues]
+  );
+
+  const totalCount = errorCount + warningCount;
+
+  // Group issues by resource type - memoized
+  const groupedIssues = useMemo(() => {
+    return activeIssues.reduce(
+      (acc: Record<ResourceType, ValidationIssue[]>, issue: ValidationIssue) => {
+        const key = issue.resourceType;
+        if (!acc[key]) {
+          acc[key] = [];
+        }
+        acc[key].push(issue);
+        return acc;
+      },
+      {} as Record<ResourceType, ValidationIssue[]>
+    );
+  }, [activeIssues]);
+
+  // Stable callback references
+  const handleToggleExpanded = useCallback(() => {
+    setIsExpanded((prev) => !prev);
+  }, []);
+
+  const handleClose = useCallback(() => {
+    setIsExpanded(false);
+  }, []);
+
+  const handleRemoveIssue = useCallback(
+    (id: string) => {
+      removeIssue(id);
+    },
+    [removeIssue]
+  );
+
+  // Handle manual validation
+  const handleValidateNow = useCallback(async () => {
+    setIsValidating(true);
+    try {
+      await runWorkspaceValidation();
+    } finally {
+      setIsValidating(false);
+    }
+  }, []);
+
+  // Handle removal of dangling relationships (those with missing source/target tables)
+  const handleRemoveDanglingRelationship = useCallback(
+    async (relationshipId: string) => {
+      removeRelationship(relationshipId);
+      // Re-run validation to update the issues list
+      setIsValidating(true);
+      try {
+        await runWorkspaceValidation();
+      } finally {
+        setIsValidating(false);
+      }
+    },
+    [removeRelationship]
+  );
+
+  // Format relative time
+  const formatRelativeTime = useCallback((isoString: string | null): string => {
+    if (!isoString) return '';
+    const date = new Date(isoString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / (1000 * 60));
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+    if (diffMins < 1) return 'just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    return `${diffDays}d ago`;
+  }, []);
+
+  const validatingNow = isValidating || isValidatingStore;
+
+  if (totalCount === 0) {
+    return null;
+  }
+
+  return (
+    <div className={`relative ${className}`}>
+      {/* Indicator button */}
+      <button
+        onClick={handleToggleExpanded}
+        className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+          errorCount > 0
+            ? 'bg-red-100 text-red-700 hover:bg-red-200'
+            : 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'
+        }`}
+        title={`${errorCount} error(s), ${warningCount} warning(s) - Click to view details`}
+      >
+        {errorCount > 0 ? (
+          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+            <path
+              fillRule="evenodd"
+              d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+              clipRule="evenodd"
+            />
+          </svg>
+        ) : (
+          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+            <path
+              fillRule="evenodd"
+              d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+              clipRule="evenodd"
+            />
+          </svg>
+        )}
+        <span>
+          {totalCount} Issue{totalCount !== 1 ? 's' : ''}
+        </span>
+        <svg
+          className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      {/* Expanded panel */}
+      {isExpanded && (
+        <div className="absolute right-0 top-full mt-2 w-96 max-h-96 overflow-auto bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+          {/* Header */}
+          <div className="sticky top-0 bg-white border-b border-gray-200 px-4 py-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-gray-900">Validation Issues</h3>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleValidateNow}
+                  disabled={validatingNow}
+                  className="text-xs px-2 py-1 bg-blue-100 text-blue-700 hover:bg-blue-200 rounded disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                  title="Run validation on all workspace resources"
+                >
+                  {validatingNow ? (
+                    <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      />
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                      />
+                    </svg>
+                  ) : (
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                      />
+                    </svg>
+                  )}
+                  {validatingNow ? 'Validating...' : 'Validate Now'}
+                </button>
+                <button
+                  onClick={clearAllIssues}
+                  className="text-xs text-gray-500 hover:text-gray-700"
+                >
+                  Clear All
+                </button>
+                <button onClick={handleClose} className="text-gray-400 hover:text-gray-600">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                </button>
+              </div>
+            </div>
+            {lastValidatedAt && (
+              <p className="text-xs text-gray-400 mt-1">
+                Last validated: {formatRelativeTime(lastValidatedAt)}
+              </p>
+            )}
+          </div>
+
+          {/* Issues list */}
+          <div className="divide-y divide-gray-100">
+            {Object.entries(groupedIssues).map(([type, typeIssues]) => (
+              <div key={type} className="px-4 py-3">
+                <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
+                  {resourceTypeLabels[type as ResourceType]} ({typeIssues.length})
+                </h4>
+                <ul className="space-y-2">
+                  {typeIssues.map((issue: ValidationIssue) => (
+                    <li
+                      key={issue.id}
+                      className={`text-sm rounded-md p-2 ${
+                        issue.severity === 'error'
+                          ? 'bg-red-50 text-red-800'
+                          : issue.severity === 'warning'
+                            ? 'bg-yellow-50 text-yellow-800'
+                            : 'bg-blue-50 text-blue-800'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium truncate">{issue.resourceName}</p>
+                          <p className="text-xs mt-0.5">{issue.message}</p>
+                          {issue.field && (
+                            <p className="text-xs mt-0.5 opacity-75">Field: {issue.field}</p>
+                          )}
+                          {issue.filePath && (
+                            <p className="text-xs mt-0.5 opacity-75 truncate">
+                              File: {issue.filePath}
+                            </p>
+                          )}
+                          {/* Show Remove Relationship button for dangling relationship issues */}
+                          {issue.resourceType === 'relationship' &&
+                            (issue.field === 'source_table_id' ||
+                              issue.field === 'target_table_id' ||
+                              issue.field === 'source_id' ||
+                              issue.field === 'target_id') && (
+                              <button
+                                onClick={() => handleRemoveDanglingRelationship(issue.resourceId)}
+                                className="mt-1.5 text-xs px-2 py-0.5 bg-red-100 text-red-700 hover:bg-red-200 rounded"
+                                title="Remove this orphaned relationship"
+                              >
+                                Remove Relationship
+                              </button>
+                            )}
+                        </div>
+                        <button
+                          onClick={() => handleRemoveIssue(issue.id)}
+                          className="flex-shrink-0 opacity-50 hover:opacity-100"
+                          title="Dismiss"
+                        >
+                          <svg
+                            className="w-4 h-4"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M6 18L18 6M6 6l12 12"
+                            />
+                          </svg>
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+
+          {/* Footer with help text */}
+          <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 px-4 py-2">
+            <p className="text-xs text-gray-500">
+              These issues were detected during validation. Fix issues to ensure data integrity
+              before saving or committing. Click &quot;Validate Now&quot; to re-check all resources.
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default ValidationWarnings;

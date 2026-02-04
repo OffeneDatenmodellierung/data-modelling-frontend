@@ -40,10 +40,22 @@ import { KnowledgePanel } from '@/components/knowledge/KnowledgePanel';
 import { SketchPanel } from '@/components/sketch/SketchPanel';
 import { GitPanel, GitStatusIndicator } from '@/components/git';
 import { gitService } from '@/services/git/gitService';
+import { GitHubUserMenu, GitHubAuthDialog, GitHubRepoSelector } from '@/components/github';
+
+import { useGitHubStore } from '@/stores/githubStore';
+import { useGitHubRepoStore } from '@/stores/githubRepoStore';
+import { isElectron } from '@/services/platform/platform';
 import type { SharedResourceReference } from '@/types/domain';
+import { HelpButton, HelpPanel } from '@/components/help';
+import { ValidationWarnings } from '@/components/common/ValidationWarnings';
+import { useHelpPanel } from '@/hooks/useHelpPanel';
 
 const ModelEditor: React.FC = () => {
-  const { workspaceId, domainId } = useParams<{ workspaceId: string; domainId?: string }>();
+  const params = useParams<{ workspaceId: string; domainId?: string; '*': string }>();
+  // Handle both regular workspace routes (/workspace/:workspaceId) and
+  // GitHub repo routes (/workspace/github/*) where the path contains encoded slashes
+  const workspaceId = params['*'] ? `github/${params['*']}` : params.workspaceId;
+  const domainId = params.domainId;
   const { fetchWorkspace, workspaces, setCurrentWorkspace } = useWorkspaceStore();
   const {
     selectedDomainId,
@@ -91,6 +103,9 @@ const ModelEditor: React.FC = () => {
   const [isFiltering, setIsFiltering] = useState(false);
   const [showSharedResourcePicker, setShowSharedResourcePicker] = useState(false);
   const [canvasRefreshKey, setCanvasRefreshKey] = useState(0);
+
+  // Initialize help panel keyboard shortcuts (F1, Cmd+?)
+  useHelpPanel();
 
   // Handle shared resource selection
   const handleSharedResourcesSelected = (sharedResources: SharedResourceReference[]) => {
@@ -295,6 +310,99 @@ const ModelEditor: React.FC = () => {
     };
   }, [workspaceId]);
 
+  // State for tracking GitHub repo initialization
+  const [isGitHubRepoInitialized, setIsGitHubRepoInitialized] = useState(false);
+  const [isInitializingGitHubRepo, setIsInitializingGitHubRepo] = useState(false);
+
+  // Initialize GitHub repo mode when URL starts with 'github/'
+  // This handles direct navigation to GitHub workspace URLs
+  useEffect(() => {
+    const initGitHubRepo = async () => {
+      if (!workspaceId || !workspaceId.startsWith('github/')) {
+        setIsGitHubRepoInitialized(true);
+        return;
+      }
+
+      // Check if GitHub repo is already open with this workspace
+      const existingWorkspace = useGitHubRepoStore.getState().workspace;
+      if (existingWorkspace && existingWorkspace.id === workspaceId.substring(7)) {
+        setIsGitHubRepoInitialized(true);
+        return;
+      }
+
+      // Wait for GitHub authentication to complete
+      const githubState = useGitHubStore.getState();
+      if (!githubState.auth.isAuthenticated) {
+        console.log('[ModelEditor] Waiting for GitHub authentication...');
+        // Give auth a moment to complete (it runs on app init)
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+
+        // Check again after waiting
+        const updatedState = useGitHubStore.getState();
+        if (!updatedState.auth.isAuthenticated) {
+          console.log('[ModelEditor] GitHub not authenticated, showing auth dialog');
+          updatedState.setShowAuthDialog(true);
+          setError('Please connect to GitHub to access this workspace');
+          setIsLoading(false);
+          return;
+        }
+      }
+
+      // Parse the GitHub URL: github/owner/repo/branch/workspacePath
+      const parts = workspaceId.substring(7).split('/');
+      if (parts.length < 3) {
+        setError('Invalid GitHub workspace URL');
+        setIsLoading(false);
+        return;
+      }
+
+      const owner = parts[0]!;
+      const repo = parts[1]!;
+      const branch = parts[2]!;
+      const pathParts = parts.slice(3);
+      const workspacePath = pathParts.join('/') || '_root_';
+      const workspaceName =
+        workspacePath === '_root_' ? repo : pathParts[pathParts.length - 1] || repo;
+
+      console.log('[ModelEditor] Initializing GitHub repo from URL:', {
+        owner,
+        repo,
+        branch,
+        workspacePath,
+      });
+
+      setIsInitializingGitHubRepo(true);
+      try {
+        await useGitHubRepoStore
+          .getState()
+          .openWorkspace(
+            owner,
+            repo,
+            branch,
+            workspacePath === '_root_' ? '' : workspacePath,
+            workspaceName
+          );
+
+        // Also set the connection in githubStore so PR panel works
+        useGitHubStore.getState().setConnection({
+          owner,
+          repo,
+          branch,
+        });
+
+        setIsGitHubRepoInitialized(true);
+      } catch (error) {
+        console.error('[ModelEditor] Failed to initialize GitHub repo:', error);
+        setError(error instanceof Error ? error.message : 'Failed to open GitHub repository');
+        setIsLoading(false);
+      } finally {
+        setIsInitializingGitHubRepo(false);
+      }
+    };
+
+    initGitHubRepo();
+  }, [workspaceId]);
+
   // Load workspace and domain on mount
   useEffect(() => {
     const loadWorkspace = async () => {
@@ -304,9 +412,189 @@ const ModelEditor: React.FC = () => {
         return;
       }
 
+      // Wait for GitHub repo initialization if needed
+      if (workspaceId.startsWith('github/') && !isGitHubRepoInitialized) {
+        return;
+      }
+
       try {
         setIsLoading(true);
         setError(null);
+
+        // Handle GitHub repo mode - load workspace content from GitHub
+        if (workspaceId.startsWith('github/')) {
+          const githubRepoState = useGitHubRepoStore.getState();
+          const { workspace: githubWorkspace } = githubRepoState;
+
+          if (!githubWorkspace) {
+            setError('GitHub workspace not initialized');
+            setIsLoading(false);
+            return;
+          }
+
+          console.log('[ModelEditor] Loading GitHub workspace content...', {
+            owner: githubWorkspace.owner,
+            repo: githubWorkspace.repo,
+            branch: githubWorkspace.branch,
+            workspacePath: githubWorkspace.workspacePath,
+          });
+
+          // Import the V2 loader for loading workspace from GitHub files
+          const { WorkspaceV2Loader } = await import('@/services/storage/workspaceV2Loader');
+          const { githubContentsService } = await import('@/services/github/githubContentsService');
+
+          // Get the list of files in the workspace
+          const files = await githubContentsService.getWorkspaceFiles(
+            githubWorkspace.owner,
+            githubWorkspace.repo,
+            githubWorkspace.workspacePath,
+            githubWorkspace.branch
+          );
+
+          console.log('[ModelEditor] GitHub workspace files:', files);
+
+          // Load the content of each file
+          const fileContents: Array<{ name: string; content: string }> = [];
+          for (const filePath of files) {
+            try {
+              const content = await githubRepoState.readFile(filePath);
+              // Extract just the filename from the path
+              const fileName = filePath.split('/').pop() || filePath;
+              fileContents.push({ name: fileName, content });
+            } catch (err) {
+              console.warn(`[ModelEditor] Failed to read file ${filePath}:`, err);
+            }
+          }
+
+          console.log(
+            '[ModelEditor] Loaded file contents:',
+            fileContents.map((f) => f.name)
+          );
+
+          // Use the V2 loader to parse the workspace content
+          // The loader returns an extended workspace with additional properties
+          const loadedWorkspace = (await WorkspaceV2Loader.loadFromStringFiles(
+            fileContents
+          )) as any;
+
+          console.log('[ModelEditor] Parsed workspace:', {
+            name: loadedWorkspace.name,
+            tablesCount: loadedWorkspace.tables?.length || 0,
+            domainsCount: loadedWorkspace.domains?.length || 0,
+          });
+
+          // Set the loaded data into the model store
+          if (loadedWorkspace.tables) {
+            setTables(loadedWorkspace.tables);
+          }
+          if (loadedWorkspace.relationships) {
+            setRelationships(loadedWorkspace.relationships);
+          }
+          if (loadedWorkspace.systems) {
+            setSystems(loadedWorkspace.systems);
+          }
+          if (loadedWorkspace.products) {
+            setProducts(loadedWorkspace.products);
+          }
+          if (loadedWorkspace.assets) {
+            setComputeAssets(loadedWorkspace.assets);
+          }
+          if (loadedWorkspace.bpmnProcesses) {
+            setBPMNProcesses(loadedWorkspace.bpmnProcesses);
+          }
+          if (loadedWorkspace.dmnDecisions) {
+            setDMNDecisions(loadedWorkspace.dmnDecisions);
+          }
+
+          // Set knowledge articles and decision records to their respective stores
+          if (loadedWorkspace.knowledgeArticles && loadedWorkspace.knowledgeArticles.length > 0) {
+            const { useKnowledgeStore } = await import('@/stores/knowledgeStore');
+            useKnowledgeStore.getState().setArticles(loadedWorkspace.knowledgeArticles);
+            console.log(
+              '[ModelEditor] Set knowledge articles:',
+              loadedWorkspace.knowledgeArticles.length
+            );
+          }
+          if (loadedWorkspace.decisionRecords && loadedWorkspace.decisionRecords.length > 0) {
+            const { useDecisionStore } = await import('@/stores/decisionStore');
+            useDecisionStore.getState().setDecisions(loadedWorkspace.decisionRecords);
+            console.log(
+              '[ModelEditor] Set decision records:',
+              loadedWorkspace.decisionRecords.length
+            );
+          }
+
+          // Set domains - ensure we always have at least one domain
+          let domainToSelect: string | null = null;
+
+          if (loadedWorkspace.domains && loadedWorkspace.domains.length > 0) {
+            console.log(
+              '[ModelEditor] Setting domains from loaded workspace:',
+              loadedWorkspace.domains.map((d: any) => ({ id: d.id, name: d.name }))
+            );
+            setDomains(loadedWorkspace.domains);
+            const firstDomain = loadedWorkspace.domains[0];
+            if (firstDomain) {
+              domainToSelect = firstDomain.id;
+            }
+          } else {
+            // Create default domain when none exist in workspace
+            console.log('[ModelEditor] No domains in workspace, creating default domain');
+            const { generateUUID } = await import('@/utils/validation');
+            const defaultDomain = {
+              id: generateUUID(),
+              workspace_id: workspaceId,
+              name: 'Default',
+              model_type: 'conceptual' as const,
+              is_primary: true,
+              created_at: new Date().toISOString(),
+              last_modified_at: new Date().toISOString(),
+            };
+            setDomains([defaultDomain]);
+            domainToSelect = defaultDomain.id;
+          }
+
+          // Set selected domain AFTER setting domains to ensure state is consistent
+          if (domainToSelect) {
+            console.log('[ModelEditor] Setting selected domain:', domainToSelect);
+            setSelectedDomain(domainToSelect);
+          }
+
+          // Verify the state was set correctly
+          const finalState = useModelStore.getState();
+          console.log('[ModelEditor] Final state after loading GitHub workspace:', {
+            domainsCount: finalState.domains.length,
+            selectedDomainId: finalState.selectedDomainId,
+            tablesCount: finalState.tables.length,
+          });
+
+          // Add workspace to workspaceStore and set as current for auto-save to work
+          const githubWorkspaceObj = {
+            id: workspaceId,
+            name: githubWorkspace.workspaceName,
+            owner_id: 'github', // Placeholder for GitHub repo mode
+            created_at: new Date().toISOString(),
+            last_modified_at: new Date().toISOString(),
+          };
+
+          // Check if workspace already exists, if not add it
+          const existingWorkspace = useWorkspaceStore
+            .getState()
+            .workspaces.find((w) => w.id === workspaceId);
+          if (!existingWorkspace) {
+            useWorkspaceStore.getState().addWorkspace(githubWorkspaceObj);
+          }
+          useWorkspaceStore.getState().setCurrentWorkspace(workspaceId);
+          console.log('[ModelEditor] Set current workspace for GitHub repo mode:', workspaceId);
+
+          addToast({
+            type: 'success',
+            message: `Loaded GitHub workspace: ${githubWorkspace.workspaceName}`,
+          });
+
+          setIsLoading(false);
+          return;
+        }
 
         // Check if we're in offline mode - skip API calls
         const currentMode = useSDKModeStore.getState().mode;
@@ -521,12 +809,135 @@ const ModelEditor: React.FC = () => {
     fetchRelationships,
     loadDomainAssets,
     setSelectedDomain,
+    isGitHubRepoInitialized,
   ]);
 
-  if (isLoading) {
+  // Watch for branch switches in GitHub repo mode and reload workspace content
+  const branchSwitchCounter = useGitHubRepoStore((state) => state.branchSwitchCounter);
+  const previousBranchSwitchCounterRef = React.useRef(branchSwitchCounter);
+
+  useEffect(() => {
+    // Skip initial render and only react to actual changes
+    if (previousBranchSwitchCounterRef.current === branchSwitchCounter) {
+      return;
+    }
+    previousBranchSwitchCounterRef.current = branchSwitchCounter;
+
+    // Only reload if we're in GitHub repo mode
+    if (!workspaceId?.startsWith('github/')) {
+      return;
+    }
+
+    const reloadWorkspaceContent = async () => {
+      const githubRepoState = useGitHubRepoStore.getState();
+      const { workspace: githubWorkspace } = githubRepoState;
+
+      if (!githubWorkspace) {
+        console.log('[ModelEditor] No GitHub workspace to reload');
+        return;
+      }
+
+      console.log('[ModelEditor] Branch switched, reloading workspace content...', {
+        branch: githubWorkspace.branch,
+        branchSwitchCounter,
+      });
+
+      setIsLoading(true);
+
+      try {
+        // Import the V2 loader for loading workspace from GitHub files
+        const { WorkspaceV2Loader } = await import('@/services/storage/workspaceV2Loader');
+        const { githubContentsService } = await import('@/services/github/githubContentsService');
+
+        // Get the list of files in the workspace
+        const files = await githubContentsService.getWorkspaceFiles(
+          githubWorkspace.owner,
+          githubWorkspace.repo,
+          githubWorkspace.workspacePath,
+          githubWorkspace.branch
+        );
+
+        // Load the content of each file
+        const fileContents: Array<{ name: string; content: string }> = [];
+        for (const filePath of files) {
+          try {
+            const content = await githubRepoState.readFile(filePath);
+            const fileName = filePath.split('/').pop() || filePath;
+            fileContents.push({ name: fileName, content });
+          } catch (err) {
+            console.warn(`[ModelEditor] Failed to read file ${filePath}:`, err);
+          }
+        }
+
+        // Use the V2 loader to parse the workspace content
+        const loadedWorkspace = (await WorkspaceV2Loader.loadFromStringFiles(fileContents)) as any;
+
+        console.log('[ModelEditor] Reloaded workspace after branch switch:', {
+          name: loadedWorkspace.name,
+          tablesCount: loadedWorkspace.tables?.length || 0,
+          domainsCount: loadedWorkspace.domains?.length || 0,
+        });
+
+        // Set the loaded data into the model store
+        if (loadedWorkspace.tables) {
+          setTables(loadedWorkspace.tables);
+        }
+        if (loadedWorkspace.relationships) {
+          setRelationships(loadedWorkspace.relationships);
+        }
+        if (loadedWorkspace.systems) {
+          setSystems(loadedWorkspace.systems);
+        }
+        if (loadedWorkspace.products) {
+          setProducts(loadedWorkspace.products);
+        }
+        if (loadedWorkspace.assets) {
+          setComputeAssets(loadedWorkspace.assets);
+        }
+        if (loadedWorkspace.domains && loadedWorkspace.domains.length > 0) {
+          setDomains(loadedWorkspace.domains);
+        }
+
+        // Increment canvas refresh key to force re-render
+        setCanvasRefreshKey((prev) => prev + 1);
+
+        addToast({
+          type: 'info',
+          message: `Switched to branch: ${githubWorkspace.branch}`,
+        });
+      } catch (error) {
+        console.error('[ModelEditor] Failed to reload workspace after branch switch:', error);
+        addToast({
+          type: 'error',
+          message: 'Failed to reload workspace content',
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    reloadWorkspaceContent();
+  }, [
+    branchSwitchCounter,
+    workspaceId,
+    setTables,
+    setRelationships,
+    setSystems,
+    setProducts,
+    setComputeAssets,
+    setDomains,
+    addToast,
+  ]);
+
+  if (isLoading || isInitializingGitHubRepo) {
     return (
       <div className="flex items-center justify-center h-screen">
-        <Loading />
+        <div className="text-center">
+          <Loading />
+          {isInitializingGitHubRepo && (
+            <p className="mt-4 text-gray-600">Connecting to GitHub repository...</p>
+          )}
+        </div>
       </div>
     );
   }
@@ -554,7 +965,7 @@ const ModelEditor: React.FC = () => {
 
   return (
     <div className="flex flex-col h-screen bg-gray-50">
-      {/* Domain Selector, Tag Filter, and Settings - combined header row with logo */}
+      {/* Main header row with logo, actions, and controls */}
       <div className="bg-white border-b border-gray-200 px-4 py-2 shadow-sm">
         <div className="flex items-center gap-4">
           {/* Logo */}
@@ -565,8 +976,6 @@ const ModelEditor: React.FC = () => {
             style={{ maxHeight: '32px' }}
           />
 
-          <DomainSelector workspaceId={workspaceId ?? ''} />
-
           {/* Collaboration Status - inline when online */}
           {mode === 'online' && workspaceId && (
             <div className="flex items-center gap-2">
@@ -574,14 +983,26 @@ const ModelEditor: React.FC = () => {
               <PresenceIndicator workspaceId={workspaceId} />
             </div>
           )}
-          <div className="flex-1">
-            <TagFilter
-              onFilterChange={handleTagFilterChange}
-              placeholder="Filter by tags (e.g., env:production, product:food)"
-            />
-          </div>
-          {selectedDomainId && (
-            <>
+
+          {/* Spacer to push right-side items */}
+          <div className="flex-1" />
+
+          {/* Right side controls */}
+          <div className="flex items-center gap-2">
+            {/* Git Status Indicator (works in both Electron and GitHub repo mode) */}
+            <GitStatusIndicator />
+
+            {/* GitHub User Menu (Browser mode only) */}
+            {!isElectron() && <GitHubUserMenu />}
+
+            {/* Validation Warnings */}
+            <ValidationWarnings />
+
+            {/* Save/Exit Controls (Online indicator, pending count, Sync/Commit buttons, Exit) */}
+            <SaveExitControls />
+
+            {/* Refresh button - before Help/Settings */}
+            {selectedDomainId && (
               <button
                 onClick={() => {
                   // Force a re-render by incrementing the refresh key
@@ -606,20 +1027,10 @@ const ModelEditor: React.FC = () => {
                 </svg>
                 Refresh
               </button>
-              <button
-                onClick={() => setShowSharedResourcePicker(true)}
-                className="px-3 py-1.5 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 whitespace-nowrap"
-                title="Share resources from other domains"
-              >
-                Share Resources
-              </button>
-            </>
-          )}
+            )}
 
-          {/* Git Status, Settings and History buttons */}
-          <div className="flex items-center gap-2 ml-auto">
-            {/* Git Status Indicator */}
-            <GitStatusIndicator />
+            {/* Help Button */}
+            <HelpButton />
 
             <button
               onClick={() => setShowWorkspaceSettings(!showWorkspaceSettings)}
@@ -639,22 +1050,42 @@ const ModelEditor: React.FC = () => {
             )}
           </div>
         </div>
-        {isFiltering && <div className="mt-1 text-xs text-gray-500">Filtering resources...</div>}
-        {tagFilter.length > 0 && !isFiltering && (
-          <div className="mt-1 text-xs text-blue-600">
-            Showing {tables.length} table(s), {computeAssets.length} asset(s),{' '}
-            {relationships.length} relationship(s), {systems.length} system(s)
-          </div>
+      </div>
+
+      {/* Secondary toolbar: Domain, View mode, Filter, Share Resources, BPMN links */}
+      <div className="bg-gray-50 border-b border-gray-200 px-4 py-2 flex items-center gap-4">
+        <DomainSelector workspaceId={workspaceId ?? ''} />
+        {selectedDomainId && (
+          <>
+            <ViewModeSelector domainId={selectedDomainId} />
+            <div className="flex-1">
+              <TagFilter
+                onFilterChange={handleTagFilterChange}
+                placeholder="Filter by tags (e.g., env:production, product:food)"
+              />
+            </div>
+            <button
+              onClick={() => setShowSharedResourcePicker(true)}
+              className="px-3 py-1.5 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 whitespace-nowrap"
+              title="Share resources from other domains"
+            >
+              Share Resources
+            </button>
+            <BPMNProcessLinks domainId={selectedDomainId} />
+          </>
         )}
       </div>
 
-      {/* Secondary toolbar: View mode, BPMN links, Save/Exit */}
-      {selectedDomainId && (
-        <div className="bg-gray-50 border-b border-gray-200 px-4 py-2 flex items-center gap-4">
-          <ViewModeSelector domainId={selectedDomainId} />
-          <BPMNProcessLinks domainId={selectedDomainId} />
-          <div className="flex-1" />
-          <SaveExitControls />
+      {/* Filter status messages */}
+      {(isFiltering || tagFilter.length > 0) && (
+        <div className="bg-gray-50 px-4 py-1 border-b border-gray-200">
+          {isFiltering && <div className="text-xs text-gray-500">Filtering resources...</div>}
+          {tagFilter.length > 0 && !isFiltering && (
+            <div className="text-xs text-blue-600">
+              Showing {tables.length} table(s), {computeAssets.length} asset(s),{' '}
+              {relationships.length} relationship(s), {systems.length} system(s)
+            </div>
+          )}
         </div>
       )}
 
@@ -768,6 +1199,14 @@ const ModelEditor: React.FC = () => {
         isOpen={showImportExportDialog}
         onClose={() => setShowImportExportDialog(false)}
       />
+
+      {/* GitHub Dialogs (Browser mode only) */}
+      {!isElectron() && (
+        <>
+          <GitHubAuthDialog />
+          <GitHubRepoSelector />
+        </>
+      )}
 
       {/* Multi-Table Editor Modals - up to 3 editors side by side */}
       {openTableEditorIds.map((tableId, index) => {
@@ -888,6 +1327,9 @@ const ModelEditor: React.FC = () => {
           onResourcesSelected={handleSharedResourcesSelected}
         />
       )}
+
+      {/* Help Panel */}
+      <HelpPanel />
     </div>
   );
 };

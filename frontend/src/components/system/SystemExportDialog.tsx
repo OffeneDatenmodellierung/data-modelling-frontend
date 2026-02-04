@@ -195,7 +195,7 @@ export const SystemExportDialog: React.FC<SystemExportDialogProps> = ({
       <div className="space-y-4">
         {/* Export Format Selection */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Export Format</label>
+          <span className="block text-sm font-medium text-gray-700 mb-2">Export Format</span>
           <div className="flex gap-4">
             <label className="flex items-center gap-2 cursor-pointer">
               <input

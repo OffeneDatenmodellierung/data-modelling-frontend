@@ -403,6 +403,9 @@ export const DecisionList: React.FC<DecisionListProps> = ({
                 <div
                   key={decision.id}
                   onClick={() => handleDecisionClick(decision)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleDecisionClick(decision)}
+                  role="button"
+                  tabIndex={0}
                   className={`p-4 cursor-pointer transition-colors ${
                     selectedDecision?.id === decision.id
                       ? 'bg-blue-50 border-l-4 border-l-blue-500'

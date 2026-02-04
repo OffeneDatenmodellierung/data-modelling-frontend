@@ -42,12 +42,12 @@ export default defineConfig({
     },
   },
   // Content Security Policy for bpmn-js/dmn-js inline styles
-  // Cross-Origin headers required for SharedArrayBuffer (DuckDB-WASM performance)
   server: {
     port: 5173,
     headers: {
+      // CSP updated to allow GitHub API and CDN connections for dev mode
       'Content-Security-Policy':
-        "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; worker-src 'self' blob:;",
+        "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; worker-src 'self' blob: https://cdn.jsdelivr.net; connect-src 'self' https://api.github.com https://raw.githubusercontent.com https://*.githubusercontent.com https://cdn.jsdelivr.net;",
       'Cross-Origin-Opener-Policy': 'same-origin',
       'Cross-Origin-Embedder-Policy': 'require-corp',
     },
@@ -79,10 +79,6 @@ export default defineConfig({
           ) {
             return 'wasm/[name][extname]';
           }
-          // Keep DuckDB WASM files in duckdb/ directory
-          if (assetInfo.name && assetInfo.name.includes('duckdb')) {
-            return 'duckdb/[name][extname]';
-          }
           return 'assets/[name]-[hash][extname]';
         },
       },
@@ -91,12 +87,16 @@ export default defineConfig({
   // Optimize WASM handling
   // Exclude WASM packages from pre-bundling (they need to load WASM files dynamically)
   optimizeDeps: {
-    exclude: ['@offenedatenmodellierung/data-modelling-sdk', '@duckdb/duckdb-wasm'],
+    exclude: ['@offenedatenmodellierung/data-modelling-sdk'],
   },
   test: {
     globals: true,
     environment: 'jsdom',
     setupFiles: './tests/setup.ts',
+    // Use forks pool for better isolation and to prevent "Closing rpc while fetch was pending" errors
+    pool: 'forks',
+    // Ensure tests are isolated to prevent module teardown race conditions
+    isolate: true,
     exclude: [
       '**/node_modules/**',
       '**/dist/**',

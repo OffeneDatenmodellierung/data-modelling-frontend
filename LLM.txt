@@ -5,9 +5,9 @@ This file provides context for Large Language Models working with this codebase.
 ## Project Overview
 
 A domain-centric data modelling application built with React, TypeScript, and Electron.
-Creates data architectures, models, and flow diagrams entirely offline.
+Creates data architectures, models, and flow diagrams entirely offline with full Git/GitHub integration.
 
-**Version**: 2.5.0
+**Version**: 3.0.0
 **License**: ISC
 
 ## Technology Stack
@@ -26,21 +26,23 @@ Creates data architectures, models, and flow diagrams entirely offline.
 - Electron for cross-platform desktop app
 - Native file system access
 - IPC for main/renderer communication
+- simple-git for Git operations
 
 ### WASM Modules
-- **data-modelling-sdk 2.1.0**: YAML parsing, validation, ODCS/ODPS/CADS format support, Knowledge Base, Decision Records, Sketches, stable YAML key ordering
-- **DuckDB-WASM 1.32.0**: In-browser SQL database
+- **data-modelling-sdk 2.3.0**: YAML parsing, validation, ODCS/ODPS/CADS format support, Knowledge Base, Decision Records, Sketches, stable YAML key ordering, workspace relationships, 150+ infrastructure types
 
 ## Key Features
 
 1. **Data Modelling**: Conceptual, logical, physical models with crow's feet notation
 2. **Domain-Centric**: Organize by business domains with systems, tables, relationships
-3. **Excalidraw Sketches**: Freeform diagramming with Excalidraw integration (architecture, dataflow, ER, sequence, flowchart, wireframe, concept, infrastructure diagrams)
-4. **Decision Logs**: MADR-format Architecture Decision Records
-5. **Knowledge Base**: Documentation articles (Guide, Tutorial, Reference, etc.)
-6. **DuckDB-WASM**: In-browser SQL with OPFS persistence
-7. **Import/Export**: ODCS, SQL, AVRO, JSON Schema, Protobuf formats
-8. **Offline Only**: No backend server required
+3. **Git Integration** (v3.0.0): Full Git version control with staging, commits, branches, stash, rebase, tags, blame
+4. **GitHub Integration** (v3.0.0): PRs, reviews, comments, merge with PAT and OAuth authentication
+5. **Excalidraw Sketches**: Freeform diagramming with Excalidraw integration
+6. **Decision Logs**: MADR-format Architecture Decision Records
+7. **Knowledge Base**: Documentation articles (Guide, Tutorial, Reference, etc.)
+8. **Help Panel**: Searchable in-app documentation with keyboard shortcuts (F1)
+9. **Import/Export**: ODCS, SQL, AVRO, JSON Schema, Protobuf formats
+10. **Offline First**: Works without backend; GitHub features require authentication
 
 ## Project Structure
 
@@ -50,7 +52,6 @@ dm/
 │   ├── src/
 │   │   ├── components/       # React components
 │   │   ├── services/         # Business logic
-│   │   │   ├── database/     # DuckDB services
 │   │   │   ├── sdk/          # WASM SDK integration (incl. sketchService)
 │   │   │   ├── storage/      # File storage
 │   │   │   └── platform/     # Platform abstraction
@@ -67,28 +68,6 @@ dm/
 └── TODO.md                   # Implementation tasks
 ```
 
-## DuckDB-WASM Integration (v2.1.0)
-
-### Services
-- `duckdbService.ts`: Core DuckDB initialization and query execution
-- `opfsManager.ts`: OPFS file system management
-- `schemaManager.ts`: Database schema and migrations
-- `syncEngine.ts`: YAML ↔ DuckDB synchronization
-- `queryBuilder.ts`: Type-safe SQL query builder
-- `duckdbStorageAdapter.ts`: Storage interface implementation
-
-### React Hooks
-- `useDuckDB()`: Access DuckDB service
-- `useQuery()`: Execute SELECT queries
-- `useMutation()`: Execute INSERT/UPDATE/DELETE
-- `useSyncStatus()`: Monitor sync state
-
-### Browser Support
-- Chrome 86+, Edge 86+: Full OPFS support
-- Firefox 111+: Full OPFS support
-- Safari 15.2+: Limited OPFS support
-- Fallback: In-memory mode for unsupported browsers
-
 ## Important Files
 
 ### Configuration
@@ -97,17 +76,17 @@ dm/
 - `package.json`: Dependencies and scripts
 
 ### Documentation
-- `docs/DUCKDB_GUIDE.md`: User guide
-- `docs/api/DUCKDB_SERVICE.md`: API reference
-- `docs/api/SYNC_ENGINE.md`: Sync engine reference
-- `docs/DUCKDB_BINDINGS.md`: WASM bindings
 - `docs/SDK_BINDINGS.md`: SDK bindings
 
 ### Tests
-- `tests/unit/services/database/`: DuckDB unit tests (117 tests)
 - `tests/unit/stores/sketchStore.test.ts`: Sketch store tests (50 tests)
 - `tests/unit/services/sdk/sketchService.test.ts`: Sketch service tests (37 tests)
-- Total test count: 744 tests
+- `tests/unit/stores/gitStore.test.ts`: Git store tests (37 tests)
+- `tests/unit/stores/githubStore.test.ts`: GitHub store tests (48 tests)
+- `tests/unit/components/github/`: PR review component tests (37 tests)
+- `tests/unit/stores/helpStore.test.ts`: Help store tests (23 tests)
+- `tests/unit/types/help.test.ts`: Help utility tests (22 tests)
+- Total test count: ~780 tests
 
 ## Development Commands
 
@@ -136,29 +115,6 @@ npm run electron:build   # Build Electron app
 - No partial implementations or TODOs
 - Conventional commit messages
 - ESLint + Prettier formatting
-
-## Architecture Notes
-
-### Singleton Services
-- DuckDB service uses singleton pattern
-- OPFS manager uses singleton pattern
-- Access via `getDuckDBService()`, `getOPFSManager()`
-
-### Query Builder Pattern
-```typescript
-import { query } from './queryBuilder';
-
-const { sql, params } = query
-  .select('tables')
-  .where('domain_id', '=', domainId)
-  .orderBy('name', 'ASC')
-  .build();
-```
-
-### Sync Engine
-- Hash-based change detection (SHA-256)
-- Bidirectional YAML ↔ DuckDB sync
-- Configurable sync strategies
 
 ## Excalidraw Sketches (v2.5.0)
 
@@ -195,14 +151,88 @@ Excalidraw integration provides freeform diagramming for architecture, dataflow,
 - File pattern: `{workspace}_{domain}_{name}.sketch.json`
 - Global sketches: `{workspace}_global_{name}.sketch.json`
 
-## Common Tasks
+## Git/GitHub Integration (v3.0.0)
 
-### Adding a New Table to DuckDB
-1. Update `schemaManager.ts` with CREATE TABLE
-2. Add types to `types/duckdb.ts`
-3. Add operations to `duckdbStorageAdapter.ts`
-4. Create sync logic in `syncEngine.ts`
-5. Add tests
+### Git Features (Electron Only)
+Full Git version control via `simple-git` library:
+- **Repository**: Initialize, status, current branch
+- **Staging**: Stage/unstage files, view diffs
+- **Commits**: Create commits, view history with diffs
+- **Branches**: Create, switch, delete, merge branches
+- **Remotes**: Push, pull, fetch from remotes
+- **Stash**: Save, apply, pop, drop stashes
+- **Advanced**: Cherry-pick, rebase, tags, blame
+
+### GitHub Features (Browser + Electron)
+GitHub API integration with dual authentication:
+- **PAT Auth**: Personal Access Token for individual use
+- **OAuth**: GitHub App authentication for organizations
+- **Pull Requests**: List, view, create, review, merge
+- **Reviews**: Approve, request changes, add comments
+- **Issues**: View and manage issues
+
+### Stores
+- `gitStore.ts`: Local Git operations state
+- `githubStore.ts`: GitHub API state and operations
+- `helpStore.ts`: Help panel state and navigation
+
+### Components
+- `components/git/`: GitPanel, CommitHistory, BranchSelector, StashList, etc.
+- `components/github/`: GitHubPanel, PullRequestList, PRDetail, CreatePRDialog, etc.
+- `components/help/`: HelpPanel, HelpSearch, HelpTopicList, HelpTopicViewer, etc.
+
+### Services
+- `services/git/gitService.ts`: Git operations via Electron IPC
+- `services/github/githubService.ts`: GitHub REST API client
+- `services/github/githubAuthService.ts`: PAT and OAuth authentication
+
+### Help System
+- Press **F1** or **Cmd+?** to open help panel
+- Searchable topics with relevance scoring
+- Contextual filtering by current view
+- Categories: Getting Started, Git, Canvas, Tables, Keyboard Shortcuts
+
+### PR Review Workflow (v3.0.0)
+Complete pull request review workflow with inline comments:
+
+**Components**
+- `PRListPanel.tsx`: Sidebar panel for browsing and filtering PRs
+- `PRFileDiffViewer.tsx`: Enhanced diff viewer with line numbers and inline comments
+- `PRInlineComment.tsx`: Inline comment thread display
+- `PRReviewSubmitDialog.tsx`: Review submission modal (Approve/Request Changes/Comment)
+- `BranchSwitcher.tsx`: Switch between branches during review
+- `BranchComparePanel.tsx`: Compare branches and view merge changes
+
+**Store State** (githubStore.ts)
+- `pendingReview`: Collects comments before submission
+- `prReviewComments`: Inline code review comments
+- `reviewThreads`: Threaded discussion structure
+- `previousBranch`: Track branch before PR review switch
+- `showPRListPanel`: Toggle PR sidebar visibility
+
+**Selectors**
+- `selectPendingComments`: Get pending review comments
+- `selectPendingCommentCount`: Count pending comments
+- `selectHasPendingReview`: Check if review in progress
+- `selectShowPRListPanel`: PR panel visibility state
+
+**Types** (types/github.ts)
+- `PendingReviewComment`: Comment awaiting submission
+- `ReviewThread`: Threaded comment structure
+- `DiffLine`: Parsed diff line with type and line numbers
+- `ParsedFileDiff`: Complete file diff with hunks
+- `DiffHunk`: Individual diff hunk
+
+**Workflow**
+1. Open PR List Panel from toolbar
+2. Select PR to view details
+3. Click file to see diff
+4. Click line number to add inline comment
+5. Comments collected as pending until submission
+6. Submit review: Approve, Request Changes, or Comment
+7. Merge PR or request changes
+
+## Common Tasks
 
 ### Adding a New React Hook
 1. Create hook in `hooks/` directory

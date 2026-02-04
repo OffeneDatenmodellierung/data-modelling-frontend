@@ -1,10 +1,19 @@
 /**
  * Type definitions for Workspace entity
+ * Updated for SDK 2.3.0+
  */
 
-import type { Domain, ViewPositions } from './domain';
-import type { System } from './system';
+import type { Domain, ViewPositions, SharedResourceReference } from './domain';
+import type { System, SystemType } from './system';
 import type { Owner } from './table';
+import type {
+  ForeignKeyDetails,
+  ETLJobMetadata,
+  VisualMetadata,
+  ContactDetails,
+  SLAProperty,
+  FlowDirection,
+} from './relationship';
 
 export interface Workspace {
   id: string; // UUID
@@ -64,7 +73,8 @@ export interface AssetReference {
 }
 
 /**
- * RelationshipV2 - Relationship definition matching SDK schema
+ * RelationshipV2 - Relationship definition matching SDK schema (SDK 2.3.0+)
+ * Supports crow's feet notation with EndpointCardinality and FlowDirection
  */
 export interface RelationshipV2 {
   id: string; // UUID
@@ -77,10 +87,24 @@ export interface RelationshipV2 {
   notes?: string;
   owner?: string;
   color?: string; // Hex or named color for visualization
+
+  // SDK 2.3.0+ fields
+  source_key?: string; // UUID reference to source column/compound key
+  target_key?: string; // UUID reference to target column/compound key
+  label?: string; // Display label for relationship
+  flow_direction?: FlowDirection; // Direction of data flow
+  infrastructure_type?: string; // Infrastructure classification
+  source_handle?: string; // ReactFlow handle ID for source connection
+  target_handle?: string; // ReactFlow handle ID for target connection
+  foreign_key_details?: ForeignKeyDetails; // Column-level FK mapping
+  etl_job_metadata?: ETLJobMetadata; // ETL job info
+  visual_metadata?: VisualMetadata; // Waypoints, label positions
+  contact_details?: ContactDetails; // Owner contact info
+  sla?: SLAProperty[]; // SLA properties
 }
 
 /**
- * DomainV2 - Domain definition matching SDK schema DomainReference
+ * DomainV2 - Domain definition matching SDK schema DomainReference (SDK 2.3.0+)
  */
 export interface DomainV2 {
   // Required fields (per SDK schema)
@@ -89,12 +113,45 @@ export interface DomainV2 {
 
   // Optional fields
   description?: string;
+  owner?: Owner; // Domain owner (SDK 2.3.0+)
   systems?: SystemV2[]; // Nested system references
   view_positions?: ViewPositions; // Canvas positions for nodes per view mode
+
+  // SDK 2.3.0+ fields for resource management
+  shared_resources?: SharedResourceReference[]; // Cross-domain resource sharing
+  transformation_links?: TransformationLinkV2[]; // BPMN-to-table mappings for ETL view
+  table_visibility?: TableVisibilityV2[]; // Cross-domain table visibility settings
 }
 
 /**
- * SystemV2 - System definition matching SDK schema SystemReference
+ * TransformationLinkV2 - Data transformation link within a domain (SDK 2.3.0+)
+ * Links BPMN processes to tables for ETL view visualization
+ */
+export interface TransformationLinkV2 {
+  id: string; // UUID
+  name?: string; // Optional name
+  transformation_type?: string; // Type of transformation
+  bpmn_process_id?: string; // UUID of the BPMN process
+  source_table_id: string; // UUID of source table
+  target_table_id: string; // UUID of target table
+  metadata?: Record<string, unknown>; // Additional transformation metadata
+  bpmn_element_id?: string; // Reference to specific BPMN element
+  url?: string; // Optional URL reference
+  description?: string; // Optional description
+}
+
+/**
+ * TableVisibilityV2 - Table visibility setting for a domain (SDK 2.3.0+)
+ */
+export interface TableVisibilityV2 {
+  table_id: string; // UUID of the table
+  visibility: 'public' | 'domainOnly' | 'hidden'; // Visibility level
+  visible_in_domains?: string[]; // Array of domain UUIDs where this table is visible
+}
+
+/**
+ * SystemV2 - System definition matching SDK schema SystemReference (SDK 2.3.0+)
+ * Includes DataFlow metadata (owner, SLA, contact_details, infrastructure_type)
  */
 export interface SystemV2 {
   // Required fields (per SDK schema)
@@ -103,8 +160,18 @@ export interface SystemV2 {
 
   // Optional fields
   description?: string;
+  system_type?: SystemType; // Database/system type (SDK 2.3.0+)
+  connection_string?: string; // Connection URL (SDK 2.3.0+)
   table_ids?: string[]; // UUIDs of tables belonging to this system
   asset_ids?: string[]; // UUIDs of compute assets belonging to this system
+
+  // SDK 2.3.0+ DataFlow metadata fields
+  owner?: Owner; // System owner
+  sla?: SLAProperty[]; // SLA properties
+  contact_details?: ContactDetails; // Contact information
+  infrastructure_type?: string; // Infrastructure classification
+  notes?: string; // Additional notes
+  version?: string; // Version tracking
 }
 
 /**

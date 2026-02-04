@@ -18,7 +18,6 @@ export default [
       '*.min.js',
       'electron/**',
       'public/wasm/**',
-      'public/duckdb/**',
       'scripts/**',
       '**/bpmn-js/**',
       '**/dmn-js/**',

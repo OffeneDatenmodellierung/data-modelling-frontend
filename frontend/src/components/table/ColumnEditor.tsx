@@ -44,7 +44,9 @@ export const ColumnEditor: React.FC<ColumnEditorProps> = ({
 
   const handleNameChange = (newName: string) => {
     setName(newName);
-    if (newName && !isValidColumnName(newName)) {
+    if (!newName || newName.trim().length === 0) {
+      setNameError('Column name is required');
+    } else if (!isValidColumnName(newName)) {
       setNameError('Column name must be alphanumeric with underscores only');
     } else {
       setNameError(null);

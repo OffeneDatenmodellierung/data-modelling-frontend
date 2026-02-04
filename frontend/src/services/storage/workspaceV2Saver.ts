@@ -51,6 +51,27 @@ export class WorkspaceV2Saver {
     allDecisionRecords: Decision[] = [],
     allSketches: Sketch[] = []
   ): Promise<SavedFile[]> {
+    // Log input data for debugging
+    console.log('[WorkspaceV2Saver] generateFiles called with:', {
+      workspaceId: workspace.id,
+      workspaceName: workspace.name,
+      domainsCount: domains.length,
+      tablesCount: allTables.length,
+      systemsCount: allSystems.length,
+      tables: allTables.map((t) => ({
+        id: t.id,
+        name: t.name,
+        primary_domain_id: t.primary_domain_id,
+      })),
+      domains: domains.map((d) => ({ id: d.id, name: d.name })),
+      systems: allSystems.map((s) => ({
+        id: s.id,
+        name: s.name,
+        domain_id: (s as any).domain_id,
+        table_ids: s.table_ids,
+      })),
+    });
+
     const files: SavedFile[] = [];
 
     // Sanitize workspace name for filenames
@@ -87,6 +108,27 @@ export class WorkspaceV2Saver {
       `[WorkspaceV2Saver] Generated workspace.yaml and README.md for "${workspace.name}"`
     );
 
+    // Log all tables and domains for debugging
+    console.log(
+      `[WorkspaceV2Saver] Total tables to save: ${allTables.length}, domains: ${domains.length}`
+    );
+    const domainIds = new Set(domains.map((d) => d.id));
+    const orphanedTables = allTables.filter((t) => !domainIds.has(t.primary_domain_id));
+    if (orphanedTables.length > 0) {
+      console.error(
+        `[WorkspaceV2Saver] WARNING: ${orphanedTables.length} table(s) have no matching domain and will NOT be saved:`,
+        orphanedTables.map((t) => ({
+          id: t.id,
+          name: t.name,
+          primary_domain_id: t.primary_domain_id,
+        }))
+      );
+      console.error(
+        `[WorkspaceV2Saver] Available domain IDs:`,
+        domains.map((d) => ({ id: d.id, name: d.name }))
+      );
+    }
+
     // 3. Generate individual resource files in type-specific subdirectories
     for (const domain of domains) {
       const domainName = FileMigration.sanitizeFileName(domain.name);
@@ -108,14 +150,53 @@ export class WorkspaceV2Saver {
       const tablesWithoutSystem: Table[] = [];
 
       // Build a reverse lookup: table_id -> system_id
+      // First, check domain systems (primary lookup)
       const tableToSystemMap = new Map<string, string>();
       for (const system of domainSystems) {
-        if (system.table_ids) {
+        if (system.table_ids && system.table_ids.length > 0) {
+          console.log(
+            `[WorkspaceV2Saver] System "${system.name}" (${system.id}) has ${system.table_ids.length} table_ids:`,
+            system.table_ids
+          );
           for (const tableId of system.table_ids) {
             tableToSystemMap.set(tableId, system.id);
           }
+        } else {
+          console.log(`[WorkspaceV2Saver] System "${system.name}" (${system.id}) has NO table_ids`);
         }
       }
+
+      // Also check ALL systems for tables that might be linked to systems in other domains
+      // This handles the edge case where a table is imported into domain A but linked to a system in domain B
+      const crossDomainSystemsForTables = new Map<string, System>();
+      for (const table of domainTables) {
+        if (!tableToSystemMap.has(table.id)) {
+          // Table not found in domain systems, check all systems
+          const systemWithTable = allSystems.find(
+            (s) => s.table_ids?.includes(table.id) && !domainSystems.some((ds) => ds.id === s.id)
+          );
+          if (systemWithTable) {
+            console.warn(
+              `[WorkspaceV2Saver] Table "${table.name}" (${table.id}) is in domain "${domain.name}" but linked to system "${systemWithTable.name}" (${systemWithTable.id}) in different domain. Adding system to export.`
+            );
+            // Add this system to the lookup so the table gets exported with its system
+            crossDomainSystemsForTables.set(systemWithTable.id, systemWithTable);
+            tableToSystemMap.set(table.id, systemWithTable.id);
+          }
+        }
+      }
+
+      // Log domain tables for comparison
+      console.log(
+        `[WorkspaceV2Saver] Domain "${domain.name}" has ${domainTables.length} table(s):`,
+        domainTables.map((t) => ({ id: t.id, name: t.name }))
+      );
+
+      // Merge cross-domain systems into domainSystems for the export loop
+      const effectiveDomainSystems = [
+        ...domainSystems,
+        ...Array.from(crossDomainSystemsForTables.values()),
+      ];
 
       for (const table of domainTables) {
         const systemId = tableToSystemMap.get(table.id);
@@ -124,13 +205,28 @@ export class WorkspaceV2Saver {
           existing.push(table);
           tablesBySystem.set(systemId, existing);
         } else {
+          // Log warning for tables that should have a system but don't
+          // This helps diagnose issues where tables are not being saved correctly
+          const metadataSystemId = (table as any).metadata?.system_id;
+          if (metadataSystemId) {
+            console.warn(
+              `[WorkspaceV2Saver] Table "${table.name}" (${table.id}) has metadata.system_id="${metadataSystemId}" but no system in domain "${domain.name}" has this table in table_ids. Available systems:`,
+              domainSystems.map((s) => ({ id: s.id, name: s.name, table_ids: s.table_ids }))
+            );
+          }
           tablesWithoutSystem.push(table);
         }
       }
 
+      // Log summary of table grouping for debugging
+      console.log(
+        `[WorkspaceV2Saver] Domain "${domain.name}" table grouping: ${tablesBySystem.size} system(s) with tables, ${tablesWithoutSystem.length} table(s) without system`
+      );
+
       // Generate one ODCS file per system (containing all tables for that system)
       for (const [systemId, systemTables] of tablesBySystem) {
-        const system = domainSystems.find((s) => s.id === systemId);
+        // Use effectiveDomainSystems to include cross-domain systems
+        const system = effectiveDomainSystems.find((s) => s.id === systemId);
         const systemName = system?.name || systemId;
         const fileName = FileMigration.generateFileName(
           workspaceName,
@@ -402,7 +498,7 @@ export class WorkspaceV2Saver {
 
   /**
    * Convert internal Workspace format to WorkspaceV2
-   * Matches SDK workspace-schema.json format
+   * Matches SDK workspace-schema.json format (SDK 2.3.0+)
    */
   private static convertToWorkspaceV2(
     workspace: Workspace,
@@ -430,22 +526,52 @@ export class WorkspaceV2Saver {
           name: domain.name,
           // Optional fields
           description: domain.description,
+          // Domain owner (SDK 2.3.0+)
+          ...(domain.owner && { owner: domain.owner }),
+          // Systems with full SDK 2.3.0+ fields
           systems: domainSystems.map((s) => ({
             id: s.id,
             name: s.name,
             description: s.description,
+            // SDK 2.3.0+ system fields
+            ...(s.system_type && { system_type: s.system_type }),
+            ...(s.connection_string && { connection_string: s.connection_string }),
             // Include table and asset IDs for system-resource linkage
             ...(s.table_ids && s.table_ids.length > 0 && { table_ids: s.table_ids }),
             ...(s.asset_ids && s.asset_ids.length > 0 && { asset_ids: s.asset_ids }),
+            // SDK 2.3.0+ DataFlow metadata fields
+            ...((s as any).owner && { owner: (s as any).owner }),
+            ...((s as any).sla && (s as any).sla.length > 0 && { sla: (s as any).sla }),
+            ...((s as any).contact_details && { contact_details: (s as any).contact_details }),
+            ...((s as any).infrastructure_type && {
+              infrastructure_type: (s as any).infrastructure_type,
+            }),
+            ...((s as any).notes && { notes: (s as any).notes }),
+            ...((s as any).version && { version: (s as any).version }),
           })),
           // Include view-specific positions for nodes (tables, systems, assets) per canvas view
           ...(domain.view_positions &&
             Object.keys(domain.view_positions).length > 0 && {
               view_positions: domain.view_positions,
             }),
+          // SDK 2.3.0+ domain resource management fields
+          ...(domain.shared_resources &&
+            domain.shared_resources.length > 0 && {
+              shared_resources: domain.shared_resources,
+            }),
+          // Transformation links for ETL view (stored on domain, not BPMN)
+          ...((domain as any).transformation_links &&
+            (domain as any).transformation_links.length > 0 && {
+              transformation_links: (domain as any).transformation_links,
+            }),
+          // Table visibility settings
+          ...((domain as any).table_visibility &&
+            (domain as any).table_visibility.length > 0 && {
+              table_visibility: (domain as any).table_visibility,
+            }),
         };
       }),
-      // Include all relationships at workspace level
+      // Include all relationships at workspace level with SDK 2.3.0+ fields
       relationships: allRelationships.map((rel) => ({
         id: rel.id,
         // Use source_table_id/target_table_id if available (deprecated fields), otherwise use source_id/target_id
@@ -458,13 +584,47 @@ export class WorkspaceV2Saver {
             : rel.type === 'one-to-many'
               ? 'one_to_many'
               : 'many_to_many',
-        notes: rel.description,
+        notes: rel.description || rel.notes,
         color: rel.color,
+        owner: rel.owner,
         // Connection point handles for edge positioning on canvas
         ...(rel.source_handle && { source_handle: rel.source_handle }),
         ...(rel.target_handle && { target_handle: rel.target_handle }),
+        // SDK 2.3.0+ relationship fields
+        ...(rel.source_key && { source_key: rel.source_key }),
+        ...(rel.target_key && { target_key: rel.target_key }),
+        ...(rel.label && { label: rel.label }),
+        ...(rel.flow_direction && { flow_direction: rel.flow_direction }),
+        ...(rel.infrastructure_type && { infrastructure_type: rel.infrastructure_type as string }),
+        // Map SDK relationship_type enum to V2 snake_case format
+        ...(rel.relationship_type && {
+          relationship_type: this.mapRelationshipType(rel.relationship_type),
+        }),
+        ...(rel.foreign_key_details && { foreign_key_details: rel.foreign_key_details }),
+        ...(rel.etl_job_metadata && { etl_job_metadata: rel.etl_job_metadata }),
+        ...(rel.visual_metadata && { visual_metadata: rel.visual_metadata }),
+        ...(rel.contact_details && { contact_details: rel.contact_details }),
+        ...(rel.sla && rel.sla.length > 0 && { sla: rel.sla }),
       })),
     };
+  }
+
+  /**
+   * Map SDK relationship type enum to V2 snake_case format
+   */
+  private static mapRelationshipType(
+    type: string
+  ): 'foreign_key' | 'data_flow' | 'dependency' | 'etl' | undefined {
+    // Handle both camelCase (SDK enum) and snake_case formats
+    const typeMap: Record<string, 'foreign_key' | 'data_flow' | 'dependency' | 'etl'> = {
+      foreignKey: 'foreign_key',
+      foreign_key: 'foreign_key',
+      dataFlow: 'data_flow',
+      data_flow: 'data_flow',
+      dependency: 'dependency',
+      etl: 'etl',
+    };
+    return typeMap[type];
   }
 
   /**

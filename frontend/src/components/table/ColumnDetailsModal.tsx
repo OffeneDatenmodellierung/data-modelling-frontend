@@ -886,8 +886,14 @@ export const ColumnDetailsModal: React.FC<ColumnDetailsModalProps> = ({
                   <div key={index} className="flex gap-2 items-start p-3 bg-gray-50 rounded-lg">
                     <div className="flex-1 grid grid-cols-2 gap-2">
                       <div>
-                        <label className="block text-xs text-gray-600 mb-1">Type</label>
+                        <label
+                          htmlFor={`auth-def-type-${index}`}
+                          className="block text-xs text-gray-600 mb-1"
+                        >
+                          Type
+                        </label>
                         <select
+                          id={`auth-def-type-${index}`}
                           value={def.type}
                           onChange={(e) =>
                             handleUpdateAuthDefinition(index, { type: e.target.value })
@@ -902,8 +908,14 @@ export const ColumnDetailsModal: React.FC<ColumnDetailsModalProps> = ({
                         </select>
                       </div>
                       <div>
-                        <label className="block text-xs text-gray-600 mb-1">URL</label>
+                        <label
+                          htmlFor={`auth-def-url-${index}`}
+                          className="block text-xs text-gray-600 mb-1"
+                        >
+                          URL
+                        </label>
                         <input
+                          id={`auth-def-url-${index}`}
                           type="url"
                           value={def.url}
                           onChange={(e) =>

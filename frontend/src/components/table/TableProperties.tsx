@@ -84,32 +84,32 @@ export const TableProperties: React.FC<TablePropertiesProps> = ({
 
         {/* Basic Info */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Table Name</label>
+          <span className="block text-sm font-medium text-gray-700 mb-1">Table Name</span>
           <div className="text-lg font-semibold">{table.name}</div>
         </div>
 
         {table.alias && (
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Alias</label>
+            <span className="block text-sm font-medium text-gray-700 mb-1">Alias</span>
             <div className="text-sm text-gray-600">{table.alias}</div>
           </div>
         )}
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Model Type</label>
+          <span className="block text-sm font-medium text-gray-700 mb-1">Model Type</span>
           <div className="text-sm text-gray-600 capitalize">{table.model_type}</div>
         </div>
 
         {table.description && (
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+            <span className="block text-sm font-medium text-gray-700 mb-1">Description</span>
             <div className="text-sm text-gray-600 whitespace-pre-wrap">{table.description}</div>
           </div>
         )}
 
         {table.tags && table.tags.length > 0 && (
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Tags</label>
+            <span className="block text-sm font-medium text-gray-700 mb-1">Tags</span>
             <div className="flex flex-wrap gap-2">
               {table.tags.map((tag) => (
                 <span
@@ -125,7 +125,7 @@ export const TableProperties: React.FC<TablePropertiesProps> = ({
 
         {/* Columns */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Columns</label>
+          <span className="block text-sm font-medium text-gray-700 mb-2">Columns</span>
           <div className="space-y-2 max-h-64 overflow-y-auto">
             {table.columns.map((column) => (
               <div
@@ -159,7 +159,7 @@ export const TableProperties: React.FC<TablePropertiesProps> = ({
 
         {/* Statistics */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Statistics</label>
+          <span className="block text-sm font-medium text-gray-700 mb-1">Statistics</span>
           <div className="text-sm text-gray-600 space-y-1">
             <div>Columns: {table.columns.length}</div>
             <div>Primary Keys: {table.columns.filter((c) => c.is_primary_key).length}</div>
@@ -169,7 +169,7 @@ export const TableProperties: React.FC<TablePropertiesProps> = ({
 
         {/* Metadata */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Metadata</label>
+          <span className="block text-sm font-medium text-gray-700 mb-1">Metadata</span>
           <div className="text-sm text-gray-600 space-y-1">
             <div>Created: {formatDateReadable(table.created_at)}</div>
             <div>Last Modified: {formatDateReadable(table.last_modified_at)}</div>

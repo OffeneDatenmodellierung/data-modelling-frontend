@@ -644,10 +644,14 @@ export const TableMetadataModal: React.FC<TableMetadataModalProps> = ({
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">
+                      <label
+                        htmlFor={`role-${index}-custom-props`}
+                        className="block text-xs font-medium text-gray-600 mb-1"
+                      >
                         Custom Properties (JSON)
                       </label>
                       <textarea
+                        id={`role-${index}-custom-props`}
                         value={
                           role.customProperties
                             ? JSON.stringify(role.customProperties, null, 2)

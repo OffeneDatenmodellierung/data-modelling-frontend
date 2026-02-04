@@ -389,10 +389,14 @@ describe('DecisionList', () => {
       render(<DecisionList workspacePath={mockWorkspacePath} />);
 
       expect(screen.getByText('Sort by:')).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /Number/ })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /Title/ })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /Status/ })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /Updated/ })).toBeInTheDocument();
+      // Use getAllByRole and filter to the sort buttons (which are direct children of the sort controls area)
+      const sortButtons = screen
+        .getAllByRole('button')
+        .filter((btn) => btn.classList.contains('px-2') && btn.classList.contains('py-1'));
+      expect(sortButtons.some((btn) => btn.textContent?.includes('Number'))).toBe(true);
+      expect(sortButtons.some((btn) => btn.textContent?.includes('Title'))).toBe(true);
+      expect(sortButtons.some((btn) => btn.textContent?.includes('Status'))).toBe(true);
+      expect(sortButtons.some((btn) => btn.textContent?.includes('Updated'))).toBe(true);
     });
 
     it('should highlight active sort field', () => {

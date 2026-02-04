@@ -7,6 +7,154 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **SDK 2.3.0 Support**: Updated to data-modelling-sdk 2.3.0
+  - Extended `InfrastructureType` enum with 150+ infrastructure types covering message queues, streaming platforms, orchestration tools, data processing frameworks, cloud data platforms, ETL/ELT tools, and more
+  - Added ODPS DataProduct fields: `tenant`, `management_ports`, `owner`, `roles`, `servers`, `service_levels`, `pricing`, `terms`, `links`, `team_members`
+  - Updated workspace schema with new SystemV2, DomainV2, RelationshipV2 fields
+  - Decision `create_decision` now requires mandatory `author` parameter (SDK 2.3.0 breaking change)
+
+### Removed
+- **DuckDB-WASM Integration**: Removed unused DuckDB-WASM integration (~3000 lines of code)
+  - Removed `@duckdb/duckdb-wasm` package dependency
+  - Removed `src/services/database/` directory (duckdbService, syncEngine, schemaManager, queryBuilder, opfsManager)
+  - Removed `src/hooks/useDuckDB.ts`, `useQuery.ts`, `useSyncStatus.ts`
+  - Removed `src/contexts/DuckDBContext.tsx`
+  - Removed `src/types/duckdb.ts` and `src/types/database.ts`
+  - Removed `src/components/dev/QueryConsole.tsx` and `DatabaseInspector.tsx`
+  - Removed `src/components/database/` directory (ImportDatabaseDialog, ExportDatabaseDialog)
+  - Removed `src/components/settings/DatabaseSettings.tsx`
+  - Removed DuckDB-related Electron IPC handlers
+  - Simplified build scripts (removed `build:duckdb`, `build:all-wasm`)
+  - All data continues to flow through REST API and YAML files as before
+
+### Changed
+- **Test Infrastructure**: Improved test reliability and isolation
+  - Added `.catch()` handlers to dynamic imports in stores to prevent unhandled rejections during test teardown
+  - Added global mocks for `apiClient`, `workspaceService`, and `githubRepoSync` in test setup
+  - Configured Vitest with `pool: 'forks'` and `isolate: true` for better test isolation
+
+### Added
+- **PR Review Workflow**: Complete pull request review workflow with inline comments
+  - PR List Panel: Sidebar panel for browsing and filtering PRs with status indicators
+  - Enhanced Diff Viewer: Line numbers, click-to-comment, inline comment threads
+  - Inline Comments: Threaded review comments on specific lines of code
+  - Review Submission: Submit reviews with Approve, Request Changes, or Comment options
+  - Pending Reviews: Collect comments before submitting for batch review
+  - Branch Switching: Switch to PR branch for full code review
+  - Branch Comparison: Compare branches and view merge changes with diff preview
+- **PR Review Components**: Six new React components for PR review workflow
+  - `PRListPanel.tsx`: Collapsible sidebar with PR filtering and status badges
+  - `PRFileDiffViewer.tsx`: Enhanced diff viewer with line numbers and click-to-comment
+  - `PRInlineComment.tsx`: Inline comment thread display with reply support
+  - `PRReviewSubmitDialog.tsx`: Modal for submitting reviews with event type selection
+  - `BranchSwitcher.tsx`: UI for switching between branches during review
+  - `BranchComparePanel.tsx`: Compare branches with commit list and file changes
+- **PR Review Types**: TypeScript types for review workflow
+  - `PendingReviewComment`: Comment awaiting submission with line/side info
+  - `ReviewThread`: Threaded comment structure with resolved/outdated state
+  - `DiffLine`: Parsed diff line with type, content, and line numbers
+  - `ParsedFileDiff`: Complete file diff with hunks and statistics
+  - `DiffHunk`: Individual diff hunk with header and lines
+- **PR Review Store State**: GitHub store extensions for review workflow
+  - Pending review management (start, add comment, submit, discard)
+  - Branch switching with previous branch tracking
+  - PR list panel visibility toggle
+  - Review comment and thread management
+- **PR Review Tests**: 37 new component tests for PR review workflow
+  - `PRListPanel.test.tsx`: 8 tests for list rendering, selection, filtering
+  - `PRFileDiffViewer.test.tsx`: 5 tests for diff display and comments
+  - `PRInlineComment.test.tsx`: 5 tests for comment threads and replies
+  - `PRReviewSubmitDialog.test.tsx`: 8 tests for review submission
+  - `BranchSwitcher.test.tsx`: 4 tests for branch switching UI
+  - `BranchComparePanel.test.tsx`: 7 tests for branch comparison
+
+### Changed
+- **GitHubPRDetailPanel**: Integrated new PR review components for inline commenting
+- **ModelEditor**: Added PR List Panel toggle button in toolbar
+- **GitHub Store Tests**: Extended with 14 new tests for pending review and branch switching
+
+## [3.0.0] - 2026-02-02
+
+### Added
+- **Full Git Integration**: Complete Git version control integration for workspaces
+  - Repository initialization and status monitoring
+  - Staging, committing, and viewing commit history
+  - Branch management (create, switch, delete, merge)
+  - Remote operations (push, pull, fetch)
+  - Stash management (save, apply, pop, drop)
+  - Cherry-pick commits between branches
+  - Interactive rebase support
+  - Tag management (create, delete, push)
+  - Git blame for file history tracking
+  - Merge conflict detection and resolution
+- **GitHub Integration**: Full GitHub API integration for collaborative workflows
+  - Personal Access Token (PAT) authentication
+  - GitHub App OAuth authentication with easy switching
+  - Repository connection and management
+  - Pull request support:
+    - List, view, and create pull requests
+    - Add comments and review comments
+    - Approve, request changes, or comment reviews
+    - Merge PRs (merge, squash, rebase strategies)
+    - Conflict detection before merge
+  - Issue viewing and management
+  - Branch protection status display
+- **Git Panel UI**: New Git panel in the application sidebar
+  - File staging with checkbox selection
+  - Commit message editor with conventional commit support
+  - Branch selector with create/switch/delete actions
+  - Remote operations toolbar (push, pull, fetch)
+  - Commit history viewer with diff display
+  - Stash list with apply/pop/drop actions
+- **GitHub Panel UI**: Dedicated GitHub panel for repository operations
+  - Repository connection dialog with PAT/OAuth options
+  - Pull request list with status indicators
+  - PR detail view with files changed, comments, reviews
+  - Create PR dialog with template support
+  - Review submission interface
+- **Help Panel System**: Extensible in-app help documentation
+  - Searchable help topics with scoring algorithm
+  - Contextual help based on current view
+  - Keyboard shortcuts (F1, Cmd+?)
+  - Category-based organization
+  - Comprehensive Git documentation (8 topics):
+    - Git Integration Overview
+    - Authentication Methods (PAT, GitHub App)
+    - Basic Workflow (staging, commits, push/pull)
+    - Branch Management
+    - GitHub Pull Requests
+    - Advanced Operations (stash, rebase, cherry-pick, tags)
+    - Browser vs Electron differences
+    - Troubleshooting guide
+  - Getting Started guide
+  - Keyboard shortcuts reference
+- **Electron Release Workflow**: GitHub Actions workflow for building signed Electron apps
+  - Multi-platform builds (macOS, Windows, Linux)
+  - macOS code signing and notarization support
+  - Windows code signing support (optional)
+  - Artifact upload to GitHub Releases
+  - SHA256 checksums for all artifacts
+- **Test Coverage**: 116 new unit tests
+  - `helpStore.test.ts`: 23 tests for help panel state
+  - `help.test.ts`: 22 tests for search and filtering
+  - `githubStore.test.ts`: 34 tests for GitHub state management
+  - `gitStore.test.ts`: 37 tests for Git state management
+
+### Changed
+- **SDK Upgrade**: Works with `@offenedatenmodellierung/data-modelling-sdk` v2.1.0+
+- **Test Count**: Increased from 744 to 860 tests
+- **React Upgrade**: Using React 19.2.4 with latest features
+
+### Security
+- Fixed all npm audit vulnerabilities (0 vulnerabilities)
+  - `dompurify`: Override to ^3.3.1 (fixes XSS GHSA-vhxf-7vqr-mrjg)
+  - `nanoid`: Override to ^3.3.8 (fixes predictable ID GHSA-mwcw-c2x4-8c55)
+  - `mermaid`: Override to ^10.9.4 (fixes XSS GHSA-7rqq-prvp-x9jh)
+
+### Dependencies
+- Added `simple-git: ^3.30.0` for Git operations in Electron
+
 ## [2.5.0] - 2026-02-01
 
 ### Added
@@ -60,6 +208,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Upgraded `electron`: 39.2.7 → 40.1.0
 - Upgraded `lint-staged`: 15.5.2 → 16.2.7
 - Security vulnerabilities reduced from 15 to 6
+
+## [2.4.4] - 2026-02-02
+
+### Fixed
+- **Quality Rules Export from Imported Contracts**: Fixed quality rules not being exported for columns imported from external data contracts
+  - Quality rules with `type` and `implementation` fields (but no `dimension` field) were being dropped during export
+  - Updated `constraintsToQualityArray` to recognize and preserve quality rules in various formats
+  - Now handles quality rules with `type`, `implementation`, `engine`, `expectation`, `rule`, or `check` fields
+  - Includes catch-all to preserve any non-empty quality rule objects to prevent data loss
 
 ## [2.4.3] - 2026-01-28
 

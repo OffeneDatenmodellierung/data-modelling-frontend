@@ -3,7 +3,7 @@ productName: Open Data Modelling
 copyright: Copyright © 2025
 
 directories:
-  buildResources: build
+  buildResources: electron/build
   output: release
 
 files:
@@ -11,25 +11,86 @@ files:
   - electron/dist-electron/**/*
   - package.json
 
+# Artifact naming pattern
+artifactName: '${productName}-${version}-${os}-${arch}.${ext}'
+
+# macOS configuration
 mac:
   category: public.app-category.developer-tools
   target:
-    - target: default
+    - target: dmg
+      arch:
+        - x64
+        - arm64
+    - target: zip
       arch:
         - x64
         - arm64
   icon: electron/icons/icon.icns
-  # Fallback to PNG if ICNS not available
-  # icon: electron/icons/icon.png
   hardenedRuntime: true
   gatekeeperAssess: false
   entitlements: electron/entitlements.mac.plist
   entitlementsInherit: electron/entitlements.mac.plist
+  # Notarization - uses environment variables:
+  # APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD (or APPLE_ID_PASSWORD), APPLE_TEAM_ID
+  notarize: true
 
+# DMG configuration for macOS
+dmg:
+  contents:
+    - x: 130
+      y: 220
+    - x: 410
+      y: 220
+      type: link
+      path: /Applications
+  window:
+    width: 540
+    height: 380
+
+# Windows configuration
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  # Uses PNG and electron-builder converts to ICO automatically
+  icon: electron/icons/icon.png
+
+# NSIS installer configuration
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
+  artifactName: '${productName}-${version}-win-setup.${ext}'
 
+# Linux configuration
+linux:
+  target:
+    - target: AppImage
+      arch:
+        - x64
+    - target: deb
+      arch:
+        - x64
+  icon: electron/icons
+  category: Development
+  maintainer: Open Data Modelling Team
+
+# AppImage configuration
+appImage:
+  artifactName: '${productName}-${version}-linux-${arch}.${ext}'
+
+# Debian package configuration
+deb:
+  artifactName: '${productName}-${version}-linux-${arch}.${ext}'
+
+# Disable publishing (we handle this in GitHub Actions)
 publish: null
 
+# Compression settings
+compression: maximum
 
+# ASAR configuration
+asar: true
+asarUnpack:
+  - '**/*.node'

@@ -356,10 +356,34 @@ export const useModelStore = create<ModelState>((set, get) => ({
       ),
     })),
   removeTable: (tableId: string) => {
+    // Count orphaned relationships before removal for logging
+    const orphanedCount = get().relationships.filter(
+      (r) =>
+        r.source_table_id === tableId ||
+        r.target_table_id === tableId ||
+        r.source_id === tableId ||
+        r.target_id === tableId
+    ).length;
+
     set((state) => ({
       tables: state.tables.filter((t) => t.id !== tableId),
+      // Cascade delete: remove relationships that reference this table
+      relationships: state.relationships.filter(
+        (r) =>
+          r.source_table_id !== tableId &&
+          r.target_table_id !== tableId &&
+          r.source_id !== tableId &&
+          r.target_id !== tableId
+      ),
       selectedTableId: state.selectedTableId === tableId ? null : state.selectedTableId,
     }));
+
+    if (orphanedCount > 0) {
+      console.log(
+        `[ModelStore] Cascade deleted ${orphanedCount} relationship(s) referencing table ${tableId}`
+      );
+    }
+
     // Mark workspace as having pending changes
     useWorkspaceStore.getState().setPendingChanges(true);
   },
@@ -416,10 +440,12 @@ export const useModelStore = create<ModelState>((set, get) => ({
     }));
     useWorkspaceStore.getState().setPendingChanges(true);
   },
-  updateProduct: (productId, updates) =>
+  updateProduct: (productId, updates) => {
     set((state) => ({
       products: state.products.map((p) => (p.id === productId ? { ...p, ...updates } : p)),
-    })),
+    }));
+    useWorkspaceStore.getState().setPendingChanges(true);
+  },
   removeProduct: (productId) => {
     set((state) => ({
       products: state.products.filter((p) => p.id !== productId),
@@ -457,12 +483,14 @@ export const useModelStore = create<ModelState>((set, get) => ({
     }));
     useWorkspaceStore.getState().setPendingChanges(true);
   },
-  updateBPMNProcess: (processId, updates) =>
+  updateBPMNProcess: (processId, updates) => {
     set((state) => ({
       bpmnProcesses: state.bpmnProcesses.map((p) =>
         p.id === processId ? { ...p, ...updates } : p
       ),
-    })),
+    }));
+    useWorkspaceStore.getState().setPendingChanges(true);
+  },
   removeBPMNProcess: (processId) => {
     set((state) => ({
       bpmnProcesses: state.bpmnProcesses.filter((p) => p.id !== processId),
@@ -475,10 +503,12 @@ export const useModelStore = create<ModelState>((set, get) => ({
     }));
     useWorkspaceStore.getState().setPendingChanges(true);
   },
-  updateDMNDecision: (decisionId, updates) =>
+  updateDMNDecision: (decisionId, updates) => {
     set((state) => ({
       dmnDecisions: state.dmnDecisions.map((d) => (d.id === decisionId ? { ...d, ...updates } : d)),
-    })),
+    }));
+    useWorkspaceStore.getState().setPendingChanges(true);
+  },
   removeDMNDecision: (decisionId) => {
     set((state) => ({
       dmnDecisions: state.dmnDecisions.filter((d) => d.id !== decisionId),
@@ -703,11 +733,35 @@ export const useModelStore = create<ModelState>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       await tableService.deleteTable(domain, tableId);
+
+      // Count orphaned relationships before removal for logging
+      const orphanedCount = get().relationships.filter(
+        (r) =>
+          r.source_table_id === tableId ||
+          r.target_table_id === tableId ||
+          r.source_id === tableId ||
+          r.target_id === tableId
+      ).length;
+
       set((state) => ({
         tables: state.tables.filter((t) => t.id !== tableId),
+        // Cascade delete: remove relationships that reference this table
+        relationships: state.relationships.filter(
+          (r) =>
+            r.source_table_id !== tableId &&
+            r.target_table_id !== tableId &&
+            r.source_id !== tableId &&
+            r.target_id !== tableId
+        ),
         selectedTableId: state.selectedTableId === tableId ? null : state.selectedTableId,
         isLoading: false,
       }));
+
+      if (orphanedCount > 0) {
+        console.log(
+          `[ModelStore] Cascade deleted ${orphanedCount} relationship(s) referencing table ${tableId}`
+        );
+      }
     } catch (error) {
       set({
         error: error instanceof Error ? error.message : 'Failed to delete table',

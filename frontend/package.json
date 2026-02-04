@@ -1,6 +1,6 @@
 {
   "name": "open-data-modelling",
-  "version": "2.5.0",
+  "version": "3.0.0",
   "description": "Open Data Modelling - A domain-centric data modeling application",
   "main": "dist-electron/main.cjs",
   "directories": {
@@ -8,15 +8,13 @@
   },
   "scripts": {
     "build:wasm": "bash scripts/build-wasm.sh || echo 'WASM SDK build skipped (SDK not found or wasm-pack not installed)'",
-    "build:duckdb": "bash scripts/copy-duckdb-wasm.sh",
-    "build:all-wasm": "npm run build:wasm && npm run build:duckdb",
-    "prebuild": "npm run build:all-wasm || true",
-    "dev": "npm run build:duckdb && vite",
+    "prebuild": "npm run build:wasm || true",
+    "dev": "vite",
     "build": "tsc && vite build",
     "verify:versions": "node scripts/verify-versions.js",
     "build:electron": "vite build --config vite.electron.config.ts",
     "build:electron:frontend": "VITE_ELECTRON_BUILD=true vite build && npm run copy:wasm:electron",
-    "copy:wasm:electron": "mkdir -p dist-electron/wasm dist-electron/duckdb && cp -r public/wasm/* dist-electron/wasm/ 2>/dev/null || cp -r dist/wasm/* dist-electron/wasm/ 2>/dev/null || true && cp -r public/duckdb/* dist-electron/duckdb/ 2>/dev/null || true",
+    "copy:wasm:electron": "mkdir -p dist-electron/wasm && cp -r public/wasm/* dist-electron/wasm/ 2>/dev/null || cp -r dist/wasm/* dist-electron/wasm/ 2>/dev/null || true",
     "preview": "vite preview",
     "test": "vitest",
     "test:ui": "vitest --ui",
@@ -43,7 +41,6 @@
   "license": "ISC",
   "type": "module",
   "dependencies": {
-    "@duckdb/duckdb-wasm": "^1.32.0",
     "@excalidraw/excalidraw": "^0.18.0",
     "@offenedatenmodellierung/data-modelling-sdk": "^2.1.0",
     "@tailwindcss/vite": "^4.1.18",
@@ -52,6 +49,7 @@
     "@types/jszip": "^3.4.0",
     "axios": "^1.13.2",
     "bpmn-js": "^18.9.1",
+    "diff": "^8.0.3",
     "dmn-js": "^17.5.0",
     "html-to-image": "^1.11.13",
     "js-yaml": "^4.1.1",
@@ -65,6 +63,11 @@
     "simple-git": "^3.30.0",
     "zustand": "^5.0.9"
   },
+  "overrides": {
+    "dompurify": "^3.3.1",
+    "nanoid": "^3.3.8",
+    "mermaid": "^10.9.4"
+  },
   "devDependencies": {
     "@eslint/js": "^9.39.2",
     "@playwright/test": "^1.57.0",
@@ -72,6 +75,7 @@
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.1",
     "@testing-library/user-event": "^14.6.1",
+    "@types/diff": "^7.0.2",
     "@types/electron": "^1.6.12",
     "@types/node": "^25.0.3",
     "@types/react": "^19.2.7",

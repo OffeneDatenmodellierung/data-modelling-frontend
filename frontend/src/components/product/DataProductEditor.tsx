@@ -9,7 +9,13 @@ import { useModelStore } from '@/stores/modelStore';
 import { useUIStore } from '@/stores/uiStore';
 import { odpsService } from '@/services/sdk/odpsService';
 import { sdkLoader } from '@/services/sdk/sdkLoader';
-import type { DataProduct, ODPSInputPort, ODPSOutputPort, ODPSSupport } from '@/types/odps';
+import type {
+  DataProduct,
+  ODPSInputPort,
+  ODPSOutputPort,
+  ODPSSupport,
+  ODPSStatus,
+} from '@/types/odps';
 
 export interface DataProductEditorProps {
   product?: DataProduct;
@@ -34,7 +40,7 @@ export const DataProductEditor: React.FC<DataProductEditorProps> = ({
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [status, setStatus] = useState<'draft' | 'published' | 'deprecated'>('draft');
+  const [status, setStatus] = useState<ODPSStatus>('draft');
   const [team, setTeam] = useState('');
   const [linkedTables, setLinkedTables] = useState<string[]>([]);
   const [inputPorts, setInputPorts] = useState<ODPSInputPort[]>([]);
@@ -369,10 +375,14 @@ export const DataProductEditor: React.FC<DataProductEditorProps> = ({
           <>
             {/* Basic Information */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label
+                htmlFor="product-name"
+                className="block text-sm font-medium text-gray-700 mb-2"
+              >
                 Name <span className="text-red-500">*</span>
               </label>
               <input
+                id="product-name"
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -382,8 +392,14 @@ export const DataProductEditor: React.FC<DataProductEditorProps> = ({
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
+              <label
+                htmlFor="product-description"
+                className="block text-sm font-medium text-gray-700 mb-2"
+              >
+                Description
+              </label>
               <textarea
+                id="product-description"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 rows={3}
@@ -394,8 +410,14 @@ export const DataProductEditor: React.FC<DataProductEditorProps> = ({
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
+                <label
+                  htmlFor="product-status"
+                  className="block text-sm font-medium text-gray-700 mb-2"
+                >
+                  Status
+                </label>
                 <select
+                  id="product-status"
                   value={status}
                   onChange={(e) =>
                     setStatus(e.target.value as 'draft' | 'published' | 'deprecated')
@@ -409,8 +431,14 @@ export const DataProductEditor: React.FC<DataProductEditorProps> = ({
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Team</label>
+                <label
+                  htmlFor="product-team"
+                  className="block text-sm font-medium text-gray-700 mb-2"
+                >
+                  Team
+                </label>
                 <input
+                  id="product-team"
                   type="text"
                   value={team}
                   onChange={(e) => setTeam(e.target.value)}
@@ -422,8 +450,14 @@ export const DataProductEditor: React.FC<DataProductEditorProps> = ({
 
             {/* Linked Tables */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Linked Tables</label>
+              <label
+                htmlFor="product-linked-tables"
+                className="block text-sm font-medium text-gray-700 mb-2"
+              >
+                Linked Tables
+              </label>
               <select
+                id="product-linked-tables"
                 multiple
                 value={linkedTables}
                 onChange={(e) =>
@@ -444,7 +478,7 @@ export const DataProductEditor: React.FC<DataProductEditorProps> = ({
             {/* Input Ports */}
             <div>
               <div className="flex items-center justify-between mb-2">
-                <label className="block text-sm font-medium text-gray-700">Input Ports</label>
+                <span className="block text-sm font-medium text-gray-700">Input Ports</span>
                 <button
                   onClick={handleAddInputPort}
                   className="text-sm text-blue-600 hover:text-blue-800"
@@ -488,7 +522,7 @@ export const DataProductEditor: React.FC<DataProductEditorProps> = ({
             {/* Output Ports */}
             <div>
               <div className="flex items-center justify-between mb-2">
-                <label className="block text-sm font-medium text-gray-700">Output Ports</label>
+                <span className="block text-sm font-medium text-gray-700">Output Ports</span>
                 <button
                   onClick={handleAddOutputPort}
                   className="text-sm text-blue-600 hover:text-blue-800"
@@ -531,32 +565,48 @@ export const DataProductEditor: React.FC<DataProductEditorProps> = ({
 
             {/* Support Information */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <span className="block text-sm font-medium text-gray-700 mb-2">
                 Support Information
-              </label>
+              </span>
               <div className="space-y-2">
+                <label htmlFor="support-team" className="sr-only">
+                  Support team
+                </label>
                 <input
+                  id="support-team"
                   type="text"
                   value={support.team || ''}
                   onChange={(e) => setSupport({ ...support, team: e.target.value })}
                   placeholder="Support team"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
+                <label htmlFor="support-contact" className="sr-only">
+                  Contact email
+                </label>
                 <input
+                  id="support-contact"
                   type="text"
                   value={support.contact || ''}
                   onChange={(e) => setSupport({ ...support, contact: e.target.value })}
                   placeholder="Contact email"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
+                <label htmlFor="support-slack" className="sr-only">
+                  Slack channel
+                </label>
                 <input
+                  id="support-slack"
                   type="text"
                   value={support.slack_channel || ''}
                   onChange={(e) => setSupport({ ...support, slack_channel: e.target.value })}
                   placeholder="Slack channel"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
+                <label htmlFor="support-docs" className="sr-only">
+                  Documentation URL
+                </label>
                 <input
+                  id="support-docs"
                   type="url"
                   value={support.documentation_url || ''}
                   onChange={(e) => setSupport({ ...support, documentation_url: e.target.value })}
@@ -621,6 +671,7 @@ export const DataProductEditor: React.FC<DataProductEditorProps> = ({
                   </button>
                   {showExportMenu && (
                     <>
+                      {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- Menu backdrop */}
                       <div
                         className="fixed inset-0 z-10"
                         onClick={() => setShowExportMenu(false)}

@@ -11,14 +11,16 @@ A domain-centric data modelling application built with React and Electron. Creat
 
 - **Data Modelling**: Conceptual, logical, and physical models with crow's feet notation
 - **Infinite Canvas**: ReactFlow-based canvas for visualizing data models
+- **Git Integration** (v3.0.0): Full Git version control - staging, commits, branches, stash, rebase, tags, blame
+- **GitHub Integration** (v3.0.0): Pull requests, reviews, comments, merge with PAT and OAuth authentication
 - **Excalidraw Sketches** (v2.5.0+): Freeform diagramming for architecture, dataflow, ER, sequence, flowchart, wireframe, and infrastructure diagrams
-- **Offline Mode**: **Currently only supports offline mode** - Works without API using local files and WASM SDK
+- **Help Panel** (v3.0.0): Searchable in-app documentation with keyboard shortcuts (F1, Cmd+?)
+- **Offline First**: Works without backend; GitHub features available when authenticated
 - **Import/Export**: Support for ODCS, SQL, AVRO, JSON Schema, and Protobuf formats
 - **Cross-Platform**: Electron desktop app (macOS, Windows, Linux)
 - **Domain-Centric**: Organize data models by business domains with systems, tables, relationships, BPMN processes, and DMN decisions
 - **Decision Logs** (SDK 1.13.6+): MADR-format Architecture Decision Records with status workflow
 - **Knowledge Base** (SDK 1.13.6+): Documentation articles with types (Guide, Tutorial, Reference, etc.)
-- **DuckDB-WASM** (v2.1.0+): In-browser SQL database with OPFS persistence for advanced querying and analytics
 
 ## Prerequisites
 
@@ -219,41 +221,72 @@ The SDK 2.1.0 release includes these capabilities:
   - Publishing workflow: Draft → Review → Published → Archived
   - Full-text search across articles
   - Related articles and decisions linking
-  
-- **DuckDB Backend**: Optional embedded analytical database
-  - YAML ↔ Database synchronization
-  - SQL query execution
-  - Advanced analytics and reporting
-  - Configuration via `.data-model.toml`
 
 See the following documentation for more details:
 - [Configuration Guide](frontend/docs/CONFIGURATION.md)
 - [Decision Logs Guide](frontend/docs/DECISION_LOGS.md)
 - [Knowledge Base Guide](frontend/docs/KNOWLEDGE_BASE.md)
 
-### DuckDB-WASM Features (v2.1.0+)
+### Git/GitHub Integration (v3.0.0)
 
-The application includes DuckDB-WASM 1.29.0 (DuckDB 1.4.3) for in-browser SQL queries:
+Full Git version control and GitHub integration for collaborative workflows:
 
-- **OPFS Persistence**: Database persists in browser's Origin Private File System
-- **Browser Compatibility**: Chrome 86+, Edge 86+, Firefox 111+, Safari 15.2+
-- **Automatic Fallback**: In-memory mode for unsupported browsers
-- **YAML Sync**: Bidirectional synchronization with YAML workspace files
-- **Type-safe Queries**: Fluent query builder with TypeScript support
-- **Developer Tools**: SQL console and database inspector (dev mode)
+**Git Features (Electron Only)**:
+- Repository initialization and status monitoring
+- File staging with diff preview
+- Commit history with full diff display
+- Branch management (create, switch, delete, merge)
+- Remote operations (push, pull, fetch)
+- Stash management (save, apply, pop, drop)
+- Advanced: cherry-pick, rebase, tags, blame
 
-See [DuckDB Guide](frontend/docs/DUCKDB_GUIDE.md) for detailed documentation.
+**GitHub Features (Browser + Electron)**:
+- Personal Access Token (PAT) authentication
+- GitHub App OAuth authentication
+- Pull request management:
+  - List and view pull requests
+  - Create PRs with template support
+  - Add comments and review comments
+  - Submit reviews (approve, request changes)
+  - Merge PRs (merge, squash, rebase)
+  - Conflict detection before merge
+- Issue viewing and management
 
-## Offline Mode
+**Authentication Options**:
+1. **PAT (Personal Access Token)**: Best for individual users
+   - Go to GitHub → Settings → Developer settings → Personal access tokens
+   - Generate token with `repo` scope
+   - Paste in the app's GitHub connection dialog
 
-**⚠️ IMPORTANT: This application currently only supports OFFLINE MODE.**
+2. **GitHub App (OAuth)**: Best for organizations
+   - Admin creates GitHub App in org settings
+   - Configure app credentials in the application
+   - Users authenticate via OAuth flow
 
-The app operates entirely offline using:
+### Help System (v3.0.0)
+
+Press **F1** or **Cmd+?** (Ctrl+? on Windows) to open the searchable help panel:
+- Comprehensive Git/GitHub documentation
+- Getting started guides
+- Keyboard shortcuts reference
+- Contextual help based on current view
+
+## Offline-First Architecture
+
+The application operates offline-first with optional GitHub connectivity:
+
+**Core Features (Fully Offline)**:
 - **WASM SDK**: Direct use of `data-modelling-sdk` compiled to WebAssembly
 - **Local File System**: Electron file system access for saving/loading workspaces
-- **No API Required**: All functionality works without any backend server
+- **Git Operations**: Full local Git via simple-git (Electron only)
 
-**Note**: Online mode (API integration) is not currently supported. The application is designed to work standalone with local file storage.
+**GitHub Features (Requires Authentication)**:
+- Pull request management
+- Code reviews and comments
+- Remote repository operations
+- Issue tracking
+
+**Note**: All core data modelling functionality works completely offline. GitHub integration is optional and only needed for collaborative workflows.
 
 ## CI/CD
 

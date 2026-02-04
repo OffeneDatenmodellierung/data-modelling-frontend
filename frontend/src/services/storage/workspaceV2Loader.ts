@@ -14,6 +14,11 @@ import { decisionService } from '@/services/sdk/decisionService';
 import { sketchService } from '@/services/sdk/sketchService';
 import * as yaml from 'js-yaml';
 import { FileMigration } from '@/utils/fileMigration';
+import {
+  useValidationStore,
+  parseValidationError,
+  type ResourceType,
+} from '@/stores/validationStore';
 import type {
   Workspace,
   WorkspaceV2,
@@ -582,6 +587,8 @@ export class WorkspaceV2Loader {
       workspace_id: workspaceId,
       name: domainSpec.name,
       description: domainSpec.description,
+      // SDK 2.3.0+: Load domain owner if present
+      owner: domainSpec.owner,
       created_at: new Date().toISOString(),
       last_modified_at: new Date().toISOString(),
       systems: systems.map((s) => s.id),
@@ -592,6 +599,8 @@ export class WorkspaceV2Loader {
       decisions: decisions.map((d) => d.id),
       // Load view-specific positions for canvas nodes (tables, systems, assets)
       view_positions: domainSpec.view_positions,
+      // SDK 2.3.0+: Load shared resources if present
+      shared_resources: domainSpec.shared_resources,
     };
 
     return {
@@ -667,6 +676,8 @@ export class WorkspaceV2Loader {
       workspace_id: workspaceId,
       name: domainSpec.name,
       description: domainSpec.description,
+      // SDK 2.3.0+: Load domain owner if present
+      owner: domainSpec.owner,
       created_at: new Date().toISOString(),
       last_modified_at: new Date().toISOString(),
       systems: systems.map((s) => s.id),
@@ -677,6 +688,8 @@ export class WorkspaceV2Loader {
       decisions: decisions.map((d) => d.id),
       // Load view-specific positions for canvas nodes (tables, systems, assets)
       view_positions: domainSpec.view_positions,
+      // SDK 2.3.0+: Load shared resources if present
+      shared_resources: domainSpec.shared_resources,
     };
 
     return {
@@ -784,10 +797,35 @@ export class WorkspaceV2Loader {
         }
       } catch (error) {
         console.error(`[WorkspaceV2Loader] Failed to load table from ${file.name}:`, error);
+        // Record validation issue for the failed file
+        this.recordValidationIssue(error, 'table', file.name, file.name);
       }
     }
 
     return tables;
+  }
+
+  /**
+   * Helper to record validation issues to the validation store
+   */
+  private static recordValidationIssue(
+    error: unknown,
+    resourceType: ResourceType,
+    resourceId: string,
+    resourceName: string,
+    filePath?: string
+  ): void {
+    const issues = parseValidationError(error, resourceType, resourceId, resourceName, filePath);
+    if (issues.length > 0) {
+      useValidationStore
+        .getState()
+        .addIssues(
+          issues.map(({ id: _id, createdAt: _createdAt, isActive: _isActive, ...rest }) => rest)
+        );
+      console.log(
+        `[WorkspaceV2Loader] Recorded ${issues.length} validation issue(s) for ${resourceType}: ${resourceName}`
+      );
+    }
   }
 
   /**
@@ -901,7 +939,8 @@ export class WorkspaceV2Loader {
 
     for (const file of files) {
       try {
-        const article = await knowledgeService.parseKnowledgeYaml(file.content);
+        // Pass file path for better validation error reporting
+        const article = await knowledgeService.parseKnowledgeYaml(file.content, file.name);
 
         if (article && typeof article === 'object' && 'id' in article) {
           // Preserve domain_id from the file content as-is
@@ -912,6 +951,7 @@ export class WorkspaceV2Loader {
           `[WorkspaceV2Loader] Failed to load knowledge article from ${file.name}:`,
           error
         );
+        this.recordValidationIssue(error, 'knowledge_article', file.name, file.name, file.name);
       }
     }
 
@@ -929,7 +969,8 @@ export class WorkspaceV2Loader {
 
     for (const file of files) {
       try {
-        const record = await decisionService.parseDecisionYaml(file.content);
+        // Pass file path for better validation error reporting
+        const record = await decisionService.parseDecisionYaml(file.content, file.name);
 
         if (record && typeof record === 'object' && 'id' in record) {
           // Preserve domain_id from the file content as-is
@@ -940,6 +981,7 @@ export class WorkspaceV2Loader {
           `[WorkspaceV2Loader] Failed to load decision record from ${file.name}:`,
           error
         );
+        this.recordValidationIssue(error, 'decision_record', file.name, file.name, file.name);
       }
     }
 
@@ -1048,7 +1090,10 @@ export class WorkspaceV2Loader {
         name: spec.name,
         description: spec.description,
         domain_id: domainId,
-        system_type: 'database', // Default system type
+        // SDK 2.3.0+: Use system_type from workspace.yaml, fallback to 'database'
+        system_type: spec.system_type || 'database',
+        // SDK 2.3.0+: Load connection_string if present
+        connection_string: spec.connection_string,
         table_ids: tableIds,
         asset_ids: assetIds,
         created_at: new Date().toISOString(),
@@ -1113,10 +1158,24 @@ export class WorkspaceV2Loader {
         source_cardinality: sourceCardinality,
         target_cardinality: targetCardinality,
         description: spec.notes,
+        notes: spec.notes,
         color: spec.color,
+        owner: spec.owner,
         // Connection point handles for edge positioning on canvas
-        source_handle: (spec as any).source_handle,
-        target_handle: (spec as any).target_handle,
+        source_handle: spec.source_handle,
+        target_handle: spec.target_handle,
+        // SDK 2.3.0+ relationship fields
+        source_key: spec.source_key,
+        target_key: spec.target_key,
+        label: spec.label,
+        flow_direction: spec.flow_direction,
+        infrastructure_type: spec.infrastructure_type as any, // Map string to InfrastructureType
+        relationship_type: spec.relationship_type as any, // Map to SDKRelationshipType
+        foreign_key_details: spec.foreign_key_details,
+        etl_job_metadata: spec.etl_job_metadata,
+        visual_metadata: spec.visual_metadata,
+        contact_details: spec.contact_details,
+        sla: spec.sla,
         model_type: 'physical' as const,
         is_circular: false,
         created_at: new Date().toISOString(),

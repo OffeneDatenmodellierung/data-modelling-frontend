@@ -64,6 +64,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
   persist(
     (set, get) => {
       let autoSaveTimer: NodeJS.Timeout | null = null;
+      let debouncedSaveTimer: NodeJS.Timeout | null = null;
 
       return {
         workspaces: [],
@@ -111,7 +112,33 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             get().stopAutoSave();
           }
         },
-        setPendingChanges: (pending) => set({ pendingChanges: pending }),
+        setPendingChanges: (pending) => {
+          set({ pendingChanges: pending });
+
+          // In GitHub repo mode, trigger a debounced auto-save to write changes quickly
+          if (pending) {
+            // Clear any existing debounced timer
+            if (debouncedSaveTimer) {
+              clearTimeout(debouncedSaveTimer);
+            }
+
+            // Debounce: wait 2 seconds after the last change before saving
+            debouncedSaveTimer = setTimeout(async () => {
+              try {
+                // Check if we're in GitHub repo mode
+                const { useGitHubRepoStore } = await import('@/stores/githubRepoStore');
+                const githubRepoWorkspace = useGitHubRepoStore.getState().workspace;
+
+                if (githubRepoWorkspace && get().pendingChanges) {
+                  console.log('[WorkspaceStore] Debounced save triggered for GitHub repo mode');
+                  await get().autoSave();
+                }
+              } catch (error) {
+                console.error('[WorkspaceStore] Debounced save failed:', error);
+              }
+            }, 2000);
+          }
+        },
         markSaved: () => set({ pendingChanges: false, lastSavedAt: new Date().toISOString() }),
 
         // CRUD Operations
@@ -429,6 +456,29 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           }
 
           try {
+            // Run validation before save (silent - just updates validation store)
+            const { runWorkspaceValidation } = await import('@/utils/workspaceValidation');
+            await runWorkspaceValidation();
+
+            // Check if we're in GitHub repo mode first
+            const { useGitHubRepoStore } = await import('@/stores/githubRepoStore');
+            const githubRepoWorkspace = useGitHubRepoStore.getState().workspace;
+
+            if (githubRepoWorkspace) {
+              // GitHub Repo Mode - changes are tracked incrementally by githubRepoStore
+              // We do NOT regenerate all files here. Instead, individual stores (modelStore,
+              // knowledgeStore, etc.) should call githubRepoStore.writeFile() when items
+              // are created, updated, or deleted.
+              //
+              // The workspaceStore.pendingChanges flag is not used in GitHub repo mode.
+              // Instead, githubRepoStore.pendingChanges tracks the actual file changes.
+              set({ pendingChanges: false, lastSavedAt: new Date().toISOString() });
+              console.log(
+                '[WorkspaceStore] GitHub repo mode - skipping full file regeneration (changes tracked incrementally)'
+              );
+              return;
+            }
+
             const mode = await useSDKModeStore.getState().getMode();
             const uiStoreModule = await import('@/stores/uiStore');
 
@@ -707,6 +757,17 @@ export const useWorkspaceStore = create<WorkspaceState>()(
               message: 'Workspace not found.',
             });
             return;
+          }
+
+          // Run validation before save and update validation store
+          const { runWorkspaceValidation } = await import('@/utils/workspaceValidation');
+          const validationResult = await runWorkspaceValidation();
+
+          // Log validation results (UI components will handle displaying warnings)
+          if (validationResult.hasErrors) {
+            console.log(
+              `[WorkspaceStore] Manual save with ${validationResult.errorCount} validation error(s)`
+            );
           }
 
           const mode = await useSDKModeStore.getState().getMode();

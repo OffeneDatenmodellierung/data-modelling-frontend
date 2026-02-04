@@ -40,6 +40,7 @@ import {
   formatDecisionNumber,
   generateDecisionNumber,
 } from '@/types/decision';
+import { useValidationStore, parseValidationError } from '@/stores/validationStore';
 
 /**
  * PDF Export Result from SDK
@@ -104,8 +105,12 @@ class DecisionService {
 
   /**
    * Parse a decision from YAML string
+   * Returns the decision even if validation fails, using fallback parser
+   * Validation errors are logged to the validation store
    */
-  async parseDecisionYaml(yaml: string): Promise<Decision | null> {
+  async parseDecisionYaml(yaml: string, filePath?: string): Promise<Decision | null> {
+    let validationError: unknown = null;
+
     // Try SDK first if supported
     if (this.isSupported()) {
       const sdk = await sdkLoader.load();
@@ -114,20 +119,46 @@ class DecisionService {
           const resultJson = sdk.parse_decision_yaml(yaml);
           const sdkDecision = JSON.parse(resultJson);
 
-          if (sdkDecision.error) {
-            throw new Error(sdkDecision.error);
+          // Check for SDK error responses (can be 'error' or 'error_type')
+          if (sdkDecision.error || sdkDecision.error_type) {
+            throw sdkDecision;
           }
 
           // Convert from SDK camelCase to frontend snake_case
           return sdkDecisionToFrontend(sdkDecision);
         } catch (error) {
+          // Capture the validation error but continue to fallback
+          validationError = error;
           console.warn('[DecisionService] SDK parse failed, trying fallback:', error);
         }
       }
     }
 
-    // Fallback: Parse YAML directly using js-yaml
-    return this.parseDecisionYamlFallback(yaml);
+    // Fallback: Parse YAML directly using js-yaml (more lenient)
+    const decision = await this.parseDecisionYamlFallback(yaml);
+
+    // If we got a decision via fallback but had a validation error, log it
+    if (decision && validationError) {
+      const issues = parseValidationError(
+        validationError,
+        'decision_record',
+        decision.id,
+        decision.title || filePath || 'Unknown Decision',
+        filePath
+      );
+      if (issues.length > 0) {
+        useValidationStore
+          .getState()
+          .addIssues(
+            issues.map(({ id: _id, createdAt: _createdAt, isActive: _isActive, ...rest }) => rest)
+          );
+        console.log(
+          `[DecisionService] Added ${issues.length} validation issue(s) for decision: ${decision.title}`
+        );
+      }
+    }
+
+    return decision;
   }
 
   /**
@@ -200,8 +231,9 @@ class DecisionService {
       const resultJson = sdk.parse_decision_index_yaml(yaml);
       const sdkIndex = JSON.parse(resultJson);
 
-      if (sdkIndex.error) {
-        throw new Error(sdkIndex.error);
+      // Check for SDK error responses (can be 'error' or 'error_type')
+      if (sdkIndex.error || sdkIndex.error_type) {
+        throw new Error(sdkIndex.error || sdkIndex.message || 'Unknown SDK error');
       }
 
       // Convert from SDK camelCase to frontend snake_case
@@ -298,8 +330,9 @@ class DecisionService {
       const resultJson = sdk.export_decision_to_pdf(decisionJson, brandingJson);
       const result = JSON.parse(resultJson);
 
-      if (result.error) {
-        throw new Error(result.error);
+      // Check for SDK error responses (can be 'error' or 'error_type')
+      if (result.error || result.error_type) {
+        throw new Error(result.error || result.message || 'Unknown SDK error');
       }
 
       return {
@@ -359,12 +392,14 @@ class DecisionService {
 
   /**
    * Create a new decision using SDK
+   * SDK 2.3.0+ requires author as mandatory 5th parameter
    */
   async createDecisionViaSDK(
     number: number,
     title: string,
     context: string,
-    decisionText: string
+    decisionText: string,
+    author: string
   ): Promise<Decision | null> {
     if (!this.isSupported()) {
       return null;
@@ -376,11 +411,12 @@ class DecisionService {
     }
 
     try {
-      const resultJson = sdk.create_decision(number, title, context, decisionText);
+      const resultJson = sdk.create_decision(number, title, context, decisionText, author);
       const sdkDecision = JSON.parse(resultJson);
 
-      if (sdkDecision.error) {
-        throw new Error(sdkDecision.error);
+      // Check for SDK error responses (can be 'error' or 'error_type')
+      if (sdkDecision.error || sdkDecision.error_type) {
+        throw new Error(sdkDecision.error || sdkDecision.message || 'Unknown SDK error');
       }
 
       // Convert from SDK camelCase to frontend snake_case
@@ -408,8 +444,9 @@ class DecisionService {
       const resultJson = sdk.create_decision_index();
       const sdkIndex = JSON.parse(resultJson);
 
-      if (sdkIndex.error) {
-        throw new Error(sdkIndex.error);
+      // Check for SDK error responses (can be 'error' or 'error_type')
+      if (sdkIndex.error || sdkIndex.error_type) {
+        throw new Error(sdkIndex.error || sdkIndex.message || 'Unknown SDK error');
       }
 
       // Convert from SDK camelCase to frontend snake_case
@@ -447,8 +484,9 @@ class DecisionService {
       const resultJson = sdk.add_decision_to_index(indexJson, decisionJson, filename);
       const result = JSON.parse(resultJson);
 
-      if (result.error) {
-        throw new Error(result.error);
+      // Check for SDK error responses (can be 'error' or 'error_type')
+      if (result.error || result.error_type) {
+        throw new Error(result.error || result.message || 'Unknown SDK error');
       }
 
       // Convert back to frontend format

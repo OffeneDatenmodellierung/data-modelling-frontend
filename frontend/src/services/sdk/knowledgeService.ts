@@ -41,6 +41,15 @@ import {
   formatArticleNumber,
   generateArticleNumber,
 } from '@/types/knowledge';
+import { useValidationStore, parseValidationError } from '@/stores/validationStore';
+
+/**
+ * Result of parsing with validation info
+ */
+export interface ParseResult<T> {
+  data: T | null;
+  validationErrors: string[];
+}
 
 /**
  * Knowledge Service for SDK 1.14.0+ knowledge base management
@@ -72,8 +81,12 @@ class KnowledgeService {
 
   /**
    * Parse a knowledge article from YAML string
+   * Returns the article even if validation fails, using fallback parser
+   * Validation errors are logged to the validation store
    */
-  async parseKnowledgeYaml(yaml: string): Promise<KnowledgeArticle | null> {
+  async parseKnowledgeYaml(yaml: string, filePath?: string): Promise<KnowledgeArticle | null> {
+    let validationError: unknown = null;
+
     // Try SDK first if supported
     if (this.isSupported()) {
       const sdk = await sdkLoader.load();
@@ -82,20 +95,56 @@ class KnowledgeService {
           const resultJson = sdk.parse_knowledge_yaml(yaml);
           const sdkArticle = JSON.parse(resultJson);
 
-          if (sdkArticle.error) {
-            throw new Error(sdkArticle.error);
+          // Check for SDK error responses (can be 'error' or 'error_type')
+          if (sdkArticle.error || sdkArticle.error_type) {
+            throw sdkArticle;
           }
 
           // Convert from SDK camelCase to frontend snake_case
           return sdkKnowledgeToFrontend(sdkArticle);
         } catch (error) {
-          console.warn('[KnowledgeService] SDK parse failed, trying fallback:', error);
+          // Capture the validation error but continue to fallback
+          // Handle case where SDK throws a JSON string error
+          if (typeof error === 'string') {
+            try {
+              const parsedError = JSON.parse(error);
+              validationError = parsedError;
+            } catch {
+              validationError = { message: error };
+            }
+          } else {
+            validationError = error;
+          }
+          console.warn('[KnowledgeService] SDK parse failed, trying fallback:', validationError);
         }
       }
     }
 
-    // Fallback: Parse YAML directly using js-yaml
-    return this.parseKnowledgeYamlFallback(yaml);
+    // Fallback: Parse YAML directly using js-yaml (more lenient)
+    const article = await this.parseKnowledgeYamlFallback(yaml);
+
+    // If we got an article via fallback but had a validation error, log it
+    if (article && validationError) {
+      const issues = parseValidationError(
+        validationError,
+        'knowledge_article',
+        article.id,
+        article.title || filePath || 'Unknown Article',
+        filePath
+      );
+      if (issues.length > 0) {
+        useValidationStore
+          .getState()
+          .addIssues(
+            issues.map(({ id: _id, createdAt: _createdAt, isActive: _isActive, ...rest }) => rest)
+          );
+        console.log(
+          `[KnowledgeService] Added ${issues.length} validation issue(s) for article: ${article.title}`
+        );
+      }
+    }
+
+    return article;
   }
 
   /**
@@ -162,8 +211,9 @@ class KnowledgeService {
       const resultJson = sdk.parse_knowledge_index_yaml(yaml);
       const sdkIndex = JSON.parse(resultJson);
 
-      if (sdkIndex.error) {
-        throw new Error(sdkIndex.error);
+      // Check for SDK error responses (can be 'error' or 'error_type')
+      if (sdkIndex.error || sdkIndex.error_type) {
+        throw new Error(sdkIndex.error || sdkIndex.message || 'Unknown SDK error');
       }
 
       // Convert from SDK camelCase to frontend snake_case
@@ -263,8 +313,9 @@ class KnowledgeService {
       const resultJson = sdk.export_knowledge_to_pdf(articleJson, brandingJson);
       const result = JSON.parse(resultJson);
 
-      if (result.error) {
-        throw new Error(result.error);
+      // Check for SDK error responses (can be 'error' or 'error_type')
+      if (result.error || result.error_type) {
+        throw new Error(result.error || result.message || 'Unknown SDK error');
       }
 
       return {
@@ -303,8 +354,9 @@ class KnowledgeService {
       const resultJson = sdk.search_knowledge_articles(articlesJson, query);
       const result = JSON.parse(resultJson);
 
-      if (result.error) {
-        throw new Error(result.error);
+      // Check for SDK error responses (can be 'error' or 'error_type')
+      if (result.error || result.error_type) {
+        throw new Error(result.error || result.message || 'Unknown SDK error');
       }
 
       // Convert results back to frontend format
@@ -342,8 +394,9 @@ class KnowledgeService {
       const resultJson = sdk.create_knowledge_article(number, title, summary, content, author);
       const sdkArticle = JSON.parse(resultJson);
 
-      if (sdkArticle.error) {
-        throw new Error(sdkArticle.error);
+      // Check for SDK error responses (can be 'error' or 'error_type')
+      if (sdkArticle.error || sdkArticle.error_type) {
+        throw new Error(sdkArticle.error || sdkArticle.message || 'Unknown SDK error');
       }
 
       // Convert from SDK camelCase to frontend snake_case
@@ -371,8 +424,9 @@ class KnowledgeService {
       const resultJson = sdk.create_knowledge_index();
       const sdkIndex = JSON.parse(resultJson);
 
-      if (sdkIndex.error) {
-        throw new Error(sdkIndex.error);
+      // Check for SDK error responses (can be 'error' or 'error_type')
+      if (sdkIndex.error || sdkIndex.error_type) {
+        throw new Error(sdkIndex.error || sdkIndex.message || 'Unknown SDK error');
       }
 
       // Convert from SDK camelCase to frontend snake_case
@@ -410,8 +464,9 @@ class KnowledgeService {
       const resultJson = sdk.add_article_to_knowledge_index(indexJson, articleJson, filename);
       const result = JSON.parse(resultJson);
 
-      if (result.error) {
-        throw new Error(result.error);
+      // Check for SDK error responses (can be 'error' or 'error_type')
+      if (result.error || result.error_type) {
+        throw new Error(result.error || result.message || 'Unknown SDK error');
       }
 
       // Convert back to frontend format

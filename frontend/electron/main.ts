@@ -306,206 +306,6 @@ ipcMain.handle('close-app', () => {
 });
 
 // ============================================================================
-// DuckDB-related IPC handlers
-// ============================================================================
-
-/**
- * Export database/OPFS data to a native file
- * This allows saving browser database content to the local filesystem
- */
-ipcMain.handle(
-  'duckdb:export',
-  async (
-    _event,
-    options: {
-      data: ArrayBuffer | string;
-      defaultPath?: string;
-      format: 'json' | 'csv' | 'duckdb';
-    }
-  ) => {
-    try {
-      const filters: Electron.FileFilter[] = [];
-      let defaultExtension = '';
-
-      switch (options.format) {
-        case 'json':
-          filters.push({ name: 'JSON Files', extensions: ['json'] });
-          defaultExtension = '.json';
-          break;
-        case 'csv':
-          filters.push({ name: 'CSV Files', extensions: ['csv'] });
-          defaultExtension = '.csv';
-          break;
-        case 'duckdb':
-          filters.push({ name: 'DuckDB Database', extensions: ['duckdb', 'db'] });
-          defaultExtension = '.duckdb';
-          break;
-      }
-
-      const defaultPath =
-        options.defaultPath ||
-        `data-model-export-${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}${defaultExtension}`;
-
-      const result = await dialog.showSaveDialog({
-        title: 'Export Database',
-        defaultPath,
-        filters,
-      });
-
-      if (result.canceled || !result.filePath) {
-        return { success: false, canceled: true };
-      }
-
-      // Write the data to file
-      const dataToWrite =
-        typeof options.data === 'string' ? options.data : Buffer.from(options.data);
-
-      await writeFile(result.filePath, dataToWrite);
-      console.log(`[Electron] DuckDB export saved to: ${result.filePath}`);
-
-      return { success: true, filePath: result.filePath };
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      console.error('[Electron] DuckDB export failed:', errorMessage);
-      return { success: false, error: errorMessage };
-    }
-  }
-);
-
-/**
- * Import database file from native filesystem
- * This allows loading database content from local files into the browser
- */
-ipcMain.handle(
-  'duckdb:import',
-  async (
-    _event,
-    options: {
-      formats?: ('json' | 'csv' | 'duckdb')[];
-    }
-  ) => {
-    try {
-      const filters: Electron.FileFilter[] = [];
-      const formats = options.formats || ['json', 'csv'];
-
-      if (formats.includes('json')) {
-        filters.push({ name: 'JSON Files', extensions: ['json'] });
-      }
-      if (formats.includes('csv')) {
-        filters.push({ name: 'CSV Files', extensions: ['csv'] });
-      }
-      if (formats.includes('duckdb')) {
-        filters.push({ name: 'DuckDB Database', extensions: ['duckdb', 'db'] });
-      }
-      filters.push({ name: 'All Files', extensions: ['*'] });
-
-      const result = await dialog.showOpenDialog({
-        title: 'Import Database',
-        filters,
-        properties: ['openFile'],
-      });
-
-      if (result.canceled || result.filePaths.length === 0) {
-        return { success: false, canceled: true };
-      }
-
-      const filePath = result.filePaths[0];
-      if (!filePath) {
-        return { success: false, error: 'No file selected' };
-      }
-      const content = await readFile(filePath);
-      const extension = path.extname(filePath).toLowerCase();
-
-      // Determine format from extension
-      let format: 'json' | 'csv' | 'duckdb' | 'unknown' = 'unknown';
-      if (extension === '.json') format = 'json';
-      else if (extension === '.csv') format = 'csv';
-      else if (extension === '.duckdb' || extension === '.db') format = 'duckdb';
-
-      console.log(`[Electron] DuckDB import from: ${filePath} (format: ${format})`);
-
-      return {
-        success: true,
-        filePath,
-        format,
-        content: content.toString('utf-8'),
-        size: content.length,
-      };
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      console.error('[Electron] DuckDB import failed:', errorMessage);
-      return { success: false, error: errorMessage };
-    }
-  }
-);
-
-/**
- * Get database file info (size, modification date, etc.)
- */
-ipcMain.handle('duckdb:file-info', async (_event, filePath: string) => {
-  try {
-    const { stat } = await import('fs/promises');
-    const stats = await stat(filePath);
-    return {
-      success: true,
-      size: stats.size,
-      created: stats.birthtime.toISOString(),
-      modified: stats.mtime.toISOString(),
-      isFile: stats.isFile(),
-    };
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    return { success: false, error: errorMessage };
-  }
-});
-
-/**
- * Check if a database file exists
- */
-ipcMain.handle('duckdb:file-exists', async (_event, filePath: string) => {
-  return existsSync(filePath);
-});
-
-/**
- * Delete a database file
- */
-ipcMain.handle('duckdb:delete-file', async (_event, filePath: string) => {
-  try {
-    await unlink(filePath);
-    console.log(`[Electron] Deleted database file: ${filePath}`);
-    return { success: true };
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    console.error('[Electron] Failed to delete database file:', errorMessage);
-    return { success: false, error: errorMessage };
-  }
-});
-
-/**
- * Create a backup of a database file
- */
-ipcMain.handle(
-  'duckdb:backup',
-  async (_event, options: { sourcePath: string; backupPath?: string }) => {
-    try {
-      const { copyFile } = await import('fs/promises');
-      const backupPath =
-        options.backupPath ||
-        `${options.sourcePath}.backup-${new Date().toISOString().replace(/[:.]/g, '-')}`;
-
-      await copyFile(options.sourcePath, backupPath);
-      console.log(`[Electron] Database backup created: ${backupPath}`);
-
-      return { success: true, backupPath };
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      console.error('[Electron] Database backup failed:', errorMessage);
-      return { success: false, error: errorMessage };
-    }
-  }
-);
-
-// ============================================================================
 // Git-related IPC handlers
 // ============================================================================
 
@@ -520,14 +320,16 @@ async function getSimpleGit() {
 
 /**
  * Get git status for a workspace
+ * Supports workspaces that are subdirectories of a git repo
  */
 ipcMain.handle('git:status', async (_event, workspacePath: string) => {
   try {
     const simpleGit = await getSimpleGit();
     const git = simpleGit(workspacePath);
 
-    // Check if this is a git repo
-    const isRepo = await git.checkIsRepo();
+    // Check if this path is inside a git repo (including parent directories)
+    // checkIsRepo('root') returns true if any parent directory contains .git
+    const isRepo = await git.checkIsRepo('root');
     if (!isRepo) {
       return {
         isGitRepo: false,
@@ -539,8 +341,12 @@ ipcMain.handle('git:status', async (_event, workspacePath: string) => {
         remoteUrl: null,
         hasConflicts: false,
         conflictFiles: [],
+        gitRoot: null,
       };
     }
+
+    // Get the git root directory (may be different from workspacePath)
+    const gitRoot = await git.revparse(['--show-toplevel']);
 
     // Get status
     const status = await git.status();
@@ -607,6 +413,7 @@ ipcMain.handle('git:status', async (_event, workspacePath: string) => {
       remoteUrl,
       hasConflicts,
       conflictFiles: status.conflicted,
+      gitRoot: gitRoot.trim(),
     };
   } catch (error) {
     console.error('[Electron] Git status failed:', error);
@@ -620,6 +427,7 @@ ipcMain.handle('git:status', async (_event, workspacePath: string) => {
       remoteUrl: null,
       hasConflicts: false,
       conflictFiles: [],
+      gitRoot: null,
     };
   }
 });
@@ -804,6 +612,848 @@ ipcMain.handle('git:init', async (_event, workspacePath: string) => {
     return { success: false, error: errorMessage };
   }
 });
+
+// ============================================================================
+// Phase 3: Branch Management
+// ============================================================================
+
+/**
+ * List all branches (local and remote)
+ */
+ipcMain.handle('git:branches', async (_event, workspacePath: string) => {
+  try {
+    const simpleGit = await getSimpleGit();
+    const git = simpleGit(workspacePath);
+
+    const branchSummary = await git.branch(['-a', '-v']);
+
+    const branches = {
+      current: branchSummary.current,
+      local: [] as Array<{
+        name: string;
+        commit: string;
+        label: string;
+        current: boolean;
+      }>,
+      remote: [] as Array<{
+        name: string;
+        commit: string;
+        remoteName: string;
+        branchName: string;
+      }>,
+    };
+
+    for (const [name, data] of Object.entries(branchSummary.branches)) {
+      if (name.startsWith('remotes/')) {
+        // Remote branch
+        const parts = name.replace('remotes/', '').split('/');
+        const remoteName = parts[0];
+        const branchName = parts.slice(1).join('/');
+        // Skip HEAD pointer
+        if (branchName !== 'HEAD') {
+          branches.remote.push({
+            name,
+            commit: data.commit,
+            remoteName: remoteName || '',
+            branchName,
+          });
+        }
+      } else {
+        // Local branch
+        branches.local.push({
+          name,
+          commit: data.commit,
+          label: data.label || '',
+          current: data.current,
+        });
+      }
+    }
+
+    return { success: true, ...branches };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('[Electron] Git branches failed:', errorMessage);
+    return { success: false, error: errorMessage, current: '', local: [], remote: [] };
+  }
+});
+
+/**
+ * Create a new branch
+ */
+ipcMain.handle(
+  'git:branch-create',
+  async (
+    _event,
+    workspacePath: string,
+    branchName: string,
+    options?: { checkout?: boolean; startPoint?: string }
+  ) => {
+    try {
+      const simpleGit = await getSimpleGit();
+      const git = simpleGit(workspacePath);
+
+      if (options?.checkout) {
+        // Create and checkout in one operation
+        const args = ['-b', branchName];
+        if (options.startPoint) {
+          args.push(options.startPoint);
+        }
+        await git.checkout(args);
+      } else {
+        // Just create the branch
+        const args = [branchName];
+        if (options?.startPoint) {
+          args.push(options.startPoint);
+        }
+        await git.branch(args);
+      }
+
+      return { success: true };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('[Electron] Git branch create failed:', errorMessage);
+      return { success: false, error: errorMessage };
+    }
+  }
+);
+
+/**
+ * Switch to a branch
+ */
+ipcMain.handle('git:branch-checkout', async (_event, workspacePath: string, branchName: string) => {
+  try {
+    const simpleGit = await getSimpleGit();
+    const git = simpleGit(workspacePath);
+    await git.checkout(branchName);
+    return { success: true };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('[Electron] Git checkout failed:', errorMessage);
+    return { success: false, error: errorMessage };
+  }
+});
+
+/**
+ * Delete a branch
+ */
+ipcMain.handle(
+  'git:branch-delete',
+  async (_event, workspacePath: string, branchName: string, options?: { force?: boolean }) => {
+    try {
+      const simpleGit = await getSimpleGit();
+      const git = simpleGit(workspacePath);
+
+      const args = options?.force ? ['-D', branchName] : ['-d', branchName];
+      await git.branch(args);
+
+      return { success: true };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('[Electron] Git branch delete failed:', errorMessage);
+      return { success: false, error: errorMessage };
+    }
+  }
+);
+
+/**
+ * Rename a branch
+ */
+ipcMain.handle(
+  'git:branch-rename',
+  async (_event, workspacePath: string, oldName: string, newName: string) => {
+    try {
+      const simpleGit = await getSimpleGit();
+      const git = simpleGit(workspacePath);
+      await git.branch(['-m', oldName, newName]);
+      return { success: true };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('[Electron] Git branch rename failed:', errorMessage);
+      return { success: false, error: errorMessage };
+    }
+  }
+);
+
+// ============================================================================
+// Phase 4: Remote Operations
+// ============================================================================
+
+/**
+ * List remotes
+ */
+ipcMain.handle('git:remotes', async (_event, workspacePath: string) => {
+  try {
+    const simpleGit = await getSimpleGit();
+    const git = simpleGit(workspacePath);
+    const remotes = await git.getRemotes(true);
+
+    return {
+      success: true,
+      remotes: remotes.map((r) => ({
+        name: r.name,
+        fetchUrl: r.refs?.fetch || null,
+        pushUrl: r.refs?.push || null,
+      })),
+    };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('[Electron] Git remotes failed:', errorMessage);
+    return { success: false, error: errorMessage, remotes: [] };
+  }
+});
+
+/**
+ * Add a remote
+ */
+ipcMain.handle(
+  'git:remote-add',
+  async (_event, workspacePath: string, name: string, url: string) => {
+    try {
+      const simpleGit = await getSimpleGit();
+      const git = simpleGit(workspacePath);
+      await git.addRemote(name, url);
+      return { success: true };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('[Electron] Git remote add failed:', errorMessage);
+      return { success: false, error: errorMessage };
+    }
+  }
+);
+
+/**
+ * Remove a remote
+ */
+ipcMain.handle('git:remote-remove', async (_event, workspacePath: string, name: string) => {
+  try {
+    const simpleGit = await getSimpleGit();
+    const git = simpleGit(workspacePath);
+    await git.removeRemote(name);
+    return { success: true };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('[Electron] Git remote remove failed:', errorMessage);
+    return { success: false, error: errorMessage };
+  }
+});
+
+/**
+ * Fetch from remote
+ */
+ipcMain.handle(
+  'git:fetch',
+  async (_event, workspacePath: string, options?: { remote?: string; prune?: boolean }) => {
+    try {
+      const simpleGit = await getSimpleGit();
+      const git = simpleGit(workspacePath);
+
+      const fetchOptions: string[] = [];
+      if (options?.prune) {
+        fetchOptions.push('--prune');
+      }
+
+      if (options?.remote) {
+        await git.fetch(options.remote, undefined, fetchOptions);
+      } else {
+        await git.fetch(fetchOptions);
+      }
+
+      return { success: true };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('[Electron] Git fetch failed:', errorMessage);
+      return { success: false, error: errorMessage };
+    }
+  }
+);
+
+/**
+ * Pull from remote
+ */
+ipcMain.handle(
+  'git:pull',
+  async (_event, workspacePath: string, options?: { remote?: string; branch?: string }) => {
+    try {
+      const simpleGit = await getSimpleGit();
+      const git = simpleGit(workspacePath);
+
+      const pullResult = await git.pull(options?.remote, options?.branch);
+
+      return {
+        success: true,
+        summary: {
+          changes: pullResult.summary.changes,
+          insertions: pullResult.summary.insertions,
+          deletions: pullResult.summary.deletions,
+        },
+        files: pullResult.files,
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('[Electron] Git pull failed:', errorMessage);
+      return { success: false, error: errorMessage };
+    }
+  }
+);
+
+/**
+ * Push to remote
+ */
+ipcMain.handle(
+  'git:push',
+  async (
+    _event,
+    workspacePath: string,
+    options?: { remote?: string; branch?: string; setUpstream?: boolean; force?: boolean }
+  ) => {
+    try {
+      const simpleGit = await getSimpleGit();
+      const git = simpleGit(workspacePath);
+
+      const pushOptions: string[] = [];
+      if (options?.setUpstream) {
+        pushOptions.push('-u');
+      }
+      if (options?.force) {
+        pushOptions.push('--force');
+      }
+
+      if (options?.remote && options?.branch) {
+        await git.push(options.remote, options.branch, pushOptions);
+      } else if (options?.remote) {
+        await git.push(options.remote, undefined, pushOptions);
+      } else {
+        await git.push(pushOptions);
+      }
+
+      return { success: true };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('[Electron] Git push failed:', errorMessage);
+      return { success: false, error: errorMessage };
+    }
+  }
+);
+
+/**
+ * Get tracking branch info
+ */
+ipcMain.handle('git:tracking', async (_event, workspacePath: string, branchName?: string) => {
+  try {
+    const simpleGit = await getSimpleGit();
+    const git = simpleGit(workspacePath);
+
+    // Get current branch if not specified
+    const status = await git.status();
+    const branch = branchName || status.current;
+
+    // Get tracking info using rev-parse
+    try {
+      const upstream = await git.revparse([`${branch}@{upstream}`, '--abbrev-ref']);
+      const parts = upstream.trim().split('/');
+      const remoteName = parts[0];
+      const remoteBranch = parts.slice(1).join('/');
+
+      return {
+        success: true,
+        hasUpstream: true,
+        remoteName: remoteName || null,
+        remoteBranch: remoteBranch || null,
+        ahead: status.ahead,
+        behind: status.behind,
+      };
+    } catch {
+      // No upstream configured
+      return {
+        success: true,
+        hasUpstream: false,
+        remoteName: null,
+        remoteBranch: null,
+        ahead: 0,
+        behind: 0,
+      };
+    }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('[Electron] Git tracking failed:', errorMessage);
+    return { success: false, error: errorMessage, hasUpstream: false };
+  }
+});
+
+/**
+ * Set upstream tracking branch
+ */
+ipcMain.handle(
+  'git:set-upstream',
+  async (_event, workspacePath: string, remote: string, branch: string) => {
+    try {
+      const simpleGit = await getSimpleGit();
+      const git = simpleGit(workspacePath);
+
+      // Get current branch
+      const status = await git.status();
+      const currentBranch = status.current;
+
+      // Set upstream
+      await git.branch(['--set-upstream-to', `${remote}/${branch}`, currentBranch || 'HEAD']);
+
+      return { success: true };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('[Electron] Git set upstream failed:', errorMessage);
+      return { success: false, error: errorMessage };
+    }
+  }
+);
+
+// ============================================================================
+// Phase 5: Advanced Features - Stash, Cherry-pick, Rebase
+// ============================================================================
+
+/**
+ * List all stashes
+ */
+ipcMain.handle('git:stash-list', async (_event, workspacePath: string) => {
+  try {
+    const simpleGit = await getSimpleGit();
+    const git = simpleGit(workspacePath);
+
+    const stashList = await git.stashList();
+
+    return {
+      success: true,
+      stashes: stashList.all.map((stash, index) => ({
+        index,
+        hash: stash.hash,
+        message: stash.message,
+        date: stash.date,
+      })),
+    };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('[Electron] Git stash list failed:', errorMessage);
+    return { success: false, error: errorMessage, stashes: [] };
+  }
+});
+
+/**
+ * Save changes to stash
+ */
+ipcMain.handle(
+  'git:stash-save',
+  async (
+    _event,
+    workspacePath: string,
+    options?: { message?: string; includeUntracked?: boolean; keepIndex?: boolean }
+  ) => {
+    try {
+      const simpleGit = await getSimpleGit();
+      const git = simpleGit(workspacePath);
+
+      const args: string[] = ['push'];
+
+      if (options?.includeUntracked) {
+        args.push('--include-untracked');
+      }
+      if (options?.keepIndex) {
+        args.push('--keep-index');
+      }
+      if (options?.message) {
+        args.push('-m', options.message);
+      }
+
+      await git.stash(args);
+
+      return { success: true };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('[Electron] Git stash save failed:', errorMessage);
+      return { success: false, error: errorMessage };
+    }
+  }
+);
+
+/**
+ * Apply a stash (keep it in stash list)
+ */
+ipcMain.handle('git:stash-apply', async (_event, workspacePath: string, stashIndex?: number) => {
+  try {
+    const simpleGit = await getSimpleGit();
+    const git = simpleGit(workspacePath);
+
+    const stashRef = stashIndex !== undefined ? `stash@{${stashIndex}}` : undefined;
+    const args: string[] = ['apply'];
+    if (stashRef) {
+      args.push(stashRef);
+    }
+
+    await git.stash(args);
+
+    return { success: true };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('[Electron] Git stash apply failed:', errorMessage);
+    return { success: false, error: errorMessage };
+  }
+});
+
+/**
+ * Pop a stash (apply and remove from stash list)
+ */
+ipcMain.handle('git:stash-pop', async (_event, workspacePath: string, stashIndex?: number) => {
+  try {
+    const simpleGit = await getSimpleGit();
+    const git = simpleGit(workspacePath);
+
+    const stashRef = stashIndex !== undefined ? `stash@{${stashIndex}}` : undefined;
+    const args: string[] = ['pop'];
+    if (stashRef) {
+      args.push(stashRef);
+    }
+
+    await git.stash(args);
+
+    return { success: true };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('[Electron] Git stash pop failed:', errorMessage);
+    return { success: false, error: errorMessage };
+  }
+});
+
+/**
+ * Drop a stash
+ */
+ipcMain.handle('git:stash-drop', async (_event, workspacePath: string, stashIndex?: number) => {
+  try {
+    const simpleGit = await getSimpleGit();
+    const git = simpleGit(workspacePath);
+
+    const stashRef = stashIndex !== undefined ? `stash@{${stashIndex}}` : undefined;
+    const args: string[] = ['drop'];
+    if (stashRef) {
+      args.push(stashRef);
+    }
+
+    await git.stash(args);
+
+    return { success: true };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('[Electron] Git stash drop failed:', errorMessage);
+    return { success: false, error: errorMessage };
+  }
+});
+
+/**
+ * Clear all stashes
+ */
+ipcMain.handle('git:stash-clear', async (_event, workspacePath: string) => {
+  try {
+    const simpleGit = await getSimpleGit();
+    const git = simpleGit(workspacePath);
+
+    await git.stash(['clear']);
+
+    return { success: true };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('[Electron] Git stash clear failed:', errorMessage);
+    return { success: false, error: errorMessage };
+  }
+});
+
+/**
+ * Show stash diff
+ */
+ipcMain.handle('git:stash-show', async (_event, workspacePath: string, stashIndex?: number) => {
+  try {
+    const simpleGit = await getSimpleGit();
+    const git = simpleGit(workspacePath);
+
+    const stashRef = stashIndex !== undefined ? `stash@{${stashIndex}}` : 'stash@{0}';
+
+    // Get the diff for the stash
+    const diff = await git.diff([stashRef + '^', stashRef]);
+
+    return { success: true, diff };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('[Electron] Git stash show failed:', errorMessage);
+    return { success: false, error: errorMessage, diff: '' };
+  }
+});
+
+/**
+ * Cherry-pick a commit
+ */
+ipcMain.handle(
+  'git:cherry-pick',
+  async (_event, workspacePath: string, commitHash: string, options?: { noCommit?: boolean }) => {
+    try {
+      const simpleGit = await getSimpleGit();
+      const git = simpleGit(workspacePath);
+
+      const args: string[] = [commitHash];
+      if (options?.noCommit) {
+        args.unshift('-n');
+      }
+
+      await git.raw(['cherry-pick', ...args]);
+
+      return { success: true };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('[Electron] Git cherry-pick failed:', errorMessage);
+      return { success: false, error: errorMessage };
+    }
+  }
+);
+
+/**
+ * Abort cherry-pick
+ */
+ipcMain.handle('git:cherry-pick-abort', async (_event, workspacePath: string) => {
+  try {
+    const simpleGit = await getSimpleGit();
+    const git = simpleGit(workspacePath);
+
+    await git.raw(['cherry-pick', '--abort']);
+
+    return { success: true };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('[Electron] Git cherry-pick abort failed:', errorMessage);
+    return { success: false, error: errorMessage };
+  }
+});
+
+/**
+ * Continue cherry-pick after resolving conflicts
+ */
+ipcMain.handle('git:cherry-pick-continue', async (_event, workspacePath: string) => {
+  try {
+    const simpleGit = await getSimpleGit();
+    const git = simpleGit(workspacePath);
+
+    await git.raw(['cherry-pick', '--continue']);
+
+    return { success: true };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('[Electron] Git cherry-pick continue failed:', errorMessage);
+    return { success: false, error: errorMessage };
+  }
+});
+
+/**
+ * Start interactive rebase
+ */
+ipcMain.handle(
+  'git:rebase-start',
+  async (
+    _event,
+    workspacePath: string,
+    options: { onto?: string; branch?: string; interactive?: boolean; commits?: number }
+  ) => {
+    try {
+      const simpleGit = await getSimpleGit();
+      const git = simpleGit(workspacePath);
+
+      const args: string[] = [];
+
+      if (options.interactive) {
+        args.push('-i');
+      }
+
+      if (options.onto) {
+        args.push('--onto', options.onto);
+      }
+
+      if (options.commits) {
+        // Rebase last N commits
+        args.push(`HEAD~${options.commits}`);
+      } else if (options.branch) {
+        args.push(options.branch);
+      }
+
+      // For interactive rebase in non-interactive mode, we need to set the editor
+      // to a no-op command so it doesn't hang waiting for user input
+      if (options.interactive) {
+        // Set GIT_SEQUENCE_EDITOR to cat so it uses the default todo list
+        await git.env('GIT_SEQUENCE_EDITOR', 'cat');
+      }
+
+      await git.rebase(args);
+
+      return { success: true };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('[Electron] Git rebase start failed:', errorMessage);
+      return { success: false, error: errorMessage };
+    }
+  }
+);
+
+/**
+ * Continue rebase after resolving conflicts
+ */
+ipcMain.handle('git:rebase-continue', async (_event, workspacePath: string) => {
+  try {
+    const simpleGit = await getSimpleGit();
+    const git = simpleGit(workspacePath);
+
+    await git.rebase(['--continue']);
+
+    return { success: true };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('[Electron] Git rebase continue failed:', errorMessage);
+    return { success: false, error: errorMessage };
+  }
+});
+
+/**
+ * Abort rebase
+ */
+ipcMain.handle('git:rebase-abort', async (_event, workspacePath: string) => {
+  try {
+    const simpleGit = await getSimpleGit();
+    const git = simpleGit(workspacePath);
+
+    await git.rebase(['--abort']);
+
+    return { success: true };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('[Electron] Git rebase abort failed:', errorMessage);
+    return { success: false, error: errorMessage };
+  }
+});
+
+/**
+ * Skip current commit during rebase
+ */
+ipcMain.handle('git:rebase-skip', async (_event, workspacePath: string) => {
+  try {
+    const simpleGit = await getSimpleGit();
+    const git = simpleGit(workspacePath);
+
+    await git.rebase(['--skip']);
+
+    return { success: true };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('[Electron] Git rebase skip failed:', errorMessage);
+    return { success: false, error: errorMessage };
+  }
+});
+
+/**
+ * Get rebase status (check if rebase is in progress)
+ */
+ipcMain.handle('git:rebase-status', async (_event, workspacePath: string) => {
+  try {
+    const simpleGit = await getSimpleGit();
+    const git = simpleGit(workspacePath);
+
+    // Check for rebase-merge or rebase-apply directories
+    const gitDir = await git.revparse(['--git-dir']);
+    const { existsSync } = await import('fs');
+    const rebaseMerge = existsSync(path.join(workspacePath, gitDir.trim(), 'rebase-merge'));
+    const rebaseApply = existsSync(path.join(workspacePath, gitDir.trim(), 'rebase-apply'));
+
+    const isRebasing = rebaseMerge || rebaseApply;
+
+    let currentStep = 0;
+    let totalSteps = 0;
+
+    if (isRebasing) {
+      try {
+        const { readFile } = await import('fs/promises');
+        const baseDir = rebaseMerge
+          ? path.join(workspacePath, gitDir.trim(), 'rebase-merge')
+          : path.join(workspacePath, gitDir.trim(), 'rebase-apply');
+
+        const msgNumFile = path.join(baseDir, 'msgnum');
+        const endFile = path.join(baseDir, 'end');
+
+        if (existsSync(msgNumFile)) {
+          currentStep = parseInt(await readFile(msgNumFile, 'utf-8'), 10);
+        }
+        if (existsSync(endFile)) {
+          totalSteps = parseInt(await readFile(endFile, 'utf-8'), 10);
+        }
+      } catch {
+        // Ignore errors reading progress files
+      }
+    }
+
+    return {
+      success: true,
+      isRebasing,
+      currentStep,
+      totalSteps,
+    };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('[Electron] Git rebase status failed:', errorMessage);
+    return { success: false, error: errorMessage, isRebasing: false };
+  }
+});
+
+/**
+ * Reset to a specific commit
+ */
+ipcMain.handle(
+  'git:reset',
+  async (
+    _event,
+    workspacePath: string,
+    commitHash: string,
+    options?: { mode?: 'soft' | 'mixed' | 'hard' }
+  ) => {
+    try {
+      const simpleGit = await getSimpleGit();
+      const git = simpleGit(workspacePath);
+
+      const mode = options?.mode || 'mixed';
+      await git.reset([`--${mode}`, commitHash]);
+
+      return { success: true };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('[Electron] Git reset failed:', errorMessage);
+      return { success: false, error: errorMessage };
+    }
+  }
+);
+
+/**
+ * Revert a commit (create a new commit that undoes the changes)
+ */
+ipcMain.handle(
+  'git:revert',
+  async (_event, workspacePath: string, commitHash: string, options?: { noCommit?: boolean }) => {
+    try {
+      const simpleGit = await getSimpleGit();
+      const git = simpleGit(workspacePath);
+
+      const args: string[] = [commitHash];
+      if (options?.noCommit) {
+        args.unshift('-n');
+      }
+
+      await git.revert(args);
+
+      return { success: true };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('[Electron] Git revert failed:', errorMessage);
+      return { success: false, error: errorMessage };
+    }
+  }
+);
 
 // Quit when all windows are closed, except on macOS
 app.on('window-all-closed', () => {

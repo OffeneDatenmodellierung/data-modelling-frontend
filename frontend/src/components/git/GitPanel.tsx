@@ -3,14 +3,49 @@
  * Main panel for version control operations (Option A from design)
  */
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useGitStore } from '@/stores/gitStore';
 import { gitService } from '@/services/git/gitService';
+import { runWorkspaceValidation } from '@/utils/workspaceValidation';
 import { GitFileList } from './GitFileList';
 import { GitHistoryList } from './GitHistoryList';
 import { DiffViewer } from './DiffViewer';
+import { BranchSelector } from './BranchSelector';
+import { BranchCreateDialog } from './BranchCreateDialog';
+import { GitHubBranchCreateDialog } from './GitHubBranchCreateDialog';
+import { RemoteOperationsPanel } from './RemoteOperationsPanel';
+import { StashPanel } from './StashPanel';
+import { CherryPickDialog, CherryPickConflictPanel } from './CherryPickDialog';
+import { RebasePanel, RebaseStatusIndicator } from './RebasePanel';
+import { TagPanel } from './TagPanel';
+import { PullRequestsPanel } from './PullRequestsPanel';
+import { CacheManagementPanel } from './CacheManagementPanel';
+import { BranchMergePanel } from './BranchMergePanel';
+import { ValidationConfirmDialog } from '@/components/common/ValidationConfirmDialog';
+import { useGitHubStore, selectIsAuthenticated } from '@/stores/githubStore';
+import {
+  useGitHubRepoStore,
+  selectPendingChanges,
+  selectSyncStatus,
+} from '@/stores/githubRepoStore';
+import { useShallow } from 'zustand/react/shallow';
+import { offlineQueueService } from '@/services/github/offlineQueueService';
+import { githubApi } from '@/services/github/githubApi';
+import type { PendingChange } from '@/types/github-repo';
+import type { GitHubBranch } from '@/types/github';
+import * as Diff from 'diff';
 
-type TabType = 'changes' | 'history';
+// Constants for panel resizing
+const MIN_PANEL_WIDTH = 280;
+const MAX_PANEL_WIDTH = 1200; // Allow panel to expand up to 1200px (most of screen)
+const DEFAULT_PANEL_WIDTH = 320;
+
+// Constants for diff viewer resizing
+const MIN_DIFF_HEIGHT = 100;
+const MAX_DIFF_HEIGHT = 600;
+const DEFAULT_DIFF_HEIGHT = 256;
+
+type TabType = 'changes' | 'history' | 'remotes' | 'prs' | 'advanced';
 
 export interface GitPanelProps {
   className?: string;
@@ -27,12 +62,150 @@ export const GitPanel: React.FC<GitPanelProps> = ({ className = '' }) => {
     diffContent,
     isLoadingDiff,
     selectedCommit,
+    showBranchSelector,
+    isFetching,
+    isPulling,
+    isPushing,
+    isRebasing,
+    isCherryPicking,
+    stashes,
   } = useGitStore();
 
-  const [activeTab, setActiveTab] = useState<TabType>('changes');
+  const isGitHubAuthenticated = useGitHubStore(selectIsAuthenticated);
+
+  // Check if we're in GitHub repo mode (opened from URL)
+  // Use useShallow to prevent unnecessary re-renders when workspace object reference changes
+  const githubRepoWorkspace = useGitHubRepoStore(useShallow((state) => state.workspace));
+  const isGitHubRepoMode = githubRepoWorkspace !== null;
+
+  // GitHub repo mode pending changes - use shallow comparison for array
+  const pendingChanges = useGitHubRepoStore(useShallow(selectPendingChanges));
+  const syncStatus = useGitHubRepoStore(selectSyncStatus);
+  const isSyncing = syncStatus === 'syncing';
+
+  // Derive staged/unstaged from pendingChanges to avoid selector re-render issues
+  const stagedChanges = useMemo(() => pendingChanges.filter((c) => c.staged), [pendingChanges]);
+  const unstagedChanges = useMemo(() => pendingChanges.filter((c) => !c.staged), [pendingChanges]);
+  const hasStagedChanges = stagedChanges.length > 0;
+
+  // Staging actions - use shallow to get multiple actions in one subscription
+  const { stageChange, unstageChange, stageAllChanges, unstageAllChanges } = useGitHubRepoStore(
+    useShallow((state) => ({
+      stageChange: state.stageChange,
+      unstageChange: state.unstageChange,
+      stageAllChanges: state.stageAllChanges,
+      unstageAllChanges: state.unstageAllChanges,
+    }))
+  );
+
+  // In GitHub repo mode, default to PRs tab since local git features aren't available
+  const [activeTab, setActiveTab] = useState<TabType>(isGitHubRepoMode ? 'prs' : 'changes');
+
+  // Auto-open panel once when entering GitHub repo mode
+  const hasAutoOpenedRef = React.useRef(false);
+  useEffect(() => {
+    if (isGitHubRepoMode && !hasAutoOpenedRef.current) {
+      hasAutoOpenedRef.current = true;
+      useGitStore.getState().setPanelOpen(true);
+    }
+    // Reset when leaving GitHub repo mode
+    if (!isGitHubRepoMode) {
+      hasAutoOpenedRef.current = false;
+    }
+  }, [isGitHubRepoMode]);
+  const [cherryPickCommit, setCherryPickCommit] = useState<typeof selectedCommit>(null);
+  const [showCherryPickDialog, setShowCherryPickDialog] = useState(false);
   const [commitMessage, setCommitMessage] = useState('');
   const [isCommitting, setIsCommitting] = useState(false);
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
+  const [showValidationConfirm, setShowValidationConfirm] = useState(false);
+  const [validationErrorCount, setValidationErrorCount] = useState(0);
+  const [validationWarningCount, setValidationWarningCount] = useState(0);
+
+  // GitHub repo mode: selected pending change for diff viewing
+  const [selectedPendingChange, setSelectedPendingChange] = useState<PendingChange | null>(null);
+  const [pendingChangeDiff, setPendingChangeDiff] = useState<string | null>(null);
+  const [isLoadingPendingDiff, setIsLoadingPendingDiff] = useState(false);
+
+  // GitHub repo mode: branch creation dialog
+  const [showGitHubBranchDialog, setShowGitHubBranchDialog] = useState(false);
+
+  // GitHub repo mode: branch switching
+  const [showBranchDropdown, setShowBranchDropdown] = useState(false);
+  const [branches, setBranches] = useState<GitHubBranch[]>([]);
+  const [isLoadingBranches, setIsLoadingBranches] = useState(false);
+  const [isSwitchingBranch, setIsSwitchingBranch] = useState(false);
+  const branchDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Panel resizing (horizontal)
+  const [panelWidth, setPanelWidth] = useState(DEFAULT_PANEL_WIDTH);
+  const isResizing = useRef(false);
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  // Diff viewer resizing (vertical)
+  const [diffHeight, setDiffHeight] = useState(DEFAULT_DIFF_HEIGHT);
+  const isDiffResizing = useRef(false);
+
+  const isRemoteOperationInProgress = isFetching || isPulling || isPushing;
+
+  // Check if on protected branch (main/master)
+  const currentBranch = isGitHubRepoMode ? githubRepoWorkspace?.branch : status.currentBranch;
+  const isProtectedBranch = currentBranch === 'main' || currentBranch === 'master';
+
+  // Generate diff when a pending change is selected
+  const handleSelectPendingChange = useCallback(
+    async (change: PendingChange) => {
+      // Toggle off if already selected
+      if (selectedPendingChange?.id === change.id) {
+        setSelectedPendingChange(null);
+        setPendingChangeDiff(null);
+        return;
+      }
+
+      setSelectedPendingChange(change);
+      setIsLoadingPendingDiff(true);
+      setPendingChangeDiff(null);
+
+      try {
+        const workspaceId = githubRepoWorkspace?.id;
+        if (!workspaceId) return;
+
+        // Get the original cached content
+        const cachedFile = await offlineQueueService.getCachedFile(workspaceId, change.path);
+        const originalContent = cachedFile?.content || '';
+        const newContent = change.content || '';
+
+        // Generate unified diff with context lines
+        const diff = Diff.createPatch(
+          change.path,
+          originalContent,
+          newContent,
+          'original',
+          'modified',
+          { context: 5 } // 5 lines of context
+        );
+
+        setPendingChangeDiff(diff);
+      } catch (error) {
+        console.error('[GitPanel] Failed to generate diff:', error);
+        setPendingChangeDiff(null);
+      } finally {
+        setIsLoadingPendingDiff(false);
+      }
+    },
+    [selectedPendingChange, githubRepoWorkspace]
+  );
+
+  // Clear selected pending change when changes list updates
+  useEffect(() => {
+    if (selectedPendingChange) {
+      const stillExists = pendingChanges.some((c) => c.id === selectedPendingChange.id);
+      if (!stillExists) {
+        setSelectedPendingChange(null);
+        setPendingChangeDiff(null);
+      }
+    }
+  }, [pendingChanges, selectedPendingChange]);
 
   // Load history when switching to history tab
   useEffect(() => {
@@ -50,7 +223,8 @@ export const GitPanel: React.FC<GitPanelProps> = ({ className = '' }) => {
     }
   }, [selectedFile, activeTab, status.files.length]);
 
-  const handleCommit = useCallback(async () => {
+  // Perform the actual commit
+  const performCommit = useCallback(async () => {
     if (!commitMessage.trim()) return;
 
     setIsCommitting(true);
@@ -61,6 +235,37 @@ export const GitPanel: React.FC<GitPanelProps> = ({ className = '' }) => {
       setCommitMessage('');
     }
   }, [commitMessage]);
+
+  // Handle commit with validation check
+  const handleCommit = useCallback(async () => {
+    if (!commitMessage.trim()) return;
+
+    // Run validation before commit
+    const validationResult = await runWorkspaceValidation();
+
+    if (validationResult.hasErrors || validationResult.hasWarnings) {
+      // Store validation counts and show confirmation dialog
+      setValidationErrorCount(validationResult.errorCount);
+      setValidationWarningCount(validationResult.warningCount);
+      setShowValidationConfirm(true);
+    } else {
+      // No validation issues, proceed with commit
+      await performCommit();
+    }
+  }, [commitMessage, performCommit]);
+
+  // Handle confirmation to commit despite validation issues
+  const handleConfirmCommit = useCallback(async () => {
+    setShowValidationConfirm(false);
+    await performCommit();
+  }, [performCommit]);
+
+  // Handle viewing validation issues
+  const handleViewValidationIssues = useCallback(() => {
+    setShowValidationConfirm(false);
+    // The ValidationWarnings component in the header will show the issues
+    // We could add additional logic here to scroll to or highlight the ValidationWarnings panel
+  }, []);
 
   const handleDiscardAll = useCallback(async () => {
     if (!window.confirm('Discard all changes? This cannot be undone.')) {
@@ -74,34 +279,185 @@ export const GitPanel: React.FC<GitPanelProps> = ({ className = '' }) => {
     if (activeTab === 'history') {
       gitService.loadHistory();
     }
+    if (activeTab === 'remotes') {
+      gitService.loadRemotes();
+    }
+    if (activeTab === 'advanced') {
+      gitService.loadStashes();
+      gitService.loadTags();
+      gitService.loadRebaseStatus();
+    }
   }, [activeTab]);
+
+  const handleCherryPick = useCallback((commit: typeof selectedCommit) => {
+    setCherryPickCommit(commit);
+    setShowCherryPickDialog(true);
+  }, []);
 
   const handleInitRepo = useCallback(async () => {
     await gitService.initRepository();
   }, []);
 
+  const handleToggleBranchSelector = useCallback(() => {
+    useGitStore.getState().setShowBranchSelector(!showBranchSelector);
+  }, [showBranchSelector]);
+
+  const handleCreateBranch = useCallback(() => {
+    if (isGitHubRepoMode) {
+      setShowGitHubBranchDialog(true);
+    } else {
+      useGitStore.getState().setShowCreateBranchDialog(true);
+    }
+  }, [isGitHubRepoMode]);
+
+  // Load branches for GitHub repo mode
+  const loadBranches = useCallback(async () => {
+    if (!githubRepoWorkspace) return;
+    setIsLoadingBranches(true);
+    try {
+      const branchList = await githubApi.listBranches(
+        githubRepoWorkspace.owner,
+        githubRepoWorkspace.repo,
+        { per_page: 100 }
+      );
+      setBranches(branchList);
+    } catch (error) {
+      console.error('[GitPanel] Failed to load branches:', error);
+    } finally {
+      setIsLoadingBranches(false);
+    }
+  }, [githubRepoWorkspace]);
+
+  // Toggle branch dropdown and load branches if needed
+  const handleToggleBranchDropdown = useCallback(() => {
+    if (!showBranchDropdown) {
+      loadBranches();
+    }
+    setShowBranchDropdown(!showBranchDropdown);
+  }, [showBranchDropdown, loadBranches]);
+
+  // Switch to a different branch
+  const handleSwitchBranch = useCallback(
+    async (branchName: string) => {
+      if (!githubRepoWorkspace || branchName === githubRepoWorkspace.branch) {
+        setShowBranchDropdown(false);
+        return;
+      }
+
+      setIsSwitchingBranch(true);
+      setShowBranchDropdown(false);
+
+      try {
+        await useGitHubRepoStore.getState().switchBranch(branchName);
+      } catch (error) {
+        console.error('[GitPanel] Failed to switch branch:', error);
+      } finally {
+        setIsSwitchingBranch(false);
+      }
+    },
+    [githubRepoWorkspace]
+  );
+
+  // Close branch dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (branchDropdownRef.current && !branchDropdownRef.current.contains(event.target as Node)) {
+        setShowBranchDropdown(false);
+      }
+    };
+
+    if (showBranchDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showBranchDropdown]);
+
+  // Handle panel resize (horizontal)
+  const handleResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    isResizing.current = true;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      if (!isResizing.current) return;
+      const newWidth = window.innerWidth - moveEvent.clientX;
+      setPanelWidth(Math.min(MAX_PANEL_WIDTH, Math.max(MIN_PANEL_WIDTH, newWidth)));
+    };
+
+    const handleMouseUp = () => {
+      isResizing.current = false;
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  }, []);
+
+  // Handle diff viewer resize (vertical)
+  const handleDiffResizeStart = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      isDiffResizing.current = true;
+      document.body.style.cursor = 'row-resize';
+      document.body.style.userSelect = 'none';
+
+      const startY = e.clientY;
+      const startHeight = diffHeight;
+
+      const handleMouseMove = (moveEvent: MouseEvent) => {
+        if (!isDiffResizing.current) return;
+        const deltaY = startY - moveEvent.clientY;
+        const newHeight = startHeight + deltaY;
+        setDiffHeight(Math.min(MAX_DIFF_HEIGHT, Math.max(MIN_DIFF_HEIGHT, newHeight)));
+      };
+
+      const handleMouseUp = () => {
+        isDiffResizing.current = false;
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+      };
+
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+    },
+    [diffHeight]
+  );
+
   if (!isPanelOpen) {
     return null;
   }
 
-  // Not a git repo - show init option
-  if (!status.isGitRepo) {
+  // Not a git repo and not in GitHub repo mode - show init option
+  if (!status.isGitRepo && !isGitHubRepoMode) {
     return (
-      <div className={`w-80 border-l border-gray-200 bg-white flex flex-col ${className}`}>
+      <div
+        ref={panelRef}
+        style={{ width: panelWidth }}
+        className={`border-l border-gray-200 bg-white flex flex-col relative ${className}`}
+      >
+        {/* Resize handle */}
+        <div
+          className="absolute left-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-500 hover:opacity-50 transition-opacity z-10"
+          onMouseDown={handleResizeStart}
+        />
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
           <h2 className="text-sm font-semibold text-gray-900">Version Control</h2>
           <button
             onClick={() => useGitStore.getState().setPanelOpen(false)}
             className="p-1 text-gray-400 hover:text-gray-600 rounded"
-            title="Close panel"
+            title="Collapse panel"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M6 18L18 6M6 6l12 12"
-              />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
           </button>
         </div>
@@ -132,7 +488,17 @@ export const GitPanel: React.FC<GitPanelProps> = ({ className = '' }) => {
   }
 
   return (
-    <div className={`w-80 border-l border-gray-200 bg-white flex flex-col ${className}`}>
+    <div
+      ref={panelRef}
+      style={{ width: panelWidth }}
+      className={`border-l border-gray-200 bg-white flex flex-col relative ${className}`}
+    >
+      {/* Resize handle */}
+      <div
+        className="absolute left-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-500 hover:opacity-50 transition-opacity z-10"
+        onMouseDown={handleResizeStart}
+      />
+
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
         <div className="flex items-center gap-2">
@@ -173,72 +539,312 @@ export const GitPanel: React.FC<GitPanelProps> = ({ className = '' }) => {
           <button
             onClick={() => useGitStore.getState().setPanelOpen(false)}
             className="p-1 text-gray-400 hover:text-gray-600 rounded"
-            title="Close panel"
+            title="Collapse panel"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M6 18L18 6M6 6l12 12"
-              />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
           </button>
         </div>
       </div>
 
       {/* Branch Info */}
-      <div className="px-4 py-2 bg-gray-50 border-b border-gray-200">
-        <div className="flex items-center gap-2 text-sm">
-          <svg
-            className="w-4 h-4 text-gray-500"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M13 10V3L4 14h7v7l9-11h-7z"
-            />
-          </svg>
-          <span className="font-medium text-gray-700">{status.currentBranch || 'HEAD'}</span>
-          {status.remoteName && (
-            <span className="text-gray-500">
-              {status.ahead > 0 && <span className="text-green-600">↑{status.ahead}</span>}
-              {status.behind > 0 && <span className="text-orange-600 ml-1">↓{status.behind}</span>}
-            </span>
+      <div className="px-4 py-2 bg-gray-50 border-b border-gray-200 relative">
+        <div className="flex items-center justify-between">
+          {isGitHubRepoMode ? (
+            /* GitHub Repo Mode - branch selector dropdown */
+            <div className="relative" ref={branchDropdownRef}>
+              <button
+                onClick={handleToggleBranchDropdown}
+                disabled={isSwitchingBranch}
+                className="flex items-center gap-2 text-sm hover:bg-gray-100 rounded px-2 py-1 -ml-2 disabled:opacity-50"
+              >
+                {isSwitchingBranch ? (
+                  <svg
+                    className="w-4 h-4 text-gray-500 animate-spin"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                    />
+                  </svg>
+                ) : (
+                  <svg
+                    className="w-4 h-4 text-gray-500"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M13 10V3L4 14h7v7l9-11h-7z"
+                    />
+                  </svg>
+                )}
+                <span className="font-medium text-gray-700">{currentBranch || 'HEAD'}</span>
+                {isProtectedBranch && (
+                  <span className="px-1.5 py-0.5 text-xs bg-amber-100 text-amber-700 rounded">
+                    protected
+                  </span>
+                )}
+                <svg
+                  className={`w-4 h-4 text-gray-400 transition-transform ${showBranchDropdown ? 'rotate-180' : ''}`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M19 9l-7 7-7-7"
+                  />
+                </svg>
+              </button>
+
+              {/* Branch dropdown menu */}
+              {showBranchDropdown && (
+                <div className="absolute top-full left-0 mt-1 w-64 bg-white border border-gray-200 rounded-md shadow-lg z-50 max-h-80 overflow-y-auto">
+                  {isLoadingBranches ? (
+                    <div className="flex items-center justify-center py-4">
+                      <svg
+                        className="w-5 h-5 text-gray-400 animate-spin"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                      >
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                        />
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                        />
+                      </svg>
+                    </div>
+                  ) : branches.length === 0 ? (
+                    <div className="px-3 py-2 text-sm text-gray-500">No branches found</div>
+                  ) : (
+                    <ul className="py-1">
+                      {branches.map((branch) => (
+                        <li key={branch.name}>
+                          <button
+                            onClick={() => handleSwitchBranch(branch.name)}
+                            className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-100 flex items-center gap-2 ${
+                              branch.name === currentBranch
+                                ? 'bg-blue-50 text-blue-700'
+                                : 'text-gray-700'
+                            }`}
+                          >
+                            {branch.name === currentBranch && (
+                              <svg
+                                className="w-4 h-4 text-blue-600"
+                                fill="currentColor"
+                                viewBox="0 0 20 20"
+                              >
+                                <path
+                                  fillRule="evenodd"
+                                  d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                  clipRule="evenodd"
+                                />
+                              </svg>
+                            )}
+                            <span className={branch.name === currentBranch ? '' : 'ml-6'}>
+                              {branch.name}
+                            </span>
+                            {(branch.name === 'main' || branch.name === 'master') && (
+                              <span className="ml-auto px-1.5 py-0.5 text-xs bg-amber-100 text-amber-700 rounded">
+                                protected
+                              </span>
+                            )}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+            </div>
+          ) : (
+            /* Local Git Mode - branch selector */
+            <button
+              onClick={handleToggleBranchSelector}
+              className="flex items-center gap-2 text-sm hover:bg-gray-100 rounded px-2 py-1 -ml-2"
+            >
+              <svg
+                className="w-4 h-4 text-gray-500"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M13 10V3L4 14h7v7l9-11h-7z"
+                />
+              </svg>
+              <span className="font-medium text-gray-700">{status.currentBranch || 'HEAD'}</span>
+              <svg
+                className="w-4 h-4 text-gray-400"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M19 9l-7 7-7-7"
+                />
+              </svg>
+            </button>
           )}
+          <div className="flex items-center gap-2">
+            {/* Create branch button */}
+            <button
+              onClick={handleCreateBranch}
+              className="p-1 text-gray-400 hover:text-gray-600 rounded"
+              title="Create new branch"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 4v16m8-8H4"
+                />
+              </svg>
+            </button>
+            {!isGitHubRepoMode && status.remoteName && (
+              <span className="text-xs text-gray-500">
+                {status.ahead > 0 && <span className="text-green-600">↑{status.ahead}</span>}
+                {status.behind > 0 && (
+                  <span className="text-orange-600 ml-1">↓{status.behind}</span>
+                )}
+              </span>
+            )}
+            {isRemoteOperationInProgress && (
+              <svg className="w-4 h-4 text-blue-500 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                />
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                />
+              </svg>
+            )}
+          </div>
         </div>
+        {/* Warning banner for protected branch in GitHub repo mode */}
+        {isGitHubRepoMode && isProtectedBranch && pendingChanges.length > 0 && (
+          <div className="mt-2 px-2 py-1.5 bg-amber-50 border border-amber-200 rounded text-xs text-amber-700">
+            <span className="font-medium">Tip:</span> Create a branch before committing to{' '}
+            {currentBranch}.
+            <button
+              onClick={handleCreateBranch}
+              className="ml-1 text-amber-800 underline hover:no-underline"
+            >
+              Create branch
+            </button>
+          </div>
+        )}
+        {!isGitHubRepoMode && (
+          <>
+            <RebaseStatusIndicator className="mt-1" />
+            <BranchSelector onCreateBranch={handleCreateBranch} />
+          </>
+        )}
       </div>
 
       {/* Tabs */}
       <div className="flex border-b border-gray-200">
         <button
           onClick={() => setActiveTab('changes')}
-          className={`flex-1 px-4 py-2 text-sm font-medium ${
+          className={`flex-1 px-2 py-2 text-xs font-medium ${
             activeTab === 'changes'
               ? 'text-blue-600 border-b-2 border-blue-600'
               : 'text-gray-500 hover:text-gray-700'
           }`}
         >
           Changes
-          {status.files.length > 0 && (
-            <span className="ml-1 px-1.5 py-0.5 text-xs bg-blue-100 text-blue-700 rounded-full">
-              {status.files.length}
+          {/* Show count from pending changes in GitHub repo mode, otherwise local git status */}
+          {(isGitHubRepoMode ? pendingChanges.length : status.files.length) > 0 && (
+            <span className="ml-1 px-1 py-0.5 text-xs bg-blue-100 text-blue-700 rounded-full">
+              {isGitHubRepoMode ? pendingChanges.length : status.files.length}
             </span>
           )}
         </button>
         <button
           onClick={() => setActiveTab('history')}
-          className={`flex-1 px-4 py-2 text-sm font-medium ${
+          className={`flex-1 px-2 py-2 text-xs font-medium ${
             activeTab === 'history'
               ? 'text-blue-600 border-b-2 border-blue-600'
               : 'text-gray-500 hover:text-gray-700'
           }`}
         >
           History
+        </button>
+        <button
+          onClick={() => setActiveTab('prs')}
+          className={`flex-1 px-2 py-2 text-xs font-medium ${
+            activeTab === 'prs'
+              ? 'text-blue-600 border-b-2 border-blue-600'
+              : 'text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          PRs
+          {isGitHubAuthenticated && (
+            <span className="ml-1 w-1.5 h-1.5 bg-green-500 rounded-full inline-block" />
+          )}
+        </button>
+        <button
+          onClick={() => setActiveTab('remotes')}
+          className={`flex-1 px-2 py-2 text-xs font-medium ${
+            activeTab === 'remotes'
+              ? 'text-blue-600 border-b-2 border-blue-600'
+              : 'text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          Sync
+        </button>
+        <button
+          onClick={() => setActiveTab('advanced')}
+          className={`flex-1 px-2 py-2 text-xs font-medium ${
+            activeTab === 'advanced'
+              ? 'text-blue-600 border-b-2 border-blue-600'
+              : 'text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          More
+          {(stashes.length > 0 || isRebasing || isCherryPicking) && (
+            <span className="ml-1 w-1.5 h-1.5 bg-amber-500 rounded-full inline-block" />
+          )}
         </button>
       </div>
 
@@ -252,76 +858,305 @@ export const GitPanel: React.FC<GitPanelProps> = ({ className = '' }) => {
       {/* Content */}
       <div className="flex-1 overflow-hidden flex flex-col">
         {activeTab === 'changes' ? (
-          <>
-            {/* File list */}
-            <div className="flex-1 overflow-y-auto">
-              {status.files.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-full text-gray-500 p-4">
-                  <svg
-                    className="w-12 h-12 text-gray-300 mb-2"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={1.5}
-                      d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                    />
-                  </svg>
-                  <p className="text-sm">No changes</p>
+          isGitHubRepoMode ? (
+            /* GitHub Repo Mode - Show pending changes with staging */
+            <>
+              <div className="flex-1 overflow-y-auto">
+                {pendingChanges.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-full text-gray-500 p-4">
+                    <svg
+                      className="w-12 h-12 text-gray-300 mb-2"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={1.5}
+                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
+                    </svg>
+                    <p className="text-sm">No pending changes</p>
+                    <p className="text-xs text-gray-400 mt-1">
+                      Changes will appear here when you edit the workspace
+                    </p>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-gray-200">
+                    {/* Staged Changes Section */}
+                    {stagedChanges.length > 0 && (
+                      <div>
+                        <div className="px-3 py-2 bg-green-50 border-b border-green-200 flex items-center justify-between">
+                          <span className="text-xs font-medium text-green-700">
+                            Staged Changes ({stagedChanges.length})
+                          </span>
+                          <button
+                            onClick={() => unstageAllChanges()}
+                            className="text-xs text-green-600 hover:text-green-800"
+                          >
+                            Unstage All
+                          </button>
+                        </div>
+                        <ul className="divide-y divide-gray-100">
+                          {stagedChanges.map((change: PendingChange) => (
+                            <li
+                              key={change.id}
+                              className={`px-3 py-2 flex items-center gap-2 hover:bg-gray-50 ${
+                                selectedPendingChange?.id === change.id
+                                  ? 'bg-blue-50 border-l-2 border-blue-500'
+                                  : ''
+                              }`}
+                            >
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  unstageChange(change.id);
+                                }}
+                                className="w-5 h-5 rounded border-2 border-green-600 bg-green-600 flex items-center justify-center cursor-pointer hover:bg-green-700 hover:border-green-700 focus:ring-2 focus:ring-green-500 flex-shrink-0"
+                                title="Unstage this change"
+                              >
+                                <svg
+                                  className="w-3 h-3 text-white"
+                                  fill="currentColor"
+                                  viewBox="0 0 20 20"
+                                >
+                                  <path
+                                    fillRule="evenodd"
+                                    d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                    clipRule="evenodd"
+                                  />
+                                </svg>
+                              </button>
+                              <div
+                                className="flex-1 flex items-center gap-2 cursor-pointer"
+                                onClick={() => handleSelectPendingChange(change)}
+                              >
+                                <span
+                                  className={`w-5 h-5 flex items-center justify-center rounded text-xs font-bold flex-shrink-0 ${
+                                    change.action === 'create'
+                                      ? 'text-green-600 bg-green-100'
+                                      : change.action === 'update'
+                                        ? 'text-yellow-600 bg-yellow-100'
+                                        : 'text-red-600 bg-red-100'
+                                  }`}
+                                >
+                                  {change.action === 'create'
+                                    ? '+'
+                                    : change.action === 'update'
+                                      ? '~'
+                                      : '-'}
+                                </span>
+                                <span
+                                  className="flex-1 text-sm text-gray-700 truncate"
+                                  title={change.path}
+                                >
+                                  {change.path}
+                                </span>
+                              </div>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {/* Unstaged Changes Section */}
+                    {unstagedChanges.length > 0 && (
+                      <div>
+                        <div className="px-3 py-2 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
+                          <span className="text-xs font-medium text-gray-600">
+                            Changes ({unstagedChanges.length})
+                          </span>
+                          <button
+                            onClick={() => stageAllChanges()}
+                            className="text-xs text-blue-600 hover:text-blue-800"
+                          >
+                            Stage All
+                          </button>
+                        </div>
+                        <ul className="divide-y divide-gray-100">
+                          {unstagedChanges.map((change: PendingChange) => (
+                            <li
+                              key={change.id}
+                              className={`px-3 py-2 flex items-center gap-2 hover:bg-gray-50 ${
+                                selectedPendingChange?.id === change.id
+                                  ? 'bg-blue-50 border-l-2 border-blue-500'
+                                  : ''
+                              }`}
+                            >
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  stageChange(change.id);
+                                }}
+                                className="w-5 h-5 rounded border-2 border-gray-400 bg-white flex items-center justify-center cursor-pointer hover:border-blue-500 hover:bg-blue-50 focus:ring-2 focus:ring-blue-500 flex-shrink-0"
+                                title="Stage this change"
+                              />
+                              <div
+                                className="flex-1 flex items-center gap-2 cursor-pointer"
+                                onClick={() => handleSelectPendingChange(change)}
+                              >
+                                <span
+                                  className={`w-5 h-5 flex items-center justify-center rounded text-xs font-bold flex-shrink-0 ${
+                                    change.action === 'create'
+                                      ? 'text-green-600 bg-green-100'
+                                      : change.action === 'update'
+                                        ? 'text-yellow-600 bg-yellow-100'
+                                        : 'text-red-600 bg-red-100'
+                                  }`}
+                                >
+                                  {change.action === 'create'
+                                    ? '+'
+                                    : change.action === 'update'
+                                      ? '~'
+                                      : '-'}
+                                </span>
+                                <span
+                                  className="flex-1 text-sm text-gray-700 truncate"
+                                  title={change.path}
+                                >
+                                  {change.path}
+                                </span>
+                              </div>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Diff viewer for selected pending change */}
+              {selectedPendingChange && (
+                <div
+                  style={{ height: diffHeight }}
+                  className="border-t border-gray-200 overflow-hidden flex flex-col relative"
+                >
+                  {/* Resize handle for diff viewer */}
+                  <div
+                    className="absolute top-0 left-0 right-0 h-1 cursor-row-resize hover:bg-blue-500 hover:opacity-50 transition-opacity z-10"
+                    onMouseDown={handleDiffResizeStart}
+                  />
+                  <DiffViewer
+                    diff={pendingChangeDiff || ''}
+                    isLoading={isLoadingPendingDiff}
+                    fileName={selectedPendingChange.path}
+                  />
                 </div>
-              ) : (
-                <GitFileList
-                  files={status.files}
-                  selectedFile={selectedFile}
-                  onSelectFile={setSelectedFile}
-                />
               )}
-            </div>
 
-            {/* Diff viewer */}
-            {(selectedFile || status.files.length > 0) && diffContent && (
-              <div className="h-48 border-t border-gray-200 overflow-hidden">
-                <DiffViewer
-                  diff={diffContent}
-                  isLoading={isLoadingDiff}
-                  fileName={selectedFile || undefined}
-                />
-              </div>
-            )}
-
-            {/* Commit section */}
-            {status.files.length > 0 && (
-              <div className="border-t border-gray-200 p-3">
-                <textarea
-                  value={commitMessage}
-                  onChange={(e) => setCommitMessage(e.target.value)}
-                  placeholder="Commit message..."
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                  rows={2}
-                />
-                <div className="flex gap-2 mt-2">
-                  <button
-                    onClick={handleCommit}
-                    disabled={!commitMessage.trim() || isCommitting}
-                    className="flex-1 px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {isCommitting ? 'Committing...' : 'Commit'}
-                  </button>
-                  <button
-                    onClick={handleDiscardAll}
-                    className="px-3 py-1.5 text-sm font-medium text-red-600 border border-red-300 rounded-md hover:bg-red-50"
-                    title="Discard all changes"
-                  >
-                    Discard
-                  </button>
+              {/* Commit section for GitHub repo mode - only when there are staged changes */}
+              {hasStagedChanges && (
+                <div className="border-t border-gray-200 p-3">
+                  <textarea
+                    value={commitMessage}
+                    onChange={(e) => setCommitMessage(e.target.value)}
+                    placeholder="Commit message..."
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                    rows={2}
+                  />
+                  <div className="flex gap-2 mt-2">
+                    <button
+                      onClick={async () => {
+                        if (!commitMessage.trim()) return;
+                        await useGitHubRepoStore.getState().pushChanges(commitMessage.trim());
+                        setCommitMessage('');
+                      }}
+                      disabled={!commitMessage.trim() || isSyncing}
+                      className="flex-1 px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isSyncing
+                        ? 'Committing...'
+                        : `Commit ${stagedChanges.length} file${stagedChanges.length !== 1 ? 's' : ''}`}
+                    </button>
+                  </div>
                 </div>
+              )}
+            </>
+          ) : (
+            /* Local Git Mode - Show local git status */
+            <>
+              {/* File list */}
+              <div className="flex-1 overflow-y-auto">
+                {status.files.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-full text-gray-500 p-4">
+                    <svg
+                      className="w-12 h-12 text-gray-300 mb-2"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={1.5}
+                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
+                    </svg>
+                    <p className="text-sm">No changes</p>
+                  </div>
+                ) : (
+                  <GitFileList
+                    files={status.files}
+                    selectedFile={selectedFile}
+                    onSelectFile={setSelectedFile}
+                  />
+                )}
               </div>
-            )}
-          </>
-        ) : (
+
+              {/* Diff viewer */}
+              {(selectedFile || status.files.length > 0) && diffContent && (
+                <div
+                  style={{ height: diffHeight }}
+                  className="border-t border-gray-200 overflow-hidden relative"
+                >
+                  {/* Resize handle for diff viewer */}
+                  <div
+                    className="absolute top-0 left-0 right-0 h-1 cursor-row-resize hover:bg-blue-500 hover:opacity-50 transition-opacity z-10"
+                    onMouseDown={handleDiffResizeStart}
+                  />
+                  <DiffViewer
+                    diff={diffContent}
+                    isLoading={isLoadingDiff}
+                    fileName={selectedFile || undefined}
+                  />
+                </div>
+              )}
+
+              {/* Commit section */}
+              {status.files.length > 0 && (
+                <div className="border-t border-gray-200 p-3">
+                  <textarea
+                    value={commitMessage}
+                    onChange={(e) => setCommitMessage(e.target.value)}
+                    placeholder="Commit message..."
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                    rows={2}
+                  />
+                  <div className="flex gap-2 mt-2">
+                    <button
+                      onClick={handleCommit}
+                      disabled={!commitMessage.trim() || isCommitting}
+                      className="flex-1 px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isCommitting ? 'Committing...' : 'Commit'}
+                    </button>
+                    <button
+                      onClick={handleDiscardAll}
+                      className="px-3 py-1.5 text-sm font-medium text-red-600 border border-red-300 rounded-md hover:bg-red-50"
+                      title="Discard all changes"
+                    >
+                      Discard
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
+          )
+        ) : activeTab === 'history' ? (
           /* History tab */
           <div className="flex-1 overflow-y-auto">
             {isLoadingHistory ? (
@@ -364,11 +1199,96 @@ export const GitPanel: React.FC<GitPanelProps> = ({ className = '' }) => {
                 commits={commits}
                 selectedCommit={selectedCommit}
                 onSelectCommit={(commit) => useGitStore.getState().setSelectedCommit(commit)}
+                onCherryPick={handleCherryPick}
+                onRevert={async (commit) => {
+                  if (
+                    window.confirm(
+                      `Revert commit "${commit.message}"? This will create a new commit undoing the changes.`
+                    )
+                  ) {
+                    await gitService.revert(commit.hash);
+                  }
+                }}
               />
             )}
           </div>
+        ) : activeTab === 'prs' ? (
+          /* Pull Requests tab */
+          <PullRequestsPanel className="flex-1" />
+        ) : activeTab === 'advanced' ? (
+          /* Advanced tab - Stash, Tags, Rebase, Cherry-pick, Cache */
+          <div className="flex-1 overflow-y-auto">
+            {/* Cherry-pick conflict panel */}
+            <CherryPickConflictPanel className="px-3 pt-3" />
+
+            {/* Branch Merge Panel (GitHub repo mode only) */}
+            {isGitHubRepoMode && (
+              <div className="border-b">
+                <BranchMergePanel />
+              </div>
+            )}
+
+            {/* Cache Management Panel (GitHub repo mode only) */}
+            {isGitHubRepoMode && (
+              <div className="border-b">
+                <CacheManagementPanel />
+              </div>
+            )}
+
+            {/* Stash Panel */}
+            <div className="border-b">
+              <StashPanel />
+            </div>
+
+            {/* Tag Panel */}
+            <div className="border-b">
+              <TagPanel />
+            </div>
+
+            {/* Rebase Panel */}
+            <div>
+              <div className="px-3 py-2 border-b bg-gray-50">
+                <span className="text-sm font-medium text-gray-700">Rebase</span>
+              </div>
+              <RebasePanel />
+            </div>
+          </div>
+        ) : (
+          /* Remotes/Sync tab */
+          <div className="flex-1 overflow-y-auto">
+            <RemoteOperationsPanel />
+          </div>
         )}
       </div>
+
+      {/* Branch Create Dialog (Local Git) */}
+      <BranchCreateDialog />
+
+      {/* Branch Create Dialog (GitHub Repo Mode) */}
+      <GitHubBranchCreateDialog
+        open={showGitHubBranchDialog}
+        onClose={() => setShowGitHubBranchDialog(false)}
+      />
+
+      {/* Cherry-pick Dialog */}
+      <CherryPickDialog
+        open={showCherryPickDialog}
+        onOpenChange={setShowCherryPickDialog}
+        commit={cherryPickCommit}
+      />
+
+      {/* Validation Confirmation Dialog */}
+      <ValidationConfirmDialog
+        isOpen={showValidationConfirm}
+        onClose={() => setShowValidationConfirm(false)}
+        onConfirm={handleConfirmCommit}
+        onViewIssues={handleViewValidationIssues}
+        errorCount={validationErrorCount}
+        warningCount={validationWarningCount}
+        title="Validation Issues Found"
+        message="There are validation issues in the workspace. Do you want to commit anyway?"
+        confirmLabel="Commit"
+      />
     </div>
   );
 };

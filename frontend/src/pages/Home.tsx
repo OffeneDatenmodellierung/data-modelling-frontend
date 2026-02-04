@@ -25,6 +25,14 @@ import {
   markExamplesLoaded,
   type ExampleWorkspaceInfo,
 } from '@/services/exampleWorkspaces';
+import { GitHubRepoOpenDialog } from '@/components/github-repo';
+import { GitHubAuthDialog } from '@/components/github/GitHubAuthDialog';
+import {
+  useGitHubStore,
+  selectIsAuthenticated as selectGitHubAuthenticated,
+} from '@/stores/githubStore';
+import { offlineQueueService } from '@/services/github/offlineQueueService';
+import type { RecentWorkspace } from '@/types/github-repo';
 
 const Home: React.FC = () => {
   const navigate = useNavigate();
@@ -51,6 +59,11 @@ const Home: React.FC = () => {
   const [loadingExample, setLoadingExample] = useState<string | null>(null);
   const { addToast } = useUIStore();
 
+  // GitHub Repo Mode state
+  const [showGitHubRepoDialog, setShowGitHubRepoDialog] = useState(false);
+  const [recentGitHubWorkspaces, setRecentGitHubWorkspaces] = useState<RecentWorkspace[]>([]);
+  const isGitHubAuthenticated = useGitHubStore(selectGitHubAuthenticated);
+
   // Initialize mode on mount
   useEffect(() => {
     const initMode = async () => {
@@ -71,6 +84,20 @@ const Home: React.FC = () => {
       }
     };
     loadExamples();
+  }, []);
+
+  // Load recent GitHub workspaces
+  useEffect(() => {
+    const loadRecentGitHubWorkspaces = async () => {
+      try {
+        const recent = await offlineQueueService.getRecentWorkspaces(5);
+        const githubRecent = recent.filter((w) => w.type === 'github');
+        setRecentGitHubWorkspaces(githubRecent);
+      } catch (error) {
+        console.warn('Failed to load recent GitHub workspaces:', error);
+      }
+    };
+    loadRecentGitHubWorkspaces();
   }, []);
 
   // Load available emails from session when authenticated and online (only once)
@@ -258,6 +285,47 @@ const Home: React.FC = () => {
       });
     } finally {
       setLoadingExample(null);
+    }
+  };
+
+  // Handle opening a GitHub repo workspace
+  const handleOpenGitHubRepo = (workspaceId: string) => {
+    // Navigate to the workspace editor with the GitHub repo mode
+    // The workspaceId contains: owner/repo/branch/workspacePath
+    addToast({
+      type: 'success',
+      message: 'GitHub repository workspace opened',
+    });
+    navigate(`/workspace/github/${encodeURIComponent(workspaceId)}`);
+  };
+
+  // Handle opening a recent GitHub workspace
+  const handleOpenRecentGitHubWorkspace = async (recent: RecentWorkspace) => {
+    if (!recent.owner || !recent.repo || !recent.branch) return;
+
+    const { useGitHubRepoStore } = await import('@/stores/githubRepoStore');
+    const store = useGitHubRepoStore.getState();
+
+    try {
+      await store.openWorkspace(
+        recent.owner,
+        recent.repo,
+        recent.branch,
+        recent.workspacePath || '',
+        recent.workspaceName || recent.displayName
+      );
+
+      addToast({
+        type: 'success',
+        message: `Opened: ${recent.displayName}`,
+      });
+
+      navigate(`/workspace/github/${encodeURIComponent(recent.id)}`);
+    } catch (error) {
+      addToast({
+        type: 'error',
+        message: `Failed to open workspace: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      });
     }
   };
 
@@ -451,27 +519,167 @@ const Home: React.FC = () => {
         <header className="bg-white shadow">
           <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
             <div className="flex items-center justify-between">
-              <h1 className="text-3xl font-bold text-gray-900">Data Modelling Application</h1>
+              <div className="flex items-center gap-4">
+                <img
+                  src={getAssetPath('/logo.svg')}
+                  alt="Open Data Modelling"
+                  className="h-10 w-auto"
+                  style={{ maxHeight: '40px' }}
+                />
+                <h1 className="text-3xl font-bold text-gray-900">Open Data Modelling</h1>
+              </div>
+              {isGitHubAuthenticated && (
+                <div className="flex items-center gap-2 text-sm text-gray-600">
+                  <span className="w-2 h-2 rounded-full bg-green-500"></span>
+                  GitHub Connected
+                </div>
+              )}
             </div>
-            <p className="mt-2 text-sm text-gray-600">Offline Mode - Working locally without API</p>
           </div>
         </header>
         <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
           <div className="px-4 py-6 sm:px-0">
-            <div className="mb-6 flex gap-4 items-center">
-              <WorkspaceSelector />
-              <button
-                onClick={handleOpenLocalFolder}
-                className="bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                Open Workspace Folder
-              </button>
-              <button
-                onClick={() => setShowCreateDialog(true)}
-                className="bg-green-600 text-white py-2 px-4 rounded hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500"
-              >
-                New Workspace
-              </button>
+            {/* Workspace Mode Selection Cards */}
+            <div className="mb-8 grid gap-6 md:grid-cols-2">
+              {/* Local Folder Card */}
+              <div className="bg-white rounded-lg border-2 border-gray-200 p-6 hover:border-blue-400 transition-colors">
+                <div className="flex items-start gap-4">
+                  <div className="flex-shrink-0 w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                    <svg
+                      className="w-6 h-6 text-blue-600"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
+                      />
+                    </svg>
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-lg font-semibold text-gray-900">Local Folder</h3>
+                    <p className="text-sm text-gray-600 mt-1">
+                      Work with files on your computer. Full offline access with optional Git
+                      integration.
+                    </p>
+                    <ul className="mt-3 text-xs text-gray-500 space-y-1">
+                      <li>• Full offline access</li>
+                      <li>• Use your own Git client</li>
+                      <li>• Any folder location</li>
+                    </ul>
+                    <div className="mt-4 flex gap-2">
+                      <button
+                        onClick={handleOpenLocalFolder}
+                        className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        Open Folder
+                      </button>
+                      <button
+                        onClick={() => setShowCreateDialog(true)}
+                        className="px-4 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500"
+                      >
+                        New Workspace
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* GitHub Repository Card */}
+              <div className="bg-white rounded-lg border-2 border-gray-200 p-6 hover:border-green-400 transition-colors">
+                <div className="flex items-start gap-4">
+                  <div className="flex-shrink-0 w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                    <svg className="w-6 h-6 text-green-600" fill="currentColor" viewBox="0 0 24 24">
+                      <path
+                        fillRule="evenodd"
+                        d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-lg font-semibold text-gray-900">GitHub Repository</h3>
+                    <p className="text-sm text-gray-600 mt-1">
+                      Work directly with a GitHub repository. No local clone needed.
+                    </p>
+                    <ul className="mt-3 text-xs text-gray-500 space-y-1">
+                      <li>• No local clone needed</li>
+                      <li>• Auto-sync changes</li>
+                      <li>• Offline queue support</li>
+                    </ul>
+                    <div className="mt-4">
+                      {isGitHubAuthenticated ? (
+                        <button
+                          onClick={() => setShowGitHubRepoDialog(true)}
+                          className="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+                        >
+                          Browse Repos
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => useGitHubStore.getState().setShowAuthDialog(true)}
+                          className="px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-md hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-500"
+                        >
+                          Connect GitHub
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Recent GitHub Workspaces */}
+            {recentGitHubWorkspaces.length > 0 && (
+              <div className="mb-8">
+                <h2 className="text-lg font-semibold text-gray-900 mb-3">
+                  Recent GitHub Workspaces
+                </h2>
+                <div className="bg-white rounded-lg border border-gray-200 divide-y divide-gray-100">
+                  {recentGitHubWorkspaces.map((recent) => (
+                    <button
+                      key={recent.id}
+                      onClick={() => handleOpenRecentGitHubWorkspace(recent)}
+                      className="w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors text-left"
+                    >
+                      <svg
+                        className="w-5 h-5 text-gray-400"
+                        fill="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-gray-900 truncate">
+                          {recent.displayName}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          {recent.branch && `@ ${recent.branch}`}
+                          {recent.workspacePath && ` / ${recent.workspacePath}`}
+                        </div>
+                      </div>
+                      <div className="text-xs text-gray-400">
+                        {new Date(recent.lastOpened).toLocaleDateString()}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Existing Local Workspaces */}
+            <div className="mb-6">
+              <div className="flex gap-4 items-center mb-4">
+                <h2 className="text-lg font-semibold text-gray-900">Local Workspaces</h2>
+                <WorkspaceSelector />
+              </div>
             </div>
 
             {/* Workspace List */}
@@ -544,6 +752,16 @@ const Home: React.FC = () => {
             <footer className="mt-12 pt-6 border-t border-gray-200 text-center text-sm text-gray-500">
               Version {packageJson.version}
             </footer>
+
+            {/* GitHub Repo Open Dialog */}
+            <GitHubRepoOpenDialog
+              isOpen={showGitHubRepoDialog}
+              onClose={() => setShowGitHubRepoDialog(false)}
+              onOpen={handleOpenGitHubRepo}
+            />
+
+            {/* GitHub Auth Dialog */}
+            <GitHubAuthDialog />
 
             {/* Create Workspace Dialog for offline mode */}
             {showCreateDialog && (

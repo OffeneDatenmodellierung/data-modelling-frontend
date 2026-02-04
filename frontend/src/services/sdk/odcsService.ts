@@ -383,6 +383,14 @@ class ODCSService {
       // Check for unique
       const isUnique = col.unique === true || col.is_unique === true;
 
+      // Debug: Log quality rules being imported
+      if (col.quality || col.quality_rules) {
+        console.log(`[ODCSService] Importing quality for column "${col.name}":`, {
+          quality: col.quality,
+          quality_rules: col.quality_rules,
+        });
+      }
+
       return {
         id: columnId,
         table_id: tableId,
@@ -845,9 +853,44 @@ class ODCSService {
       // Check if already in correct ODCS format (has dimension field)
       const firstRule = qualityRules[0] as Record<string, unknown>;
       if (firstRule.dimension) {
-        return qualityRules;
+        // Ensure all rules have 'name' field (SDK requires it)
+        return qualityRules.map((rule: any, idx: number) => {
+          if (!rule.name) {
+            return {
+              ...rule,
+              name: rule.dimension
+                ? `${rule.dimension} Check`
+                : rule.type
+                  ? `${rule.type} Rule`
+                  : `Quality Rule ${idx + 1}`,
+            };
+          }
+          return rule;
+        });
       }
-      // Otherwise it might be in old great-expectations format, convert it
+      // Otherwise it might be in old great-expectations format or another valid format
+      // IMPORTANT: If the array has valid quality rule objects, pass them through
+      // Check for common quality rule fields: type, implementation, engine, expectation, etc.
+      if (
+        firstRule.type ||
+        (firstRule as any).implementation ||
+        (firstRule as any).engine ||
+        (firstRule as any).expectation ||
+        (firstRule as any).rule ||
+        (firstRule as any).check
+      ) {
+        return qualityRules as unknown[];
+      }
+
+      // If it's an array of objects with any fields, preserve it (don't lose data)
+      // This handles custom quality rule formats we might not recognize
+      if (
+        typeof firstRule === 'object' &&
+        firstRule !== null &&
+        Object.keys(firstRule).length > 0
+      ) {
+        return qualityRules as unknown[];
+      }
     }
 
     const qualityArray: unknown[] = [];
@@ -1049,9 +1092,18 @@ class ODCSService {
       /**
        * Convert a column to ODCS property format
        */
-      const columnToProperty = (col: any): any => {
+      const columnToProperty = (col: any, colIndex: number): any => {
+        // Ensure column has a name - SDK requires this field
+        const columnName = col.name || col.physicalName || `column_${colIndex + 1}`;
+
+        if (!col.name) {
+          console.warn(`[ODCSService] Column missing name, using fallback: "${columnName}"`, {
+            col,
+            colIndex,
+          });
+        }
         return {
-          name: col.name,
+          name: columnName,
           ...(col.physicalName && { physicalName: col.physicalName }),
           logicalType: col.logicalType || col.data_type || 'string',
           physicalType: col.physicalType || col.data_type || 'varchar',
@@ -1143,8 +1195,8 @@ class ODCSService {
         // Sort by order before mapping
         levelColumns.sort((a, b) => getColumnOrder(a) - getColumnOrder(b));
 
-        return levelColumns.map((col) => {
-          const prop = columnToProperty(col);
+        return levelColumns.map((col, colIndex) => {
+          const prop = columnToProperty(col, colIndex);
 
           // Check if this column has children (nested columns)
           const childColumns = allColumns.filter((c) => c.parent_column_id === col.id);
@@ -1155,8 +1207,12 @@ class ODCSService {
             const logicalType = (col.logicalType || col.data_type || '').toLowerCase();
 
             // For array types, nest under items.properties
+            // SDK requires items to be a full property definition with name, logicalType, etc.
             if (logicalType === 'array') {
               prop.items = {
+                name: `${prop.name}_item`,
+                logicalType: 'object',
+                physicalType: 'record',
                 properties: nestedProps,
               };
             } else {
@@ -1230,10 +1286,126 @@ class ODCSService {
       schemaCount: contract.schema?.length || 0,
     });
 
+    // Validate all columns have names before SDK serialization
+    // SDK requires 'name' field on all properties AND all quality rules
+    console.log('[ODCSService] Validating properties and quality rules for SDK serialization...');
+    let propertiesValidated = 0;
+    let propertiesFixed = 0;
+    let qualityRulesValidated = 0;
+    let qualityRulesFixed = 0;
+    for (const schema of contract.schema || []) {
+      const validateProperties = (props: any[], path: string = '') => {
+        for (let i = 0; i < (props || []).length; i++) {
+          const prop = props[i];
+          propertiesValidated++;
+          const propPath = path ? `${path}.properties[${i}]` : `properties[${i}]`;
+          if (!prop.name) {
+            console.error(`[ODCSService] Property missing 'name' at ${propPath}:`, prop);
+            // Fix it by assigning a fallback name
+            prop.name = prop.physicalName || `unnamed_${i}`;
+            propertiesFixed++;
+            console.warn(`[ODCSService] Assigned fallback name: "${prop.name}"`);
+          }
+          // Validate quality rules on this property
+          if (prop.quality && Array.isArray(prop.quality)) {
+            for (let j = 0; j < prop.quality.length; j++) {
+              const rule = prop.quality[j];
+              qualityRulesValidated++;
+              if (!rule.name) {
+                console.error(
+                  `[ODCSService] Quality rule missing 'name' at ${propPath}.quality[${j}]:`,
+                  rule
+                );
+                // Assign a fallback name based on dimension or type
+                rule.name = rule.dimension
+                  ? `${rule.dimension} Check`
+                  : rule.type
+                    ? `${rule.type} Rule`
+                    : `Quality Rule ${j + 1}`;
+                qualityRulesFixed++;
+                console.warn(`[ODCSService] Assigned fallback quality rule name: "${rule.name}"`);
+              }
+            }
+          }
+          // Check nested properties
+          if (prop.properties) {
+            validateProperties(prop.properties, `${propPath}`);
+          }
+          if (prop.items?.properties) {
+            // SDK requires items to be a full property definition with name, logicalType, etc.
+            if (!prop.items.name) {
+              console.error(`[ODCSService] Items missing 'name' at ${propPath}.items:`, prop.items);
+              prop.items.name = `${prop.name}_item`;
+              propertiesFixed++;
+              console.warn(`[ODCSService] Assigned fallback items name: "${prop.items.name}"`);
+            }
+            if (!prop.items.logicalType) {
+              console.error(
+                `[ODCSService] Items missing 'logicalType' at ${propPath}.items:`,
+                prop.items
+              );
+              prop.items.logicalType = 'object';
+              prop.items.physicalType = prop.items.physicalType || 'record';
+              propertiesFixed++;
+              console.warn(`[ODCSService] Assigned fallback items logicalType: "object"`);
+            }
+            validateProperties(prop.items.properties, `${propPath}.items`);
+          }
+        }
+      };
+      validateProperties(schema.properties, `schema[${schema.name}]`);
+    }
+    console.log(
+      `[ODCSService] Validation complete: ${propertiesValidated} properties checked (${propertiesFixed} fixed), ${qualityRulesValidated} quality rules checked (${qualityRulesFixed} fixed)`
+    );
+
+    const contractJson = JSON.stringify(contract);
+
     // Serialize to YAML using SDK for deterministic field ordering
     // This ensures consistent YAML output and reduces git churn
     const sdk = sdkLoader.getModule();
-    const yamlResult = sdk.export_odcs_yaml_v2(JSON.stringify(contract));
+    let yamlResult: string;
+    try {
+      yamlResult = sdk.export_odcs_yaml_v2(contractJson);
+    } catch (sdkError: any) {
+      // Parse error position from SDK error message
+      const errorMsg = sdkError?.message || String(sdkError);
+      const columnMatch = errorMsg.match(/column\s+(\d+)/);
+      if (columnMatch) {
+        const errorCol = parseInt(columnMatch[1], 10);
+        const start = Math.max(0, errorCol - 100);
+        const end = Math.min(contractJson.length, errorCol + 100);
+        console.error(`[ODCSService] SDK error at column ${errorCol}. JSON context:`);
+        console.error(
+          `[ODCSService] JSON[${start}:${errorCol}]:`,
+          contractJson.substring(start, errorCol)
+        );
+        console.error(
+          `[ODCSService] JSON[${errorCol}:${end}]:`,
+          contractJson.substring(errorCol, end)
+        );
+
+        // Try to find the nearest object boundary to identify the problematic structure
+        let braceCount = 0;
+        let objectStart = errorCol;
+        for (let i = errorCol; i >= 0; i--) {
+          if (contractJson[i] === '}') braceCount++;
+          if (contractJson[i] === '{') {
+            if (braceCount === 0) {
+              objectStart = i;
+              break;
+            }
+            braceCount--;
+          }
+        }
+        const objectEnd = Math.min(contractJson.length, objectStart + 300);
+        console.error(
+          `[ODCSService] Problematic object starting at ${objectStart}:`,
+          contractJson.substring(objectStart, objectEnd)
+        );
+      }
+      throw sdkError;
+    }
 
     console.log('[ODCSService] V2 export complete, YAML length:', yamlResult.length);
 

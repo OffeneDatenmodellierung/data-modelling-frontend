@@ -1,0 +1,334 @@
+name: Release Electron App
+
+on:
+  workflow_dispatch: # Allow manual triggering
+    inputs:
+      version:
+        description: "Version to release (without v prefix). Leave empty to use package.json version."
+        required: false
+        type: string
+  push:
+    tags:
+      - "v*"
+
+env:
+  NODE_VERSION: "22.x"
+
+permissions:
+  contents: write
+
+jobs:
+  version-check:
+    name: Version Check
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get version
+        id: version
+        working-directory: ./frontend
+        run: |
+          if [ -n "${{ inputs.version }}" ]; then
+            VERSION="${{ inputs.version }}"
+          elif [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/v}
+          else
+            VERSION=$(node -p "require('./package.json').version")
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Building Electron app version: $VERSION"
+
+  build-electron:
+    needs: version-check
+    name: Build Electron (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux
+            artifact_name: open-data-modelling-linux
+          - os: macos-latest
+            platform: mac
+            artifact_name: open-data-modelling-macos
+          - os: windows-latest
+            platform: win
+            artifact_name: open-data-modelling-windows
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ./frontend
+        run: npm ci
+
+      # macOS code signing setup
+      - name: Import Code Signing Certificate (macOS)
+        if: matrix.platform == 'mac'
+        env:
+          MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+          MACOS_CERTIFICATE_PWD: ${{ secrets.MACOS_CERTIFICATE_PWD }}
+          MACOS_KEYCHAIN_PWD: ${{ secrets.MACOS_KEYCHAIN_PWD }}
+        run: |
+          if [ -n "$MACOS_CERTIFICATE" ]; then
+            # Create a temporary keychain
+            KEYCHAIN_PATH=$RUNNER_TEMP/signing.keychain-db
+            security create-keychain -p "$MACOS_KEYCHAIN_PWD" $KEYCHAIN_PATH
+            security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
+            security unlock-keychain -p "$MACOS_KEYCHAIN_PWD" $KEYCHAIN_PATH
+
+            # Import certificate
+            echo "$MACOS_CERTIFICATE" | base64 --decode > $RUNNER_TEMP/certificate.p12
+            security import $RUNNER_TEMP/certificate.p12 -P "$MACOS_CERTIFICATE_PWD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
+            security list-keychain -d user -s $KEYCHAIN_PATH
+
+            # Allow codesign to access the key
+            security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$MACOS_KEYCHAIN_PWD" $KEYCHAIN_PATH
+            echo "SIGNING_ENABLED=true" >> $GITHUB_ENV
+          else
+            echo "No signing certificate provided, skipping code signing"
+            echo "SIGNING_ENABLED=false" >> $GITHUB_ENV
+          fi
+
+      # Build the Electron app
+      - name: Build Electron App (macOS - signed)
+        if: matrix.platform == 'mac' && env.SIGNING_ENABLED == 'true'
+        working-directory: ./frontend
+        env:
+          CSC_LINK: ${{ secrets.MACOS_CERTIFICATE }}
+          CSC_KEY_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PWD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          npm run build:electron:frontend
+          npm run build:electron
+          npx electron-builder --mac --x64 --arm64
+
+      - name: Build Electron App (macOS - unsigned)
+        if: matrix.platform == 'mac' && env.SIGNING_ENABLED != 'true'
+        working-directory: ./frontend
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          npm run build:electron:frontend
+          npm run build:electron
+          npx electron-builder --mac --x64 --arm64
+
+      - name: Build Electron App (Windows)
+        if: matrix.platform == 'win'
+        working-directory: ./frontend
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          npm run build:electron:frontend
+          npm run build:electron
+          npx electron-builder --win
+
+      - name: Build Electron App (Linux)
+        if: matrix.platform == 'linux'
+        working-directory: ./frontend
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          npm run build:electron:frontend
+          npm run build:electron
+          npx electron-builder --linux AppImage deb
+
+      # Notarize macOS app
+      - name: Notarize macOS App
+        if: matrix.platform == 'mac' && env.SIGNING_ENABLED == 'true'
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          if [ -n "$APPLE_ID" ] && [ -n "$APPLE_ID_PASSWORD" ] && [ -n "$APPLE_TEAM_ID" ]; then
+            echo "Notarization handled by electron-builder afterSign hook"
+            echo "If not configured, set up afterSign in electron-builder.yml"
+          fi
+
+      # Prepare artifacts for upload
+      - name: List build outputs
+        working-directory: ./frontend
+        shell: bash
+        run: |
+          echo "Build outputs:"
+          ls -la release/ || echo "No release directory"
+          find release -type f \( -name "*.dmg" -o -name "*.zip" -o -name "*.exe" -o -name "*.AppImage" -o -name "*.deb" \) 2>/dev/null || echo "No installers found"
+
+      - name: Prepare artifacts (macOS)
+        if: matrix.platform == 'mac'
+        id: prepare-mac
+        working-directory: ./frontend
+        run: |
+          VERSION="${{ needs.version-check.outputs.version }}"
+          mkdir -p artifacts
+
+          # Find and rename DMG files
+          for arch in x64 arm64; do
+            DMG=$(find release -name "*-${arch}.dmg" -o -name "*-universal.dmg" 2>/dev/null | head -1)
+            if [ -n "$DMG" ] && [ -f "$DMG" ]; then
+              NEWNAME="open-data-modelling-${VERSION}-mac-${arch}.dmg"
+              cp "$DMG" "artifacts/$NEWNAME"
+              echo "Prepared: $NEWNAME"
+            fi
+          done
+
+          # Also grab any universal DMG
+          UNIVERSAL_DMG=$(find release -name "*-universal.dmg" 2>/dev/null | head -1)
+          if [ -n "$UNIVERSAL_DMG" ] && [ -f "$UNIVERSAL_DMG" ]; then
+            NEWNAME="open-data-modelling-${VERSION}-mac-universal.dmg"
+            cp "$UNIVERSAL_DMG" "artifacts/$NEWNAME"
+          fi
+
+          # Also grab ZIP files for auto-update
+          for ZIP in release/*.zip; do
+            if [ -f "$ZIP" ]; then
+              cp "$ZIP" artifacts/
+            fi
+          done
+
+          ls -la artifacts/
+
+      - name: Prepare artifacts (Windows)
+        if: matrix.platform == 'win'
+        id: prepare-win
+        working-directory: ./frontend
+        shell: pwsh
+        run: |
+          $VERSION = "${{ needs.version-check.outputs.version }}"
+          New-Item -ItemType Directory -Force -Path artifacts
+
+          # Find and copy installer
+          $exe = Get-ChildItem -Path release -Filter "*.exe" -Recurse | Select-Object -First 1
+          if ($exe) {
+            $newName = "open-data-modelling-$VERSION-win-setup.exe"
+            Copy-Item $exe.FullName -Destination "artifacts\$newName"
+            Write-Host "Prepared: $newName"
+          }
+
+          Get-ChildItem artifacts
+
+      - name: Prepare artifacts (Linux)
+        if: matrix.platform == 'linux'
+        id: prepare-linux
+        working-directory: ./frontend
+        run: |
+          VERSION="${{ needs.version-check.outputs.version }}"
+          mkdir -p artifacts
+
+          # Find and copy AppImage
+          APPIMAGE=$(find release -name "*.AppImage" 2>/dev/null | head -1)
+          if [ -n "$APPIMAGE" ] && [ -f "$APPIMAGE" ]; then
+            NEWNAME="open-data-modelling-${VERSION}-linux-x86_64.AppImage"
+            cp "$APPIMAGE" "artifacts/$NEWNAME"
+            echo "Prepared: $NEWNAME"
+          fi
+
+          # Find and copy deb
+          DEB=$(find release -name "*.deb" 2>/dev/null | head -1)
+          if [ -n "$DEB" ] && [ -f "$DEB" ]; then
+            NEWNAME="open-data-modelling-${VERSION}-linux-amd64.deb"
+            cp "$DEB" "artifacts/$NEWNAME"
+            echo "Prepared: $NEWNAME"
+          fi
+
+          ls -la artifacts/
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: frontend/artifacts/*
+          retention-days: 30
+
+  update-release:
+    name: Update GitHub Release
+    needs: [version-check, build-electron]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get version info
+        id: version
+        run: |
+          VERSION="${{ needs.version-check.outputs.version }}"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+          # Check if this is a dev/prerelease version
+          if [[ "$VERSION" == *"-dev"* ]] || [[ "$VERSION" == *"-alpha"* ]] || [[ "$VERSION" == *"-beta"* ]] || [[ "$VERSION" == *"-rc"* ]]; then
+            echo "is_prerelease=true" >> $GITHUB_OUTPUT
+          else
+            echo "is_prerelease=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+          pattern: open-data-modelling-*
+
+      - name: List downloaded artifacts
+        run: |
+          echo "Downloaded artifacts:"
+          find artifacts -type f | sort
+
+      - name: Create checksums
+        run: |
+          cd artifacts
+          find . -type f \( -name "*.dmg" -o -name "*.exe" -o -name "*.AppImage" -o -name "*.deb" -o -name "*.zip" \) | while read file; do
+            sha256sum "$file" > "${file}.sha256"
+          done
+
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          name: v${{ steps.version.outputs.version }}
+          body: |
+            ## Open Data Modelling v${{ steps.version.outputs.version }}
+
+            ### Desktop Application Downloads
+
+            **macOS:**
+            - Intel (x64): `open-data-modelling-${{ steps.version.outputs.version }}-mac-x64.dmg`
+            - Apple Silicon (arm64): `open-data-modelling-${{ steps.version.outputs.version }}-mac-arm64.dmg`
+
+            **Windows:**
+            - Installer: `open-data-modelling-${{ steps.version.outputs.version }}-win-setup.exe`
+
+            **Linux:**
+            - AppImage: `open-data-modelling-${{ steps.version.outputs.version }}-linux-x86_64.AppImage`
+            - Debian/Ubuntu: `open-data-modelling-${{ steps.version.outputs.version }}-linux-amd64.deb`
+
+            ### Verification
+            SHA256 checksums are provided for each file (`.sha256` files).
+
+            ### Notes
+            - macOS apps are signed and notarized (when certificates are configured)
+            - First launch on macOS: Right-click and select "Open" if you see a security warning
+          files: |
+            artifacts/**/*.dmg
+            artifacts/**/*.exe
+            artifacts/**/*.AppImage
+            artifacts/**/*.deb
+            artifacts/**/*.zip
+            artifacts/**/*.sha256
+          fail_on_unmatched_files: false
+          prerelease: ${{ steps.version.outputs.is_prerelease }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -76,17 +76,183 @@ export enum HandlePosition {
 }
 
 /**
- * SDK 1.14.0+ Infrastructure type for data flow relationships
+ * SDK 2.3.0+ Infrastructure type for data flow relationships
+ * Comprehensive list of 70+ infrastructure types
  */
 export enum InfrastructureType {
+  // Message Queues & Streaming
   Kafka = 'kafka',
+  Pulsar = 'pulsar',
+  RabbitMQ = 'rabbitmq',
+  ActiveMQ = 'activemq',
+  AmazonMQ = 'amazonmq',
+  AzureServiceBus = 'azureservicebus',
+  GooglePubSub = 'googlepubsub',
+  NATS = 'nats',
+  Kinesis = 'kinesis',
+  EventHub = 'eventhub',
+  EventBridge = 'eventbridge',
+  SQS = 'sqs',
+  SNS = 'sns',
+
+  // Orchestration & Workflow
   Airflow = 'airflow',
+  Prefect = 'prefect',
+  Dagster = 'dagster',
+  Luigi = 'luigi',
+  Argo = 'argo',
+  StepFunctions = 'stepfunctions',
+  AzureDataFactory = 'azuredatafactory',
+  GoogleCloudComposer = 'googlecloudcomposer',
+  Temporal = 'temporal',
+  Conductor = 'conductor',
+
+  // Data Processing
   Spark = 'spark',
+  Flink = 'flink',
+  Beam = 'beam',
+  Storm = 'storm',
+  Samza = 'samza',
+  Hive = 'hive',
+  Presto = 'presto',
+  Trino = 'trino',
+  Impala = 'impala',
+  Dask = 'dask',
+  Ray = 'ray',
+  Polars = 'polars',
+
+  // Cloud Data Platforms
   Databricks = 'databricks',
   Snowflake = 'snowflake',
+  BigQuery = 'bigquery',
+  Redshift = 'redshift',
+  Synapse = 'synapse',
+  EMR = 'emr',
+  Dataproc = 'dataproc',
+  HDInsight = 'hdinsight',
+  Glue = 'glue',
+  DataFusion = 'datafusion',
+
+  // ETL/ELT Tools
   Fivetran = 'fivetran',
+  Airbyte = 'airbyte',
+  Stitch = 'stitch',
+  Matillion = 'matillion',
+  Talend = 'talend',
+  Informatica = 'informatica',
+  SSIS = 'ssis',
+  Pentaho = 'pentaho',
+  NiFi = 'nifi',
+  StreamSets = 'streamsets',
+
+  // Transformation
   DBT = 'dbt',
+  SQLMesh = 'sqlmesh',
+  Coalesce = 'coalesce',
+  DataformGoogle = 'dataformgoogle',
+
+  // Data Quality & Observability
+  GreatExpectations = 'greatexpectations',
+  Soda = 'soda',
+  MonteCarlo = 'montecarlo',
+  Atlan = 'atlan',
+  DataDog = 'datadog',
+  Bigeye = 'bigeye',
+  Anomalo = 'anomalo',
+
+  // Data Catalogs & Governance
+  DataHub = 'datahub',
+  Amundsen = 'amundsen',
+  Atlas = 'atlas',
+  Collibra = 'collibra',
+  Alation = 'alation',
+  Purview = 'purview',
+  OpenMetadata = 'openmetadata',
+
+  // Databases
+  PostgreSQL = 'postgresql',
+  MySQL = 'mysql',
+  MongoDB = 'mongodb',
+  Cassandra = 'cassandra',
+  DynamoDB = 'dynamodb',
+  CosmosDB = 'cosmosdb',
+  Redis = 'redis',
+  Elasticsearch = 'elasticsearch',
+  ClickHouse = 'clickhouse',
+  DuckDB = 'duckdb',
+  SQLite = 'sqlite',
+  Oracle = 'oracle',
+  SQLServer = 'sqlserver',
+  DB2 = 'db2',
+
+  // File/Object Storage
+  S3 = 's3',
+  GCS = 'gcs',
+  ADLS = 'adls',
+  HDFS = 'hdfs',
+  MinIO = 'minio',
+
+  // Data Lake Formats
+  Delta = 'delta',
+  Iceberg = 'iceberg',
+  Hudi = 'hudi',
+
+  // API & Integration
+  REST = 'rest',
+  GraphQL = 'graphql',
+  gRPC = 'grpc',
+  Webhook = 'webhook',
+  SFTP = 'sftp',
+  FTP = 'ftp',
+
+  // CDC & Replication
+  Debezium = 'debezium',
+  Maxwell = 'maxwell',
+  GoldenGate = 'goldengate',
+  Attunity = 'attunity',
+  Striim = 'striim',
+  Qlik = 'qlik',
+
+  // Notebooks & Analytics
+  Jupyter = 'jupyter',
+  Zeppelin = 'zeppelin',
+  Hex = 'hex',
+  Deepnote = 'deepnote',
+
+  // BI & Visualization
+  Looker = 'looker',
+  Tableau = 'tableau',
+  PowerBI = 'powerbi',
+  Metabase = 'metabase',
+  Superset = 'superset',
+  Mode = 'mode',
+  Sigma = 'sigma',
+  ThoughtSpot = 'thoughtspot',
+
+  // ML Platforms
+  SageMaker = 'sagemaker',
+  VertexAI = 'vertexai',
+  AzureML = 'azureml',
+  MLflow = 'mlflow',
+  Kubeflow = 'kubeflow',
+  Weights = 'wandb',
+  Neptune = 'neptune',
+
+  // Container & Compute
+  Kubernetes = 'kubernetes',
+  Docker = 'docker',
+  Lambda = 'lambda',
+  CloudFunctions = 'cloudfunctions',
+  AzureFunctions = 'azurefunctions',
+  ECS = 'ecs',
+  Fargate = 'fargate',
+  CloudRun = 'cloudrun',
+
+  // Generic/Other
   Custom = 'custom',
+  Other = 'other',
+  Manual = 'manual',
+  Unknown = 'unknown',
 }
 
 /**

@@ -145,6 +145,10 @@ export const useSketchStore = create<SketchState>()(
           sketches,
           filteredSketches: applyFilter(sketches, filter),
         });
+        // Mark workspace as having pending changes
+        import('@/stores/workspaceStore').then(({ useWorkspaceStore }) => {
+          useWorkspaceStore.getState().setPendingChanges(true);
+        });
       },
 
       updateSketchInStore: (sketchId, updates) => {
@@ -161,6 +165,10 @@ export const useSketchStore = create<SketchState>()(
           selectedSketch:
             selectedSketch?.id === sketchId ? (updatedSketch ?? null) : selectedSketch,
         });
+        // Mark workspace as having pending changes
+        import('@/stores/workspaceStore').then(({ useWorkspaceStore }) => {
+          useWorkspaceStore.getState().setPendingChanges(true);
+        });
       },
 
       removeSketch: (sketchId) => {
@@ -172,6 +180,10 @@ export const useSketchStore = create<SketchState>()(
           sketches,
           filteredSketches: applyFilter(sketches, filter),
           selectedSketch: selectedSketch?.id === sketchId ? null : selectedSketch,
+        });
+        // Mark workspace as having pending changes
+        import('@/stores/workspaceStore').then(({ useWorkspaceStore }) => {
+          useWorkspaceStore.getState().setPendingChanges(true);
         });
       },
 

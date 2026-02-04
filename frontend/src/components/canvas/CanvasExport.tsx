@@ -361,6 +361,7 @@ export const CanvasExport: React.FC<CanvasExportProps> = ({ filenamePrefix = 'ca
 
       {/* Selection overlay */}
       {isSelecting && (
+        // eslint-disable-next-line jsx-a11y/no-static-element-interactions -- Selection overlay for canvas export
         <div
           ref={selectionOverlayRef}
           className="absolute inset-0 z-50 cursor-crosshair"
@@ -391,6 +392,7 @@ export const CanvasExport: React.FC<CanvasExportProps> = ({ filenamePrefix = 'ca
       )}
 
       {/* Close menu when clicking outside */}
+      {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- Menu backdrop */}
       {showMenu && <div className="fixed inset-0 z-0" onClick={() => setShowMenu(false)} />}
     </>
   );

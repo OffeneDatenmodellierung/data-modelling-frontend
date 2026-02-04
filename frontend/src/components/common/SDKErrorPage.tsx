@@ -54,7 +54,7 @@ export const SDKErrorPage: React.FC<SDKErrorPageProps> = ({ error }) => {
           {isVersionError ? (
             <div className="space-y-3">
               <p className="text-gray-700">
-                The application requires SDK version 2.0.6 or later. Please update the SDK package:
+                The application requires SDK version 2.1.0 or later. Please update the SDK package:
               </p>
               <div className="bg-gray-900 rounded-lg p-4">
                 <code className="text-green-400 text-sm">
