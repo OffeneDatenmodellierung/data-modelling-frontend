@@ -356,10 +356,34 @@ export const useModelStore = create<ModelState>((set, get) => ({
       ),
     })),
   removeTable: (tableId: string) => {
+    // Count orphaned relationships before removal for logging
+    const orphanedCount = get().relationships.filter(
+      (r) =>
+        r.source_table_id === tableId ||
+        r.target_table_id === tableId ||
+        r.source_id === tableId ||
+        r.target_id === tableId
+    ).length;
+
     set((state) => ({
       tables: state.tables.filter((t) => t.id !== tableId),
+      // Cascade delete: remove relationships that reference this table
+      relationships: state.relationships.filter(
+        (r) =>
+          r.source_table_id !== tableId &&
+          r.target_table_id !== tableId &&
+          r.source_id !== tableId &&
+          r.target_id !== tableId
+      ),
       selectedTableId: state.selectedTableId === tableId ? null : state.selectedTableId,
     }));
+
+    if (orphanedCount > 0) {
+      console.log(
+        `[ModelStore] Cascade deleted ${orphanedCount} relationship(s) referencing table ${tableId}`
+      );
+    }
+
     // Mark workspace as having pending changes
     useWorkspaceStore.getState().setPendingChanges(true);
   },
@@ -709,11 +733,35 @@ export const useModelStore = create<ModelState>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       await tableService.deleteTable(domain, tableId);
+
+      // Count orphaned relationships before removal for logging
+      const orphanedCount = get().relationships.filter(
+        (r) =>
+          r.source_table_id === tableId ||
+          r.target_table_id === tableId ||
+          r.source_id === tableId ||
+          r.target_id === tableId
+      ).length;
+
       set((state) => ({
         tables: state.tables.filter((t) => t.id !== tableId),
+        // Cascade delete: remove relationships that reference this table
+        relationships: state.relationships.filter(
+          (r) =>
+            r.source_table_id !== tableId &&
+            r.target_table_id !== tableId &&
+            r.source_id !== tableId &&
+            r.target_id !== tableId
+        ),
         selectedTableId: state.selectedTableId === tableId ? null : state.selectedTableId,
         isLoading: false,
       }));
+
+      if (orphanedCount > 0) {
+        console.log(
+          `[ModelStore] Cascade deleted ${orphanedCount} relationship(s) referencing table ${tableId}`
+        );
+      }
     } catch (error) {
       set({
         error: error instanceof Error ? error.message : 'Failed to delete table',

@@ -3,6 +3,9 @@
  * Represents a physical system (database, schema, namespace) within a domain
  */
 
+import type { Owner } from './table';
+import type { SLAProperty, ContactDetails, InfrastructureType } from './relationship';
+
 export type SystemType =
   // Relational Databases
   | 'postgresql'
@@ -107,6 +110,14 @@ export interface System {
   // System contains tables and assets
   table_ids?: string[]; // Array of table IDs in this system
   asset_ids?: string[]; // Array of CADS asset IDs in this system
+
+  // SDK 2.3.0+ DataFlow metadata fields
+  owner?: Owner; // System owner
+  sla?: SLAProperty[]; // SLA properties
+  contact_details?: ContactDetails; // Contact information
+  infrastructure_type?: InfrastructureType; // Infrastructure classification
+  notes?: string; // Additional notes
+  version?: string; // Version tracking
 }
 
 export interface CreateSystemRequest {
@@ -126,4 +137,12 @@ export interface UpdateSystemRequest {
   position_y?: number;
   table_ids?: string[];
   asset_ids?: string[];
+
+  // SDK 2.3.0+ DataFlow metadata fields
+  owner?: Owner;
+  sla?: SLAProperty[];
+  contact_details?: ContactDetails;
+  infrastructure_type?: InfrastructureType;
+  notes?: string;
+  version?: string;
 }

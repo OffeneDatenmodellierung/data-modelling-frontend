@@ -13,6 +13,7 @@ import {
   type ResourceType,
   type ValidationState,
 } from '@/stores/validationStore';
+import { useModelStore } from '@/stores/modelStore';
 import { runWorkspaceValidation } from '@/utils/workspaceValidation';
 
 interface ValidationWarningsProps {
@@ -48,6 +49,9 @@ export const ValidationWarnings: React.FC<ValidationWarningsProps> = ({ classNam
         isValidatingStore: state.isValidating,
       }))
     );
+
+  // Get removeRelationship from model store for fixing dangling relationships
+  const removeRelationship = useModelStore((state) => state.removeRelationship);
 
   // Compute derived values with useMemo to avoid recalculating on every render
   const activeIssues = useMemo(() => issues.filter((i: ValidationIssue) => i.isActive), [issues]);
@@ -104,6 +108,21 @@ export const ValidationWarnings: React.FC<ValidationWarningsProps> = ({ classNam
       setIsValidating(false);
     }
   }, []);
+
+  // Handle removal of dangling relationships (those with missing source/target tables)
+  const handleRemoveDanglingRelationship = useCallback(
+    async (relationshipId: string) => {
+      removeRelationship(relationshipId);
+      // Re-run validation to update the issues list
+      setIsValidating(true);
+      try {
+        await runWorkspaceValidation();
+      } finally {
+        setIsValidating(false);
+      }
+    },
+    [removeRelationship]
+  );
 
   // Format relative time
   const formatRelativeTime = useCallback((isoString: string | null): string => {
@@ -267,6 +286,20 @@ export const ValidationWarnings: React.FC<ValidationWarningsProps> = ({ classNam
                               File: {issue.filePath}
                             </p>
                           )}
+                          {/* Show Remove Relationship button for dangling relationship issues */}
+                          {issue.resourceType === 'relationship' &&
+                            (issue.field === 'source_table_id' ||
+                              issue.field === 'target_table_id' ||
+                              issue.field === 'source_id' ||
+                              issue.field === 'target_id') && (
+                              <button
+                                onClick={() => handleRemoveDanglingRelationship(issue.resourceId)}
+                                className="mt-1.5 text-xs px-2 py-0.5 bg-red-100 text-red-700 hover:bg-red-200 rounded"
+                                title="Remove this orphaned relationship"
+                              >
+                                Remove Relationship
+                              </button>
+                            )}
                         </div>
                         <button
                           onClick={() => handleRemoveIssue(issue.id)}
