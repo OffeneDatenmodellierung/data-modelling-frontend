@@ -6,7 +6,6 @@
  * and that WASM files are present in the expected locations.
  *
  * Expected versions:
- * - DuckDB-WASM: 1.29.0 (DuckDB 1.4.3)
  * - SDK WASM: 1.13.2
  *
  * Usage: npm run verify:versions
@@ -22,17 +21,11 @@ const FRONTEND_DIR = join(__dirname, '..');
 
 // Expected versions
 const EXPECTED_VERSIONS = {
-  duckdb: '1.29.0',
   sdk: '1.13.2',
 };
 
 // WASM file locations
 const WASM_PATHS = {
-  duckdb: {
-    dir: join(FRONTEND_DIR, 'public/duckdb'),
-    files: ['duckdb-eh.wasm', 'duckdb-browser-eh.worker.js'],
-    optional: ['duckdb-mvp.wasm', 'duckdb-browser-mvp.worker.js'],
-  },
   sdk: {
     dir: join(FRONTEND_DIR, 'public/wasm'),
     files: ['data_modelling_sdk.js', 'data_modelling_sdk_bg.wasm'],
@@ -58,28 +51,6 @@ function formatSize(bytes) {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-function checkPackageVersion(packageName, expectedVersion) {
-  try {
-    const pkgPath = join(FRONTEND_DIR, 'node_modules', packageName, 'package.json');
-    if (!existsSync(pkgPath)) {
-      log('error', `Package ${packageName} is not installed`);
-      return false;
-    }
-
-    const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'));
-    if (pkg.version === expectedVersion) {
-      log('ok', `${packageName}@${pkg.version} (expected ${expectedVersion})`);
-      return true;
-    } else {
-      log('error', `${packageName}@${pkg.version} (expected ${expectedVersion})`);
-      return false;
-    }
-  } catch (err) {
-    log('error', `Failed to read ${packageName} version: ${err.message}`);
-    return false;
-  }
 }
 
 function checkWasmFiles(name, config) {
@@ -145,18 +116,7 @@ console.log('  WASM Version Verification');
 console.log('========================================\n');
 
 console.log('Expected Versions:');
-console.log(`  - DuckDB-WASM: ${EXPECTED_VERSIONS.duckdb}`);
-console.log(`  - SDK WASM:    ${EXPECTED_VERSIONS.sdk}`);
-console.log('');
-
-// Check DuckDB-WASM npm package
-console.log('--- DuckDB-WASM Package ---');
-checkPackageVersion('@duckdb/duckdb-wasm', EXPECTED_VERSIONS.duckdb);
-console.log('');
-
-// Check DuckDB-WASM files
-console.log('--- DuckDB-WASM Files ---');
-checkWasmFiles('DuckDB', WASM_PATHS.duckdb);
+console.log(`  - SDK WASM: ${EXPECTED_VERSIONS.sdk}`);
 console.log('');
 
 // Check SDK WASM files
@@ -170,10 +130,6 @@ console.log('========================================');
 if (hasErrors) {
   console.log('\x1b[31m  VERIFICATION FAILED\x1b[0m');
   console.log('  Please fix the errors above.');
-  console.log('');
-  console.log('  To fix DuckDB-WASM issues:');
-  console.log('    npm install @duckdb/duckdb-wasm@1.29.0');
-  console.log('    npm run build:duckdb');
   console.log('');
   console.log('  To fix SDK WASM issues:');
   console.log('    npm run build:wasm');

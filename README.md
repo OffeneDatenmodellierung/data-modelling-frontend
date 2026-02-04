@@ -21,7 +21,6 @@ A domain-centric data modelling application built with React and Electron. Creat
 - **Domain-Centric**: Organize data models by business domains with systems, tables, relationships, BPMN processes, and DMN decisions
 - **Decision Logs** (SDK 1.13.6+): MADR-format Architecture Decision Records with status workflow
 - **Knowledge Base** (SDK 1.13.6+): Documentation articles with types (Guide, Tutorial, Reference, etc.)
-- **DuckDB-WASM** (v2.1.0+): In-browser SQL database with OPFS persistence for advanced querying and analytics
 
 ## Prerequisites
 
@@ -222,30 +221,11 @@ The SDK 2.1.0 release includes these capabilities:
   - Publishing workflow: Draft → Review → Published → Archived
   - Full-text search across articles
   - Related articles and decisions linking
-  
-- **DuckDB Backend**: Optional embedded analytical database
-  - YAML ↔ Database synchronization
-  - SQL query execution
-  - Advanced analytics and reporting
-  - Configuration via `.data-model.toml`
 
 See the following documentation for more details:
 - [Configuration Guide](frontend/docs/CONFIGURATION.md)
 - [Decision Logs Guide](frontend/docs/DECISION_LOGS.md)
 - [Knowledge Base Guide](frontend/docs/KNOWLEDGE_BASE.md)
-
-### DuckDB-WASM Features (v2.1.0+)
-
-The application includes DuckDB-WASM 1.29.0 (DuckDB 1.4.3) for in-browser SQL queries:
-
-- **OPFS Persistence**: Database persists in browser's Origin Private File System
-- **Browser Compatibility**: Chrome 86+, Edge 86+, Firefox 111+, Safari 15.2+
-- **Automatic Fallback**: In-memory mode for unsupported browsers
-- **YAML Sync**: Bidirectional synchronization with YAML workspace files
-- **Type-safe Queries**: Fluent query builder with TypeScript support
-- **Developer Tools**: SQL console and database inspector (dev mode)
-
-See [DuckDB Guide](frontend/docs/DUCKDB_GUIDE.md) for detailed documentation.
 
 ### Git/GitHub Integration (v3.0.0)
 
@@ -298,7 +278,6 @@ The application operates offline-first with optional GitHub connectivity:
 **Core Features (Fully Offline)**:
 - **WASM SDK**: Direct use of `data-modelling-sdk` compiled to WebAssembly
 - **Local File System**: Electron file system access for saving/loading workspaces
-- **DuckDB-WASM**: In-browser SQL database with local persistence
 - **Git Operations**: Full local Git via simple-git (Electron only)
 
 **GitHub Features (Requires Authentication)**:

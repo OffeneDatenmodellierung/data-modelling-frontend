@@ -9,9 +9,7 @@ import { workspaceService } from '@/services/api/workspaceService';
 import { useUIStore } from '@/stores/uiStore';
 import type { Workspace } from '@/types/workspace';
 import { AutoSaveSettings } from '@/components/settings/AutoSaveSettings';
-import { DatabaseSettings } from '@/components/settings/DatabaseSettings';
 import { sdkLoader } from '@/services/sdk/sdkLoader';
-import { getDuckDBService } from '@/services/database/duckdbService';
 
 // App version from build-time constant
 declare const __APP_VERSION__: string;
@@ -40,21 +38,6 @@ export const WorkspaceSettings: React.FC<WorkspaceSettingsProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [newCollaboratorEmail, setNewCollaboratorEmail] = useState('');
   const [newCollaboratorAccess, setNewCollaboratorAccess] = useState<'read' | 'edit'>('edit');
-  const [duckdbVersion, setDuckdbVersion] = useState<string>('Not initialized');
-
-  // Load DuckDB version on mount
-  useEffect(() => {
-    const loadDuckDBVersion = async () => {
-      try {
-        const duckdb = getDuckDBService();
-        const stats = await duckdb.getStats();
-        setDuckdbVersion(stats.version || 'Unknown');
-      } catch {
-        setDuckdbVersion('Not available');
-      }
-    };
-    loadDuckDBVersion();
-  }, []);
 
   useEffect(() => {
     const ws = workspaces.find((w) => w.id === workspaceId);
@@ -279,19 +262,8 @@ export const WorkspaceSettings: React.FC<WorkspaceSettingsProps> = ({
                 {sdkLoader.isLoaded() ? sdkLoader.getSDKVersion() : 'Not loaded'}+
               </span>
             </div>
-            <div className="flex justify-between items-center">
-              <span className="text-sm font-medium text-gray-600">DuckDB WASM Version</span>
-              <span className="text-sm text-gray-900 font-mono">{duckdbVersion}</span>
-            </div>
           </div>
         </div>
-
-        {/* Database Settings (SDK 1.13.1+) */}
-        {workspace.domains && workspace.domains[0]?.workspace_path && (
-          <div className="mb-6 border-t pt-6">
-            <DatabaseSettings workspacePath={workspace.domains[0].workspace_path} />
-          </div>
-        )}
 
         {/* Collaborators Section (disabled - offline mode only) */}
         {/* eslint-disable-next-line no-constant-binary-expression */}

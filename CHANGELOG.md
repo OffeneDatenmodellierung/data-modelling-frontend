@@ -14,6 +14,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Updated workspace schema with new SystemV2, DomainV2, RelationshipV2 fields
   - Decision `create_decision` now requires mandatory `author` parameter (SDK 2.3.0 breaking change)
 
+### Removed
+- **DuckDB-WASM Integration**: Removed unused DuckDB-WASM integration (~3000 lines of code)
+  - Removed `@duckdb/duckdb-wasm` package dependency
+  - Removed `src/services/database/` directory (duckdbService, syncEngine, schemaManager, queryBuilder, opfsManager)
+  - Removed `src/hooks/useDuckDB.ts`, `useQuery.ts`, `useSyncStatus.ts`
+  - Removed `src/contexts/DuckDBContext.tsx`
+  - Removed `src/types/duckdb.ts` and `src/types/database.ts`
+  - Removed `src/components/dev/QueryConsole.tsx` and `DatabaseInspector.tsx`
+  - Removed `src/components/database/` directory (ImportDatabaseDialog, ExportDatabaseDialog)
+  - Removed `src/components/settings/DatabaseSettings.tsx`
+  - Removed DuckDB-related Electron IPC handlers
+  - Simplified build scripts (removed `build:duckdb`, `build:all-wasm`)
+  - All data continues to flow through REST API and YAML files as before
+
 ### Changed
 - **Test Infrastructure**: Improved test reliability and isolation
   - Added `.catch()` handlers to dynamic imports in stores to prevent unhandled rejections during test teardown

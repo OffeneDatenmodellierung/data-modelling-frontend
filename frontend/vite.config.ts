@@ -42,7 +42,6 @@ export default defineConfig({
     },
   },
   // Content Security Policy for bpmn-js/dmn-js inline styles
-  // Cross-Origin headers required for SharedArrayBuffer (DuckDB-WASM performance)
   server: {
     port: 5173,
     headers: {
@@ -80,10 +79,6 @@ export default defineConfig({
           ) {
             return 'wasm/[name][extname]';
           }
-          // Keep DuckDB WASM files in duckdb/ directory
-          if (assetInfo.name && assetInfo.name.includes('duckdb')) {
-            return 'duckdb/[name][extname]';
-          }
           return 'assets/[name]-[hash][extname]';
         },
       },
@@ -92,7 +87,7 @@ export default defineConfig({
   // Optimize WASM handling
   // Exclude WASM packages from pre-bundling (they need to load WASM files dynamically)
   optimizeDeps: {
-    exclude: ['@offenedatenmodellierung/data-modelling-sdk', '@duckdb/duckdb-wasm'],
+    exclude: ['@offenedatenmodellierung/data-modelling-sdk'],
   },
   test: {
     globals: true,

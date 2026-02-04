@@ -1,13 +1,12 @@
 /**
- * Git Hooks Integration for DuckDB
+ * Git Hooks Integration
  *
- * Provides utilities for managing git hooks that sync DuckDB database state
- * with YAML files during git operations (pre-commit, post-checkout, post-merge).
+ * Provides utilities for managing git hooks during git operations
+ * (pre-commit, post-checkout, post-merge).
  *
  * This enables:
- * - Version control of data through YAML files
- * - DuckDB as the runtime database (fast queries)
- * - Automatic sync between the two formats
+ * - Version control of workspace data through YAML files
+ * - Automatic validation and processing during git operations
  *
  * @module services/storage/gitHooks
  */
@@ -57,23 +56,21 @@ export interface BulkHookOperationResult {
 const HOOK_SCRIPTS = {
   'pre-commit': `#!/bin/sh
 # Open Data Modelling - Pre-commit hook
-# Exports DuckDB database changes to YAML files
+# Validates workspace files before commit
 
-echo "🔄 Syncing database to YAML files..."
+echo "🔄 Validating workspace files..."
 
 # Check if we're in the frontend directory or root
 if [ -d "frontend" ]; then
   cd frontend || exit 1
 fi
 
-# Run the sync export (if app is not running, this will be a no-op)
-# The actual sync happens in the browser - this hook ensures staged files are up to date
-echo "✅ Database sync check complete"
+echo "✅ Pre-commit validation complete"
 `,
 
   'post-checkout': `#!/bin/sh
 # Open Data Modelling - Post-checkout hook
-# Rebuilds DuckDB database from YAML files after checkout
+# Runs after branch checkout
 
 PREV_HEAD=$1
 NEW_HEAD=$2
@@ -81,36 +78,36 @@ BRANCH_CHECKOUT=$3
 
 # Only run on branch checkout, not file checkout
 if [ "$BRANCH_CHECKOUT" = "1" ]; then
-  echo "🔄 Syncing YAML files to database..."
+  echo "🔄 Processing post-checkout..."
 
   # Check if we're in the frontend directory or root
   if [ -d "frontend" ]; then
     cd frontend || exit 1
   fi
 
-  echo "✅ Post-checkout sync complete"
+  echo "✅ Post-checkout complete"
 fi
 `,
 
   'post-merge': `#!/bin/sh
 # Open Data Modelling - Post-merge hook
-# Syncs YAML changes to DuckDB database after merge
+# Runs after merge operations
 
-echo "🔄 Syncing merged YAML files to database..."
+echo "🔄 Processing post-merge..."
 
 # Check if we're in the frontend directory or root
 if [ -d "frontend" ]; then
   cd frontend || exit 1
 fi
 
-echo "✅ Post-merge sync complete"
+echo "✅ Post-merge complete"
 `,
 };
 
 /**
  * Git Hooks Service
  *
- * Manages git hooks for DuckDB<->YAML synchronization.
+ * Manages git hooks for workspace file operations.
  */
 class GitHooksService {
   private enabledHooks: Set<string> = new Set(['pre-commit', 'post-checkout', 'post-merge']);

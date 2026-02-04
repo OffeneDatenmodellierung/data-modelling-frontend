@@ -6,11 +6,9 @@ import { ToastContainer } from './components/common/Toast';
 import { GlobalLoading } from './components/common/Loading';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { SDKErrorPage } from './components/common/SDKErrorPage';
-import { useUIStore } from './stores/uiStore';
+
 import { useSDKModeStore } from './services/sdk/sdkMode';
 import { sdkLoader, SDKLoadError } from './services/sdk/sdkLoader';
-import { getDuckDBService } from './services/database';
-import { DUCKDB_CDN_URL } from './types/duckdb';
 import { getPlatform } from './services/platform/platform';
 import { initializeGitHubStore } from './stores/githubStore';
 import Home from './pages/Home';
@@ -36,7 +34,6 @@ const queryClient = new QueryClient({
 });
 
 function App() {
-  const { addToast } = useUIStore();
   const { initialize } = useSDKModeStore();
   const [modeInitialized, setModeInitialized] = useState(false);
   const [sdkError, setSdkError] = useState<SDKLoadError | null>(null);
@@ -88,60 +85,6 @@ function App() {
 
     loadSDK();
   }, [modeInitialized]);
-
-  // Preload DuckDB on startup (after SDK is loaded)
-  useEffect(() => {
-    if (!sdkLoaded) {
-      return; // Wait for SDK to load
-    }
-
-    const initializeDuckDB = async () => {
-      const isElectron = getPlatform() === 'electron';
-
-      // === 2. DuckDB-WASM Preload and Cache ===
-      // Preload DuckDB-WASM early so it's ready when needed
-      try {
-        console.log('[App] Preloading DuckDB-WASM...');
-        const duckdbService = getDuckDBService();
-        const initResult = await duckdbService.initialize();
-
-        if (initResult.success) {
-          console.log(
-            `[App] DuckDB-WASM initialized successfully (${initResult.storageMode} mode, version: ${initResult.version})`
-          );
-          if (!isElectron) {
-            console.log(`[App] DuckDB-WASM loaded from CDN: ${DUCKDB_CDN_URL}`);
-          }
-        } else {
-          throw new Error(initResult.error || 'DuckDB initialization failed');
-        }
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        console.error('[App] Failed to initialize DuckDB-WASM:', errorMessage);
-
-        // Show user-friendly error
-        addToast({
-          type: 'warning',
-          message: `DuckDB initialization failed: ${errorMessage}. Some database features may not work.`,
-          duration: 10000,
-        });
-
-        // Log additional debugging info
-        if (!isElectron) {
-          console.error(`[App] DuckDB-WASM CDN URL: ${DUCKDB_CDN_URL}`);
-          console.error('[App] Check browser console Network tab for failed requests');
-          console.error('[App] Ensure Cross-Origin-Embedder-Policy headers are set correctly');
-        }
-      }
-    };
-
-    // Delay slightly to allow app to fully initialize
-    const timeoutId = setTimeout(() => {
-      initializeDuckDB();
-    }, 100);
-
-    return () => clearTimeout(timeoutId);
-  }, [addToast, sdkLoaded]);
 
   // Show SDK error page if SDK failed to load
   if (sdkError) {

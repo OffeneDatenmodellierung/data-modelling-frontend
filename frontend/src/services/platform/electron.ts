@@ -28,54 +28,6 @@ export interface SaveDialogReturnValue {
   filePath?: string;
 }
 
-// DuckDB IPC types
-export interface DuckDBExportOptions {
-  data: ArrayBuffer | string;
-  defaultPath?: string;
-  format: 'json' | 'csv' | 'duckdb';
-}
-
-export interface DuckDBExportResult {
-  success: boolean;
-  filePath?: string;
-  canceled?: boolean;
-  error?: string;
-}
-
-export interface DuckDBImportOptions {
-  formats?: ('json' | 'csv' | 'duckdb')[];
-}
-
-export interface DuckDBImportResult {
-  success: boolean;
-  filePath?: string;
-  format?: 'json' | 'csv' | 'duckdb' | 'unknown';
-  content?: string;
-  size?: number;
-  canceled?: boolean;
-  error?: string;
-}
-
-export interface DuckDBFileInfo {
-  success: boolean;
-  size?: number;
-  created?: string;
-  modified?: string;
-  isFile?: boolean;
-  error?: string;
-}
-
-export interface DuckDBBackupOptions {
-  sourcePath: string;
-  backupPath?: string;
-}
-
-export interface DuckDBBackupResult {
-  success: boolean;
-  backupPath?: string;
-  error?: string;
-}
-
 // Git IPC types
 export interface GitStatusResult {
   isGitRepo: boolean;
@@ -368,13 +320,6 @@ declare global {
       showSaveDialog: (options: SaveDialogOptions) => Promise<SaveDialogReturnValue>;
       openExternal: (url: string) => Promise<void>;
       closeApp: () => Promise<void>;
-      // DuckDB operations
-      duckdbExport: (options: DuckDBExportOptions) => Promise<DuckDBExportResult>;
-      duckdbImport: (options?: DuckDBImportOptions) => Promise<DuckDBImportResult>;
-      duckdbFileInfo: (filePath: string) => Promise<DuckDBFileInfo>;
-      duckdbFileExists: (filePath: string) => Promise<boolean>;
-      duckdbDeleteFile: (filePath: string) => Promise<{ success: boolean; error?: string }>;
-      duckdbBackup: (options: DuckDBBackupOptions) => Promise<DuckDBBackupResult>;
       // Git operations
       gitStatus: (workspacePath: string) => Promise<GitStatusResult>;
       gitAdd: (

@@ -94,4 +94,3 @@ compression: maximum
 asar: true
 asarUnpack:
   - '**/*.node'
-  - '**/node_modules/duckdb/**'
