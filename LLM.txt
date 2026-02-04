@@ -7,7 +7,7 @@ This file provides context for Large Language Models working with this codebase.
 A domain-centric data modelling application built with React, TypeScript, and Electron.
 Creates data architectures, models, and flow diagrams entirely offline with full Git/GitHub integration.
 
-**Version**: 3.0.0
+**Version**: 3.0.1
 **License**: ISC
 
 ## Technology Stack
@@ -148,8 +148,14 @@ Excalidraw integration provides freeform diagramming for architecture, dataflow,
 
 ### Storage
 - Directory: `sketches/`
-- File pattern: `{workspace}_{domain}_{name}.sketch.json`
-- Global sketches: `{workspace}_global_{name}.sketch.json`
+- File pattern: `{workspace}_{domain}_{name}.sketch.yaml` (SDK format)
+- Global sketches: `{workspace}_global_{name}.sketch.yaml`
+
+### GitHub Sync (v3.0.1)
+Sketches are now properly synced to GitHub repositories:
+- `syncSketchToGitHub()`: Writes sketch YAML to `sketches/` directory
+- `deleteSketchFromGitHub()`: Removes sketch file from repository
+- Auto-sync on add, update, and remove operations in sketchStore
 
 ## Git/GitHub Integration (v3.0.0)
 

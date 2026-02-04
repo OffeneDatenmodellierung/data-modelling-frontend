@@ -47,6 +47,8 @@ vi.mock('@/utils/githubRepoSync', () => ({
   deleteKnowledgeArticleFromGitHub: vi.fn().mockResolvedValue(undefined),
   syncDecisionRecordToGitHub: vi.fn().mockResolvedValue(undefined),
   deleteDecisionRecordFromGitHub: vi.fn().mockResolvedValue(undefined),
+  syncSketchToGitHub: vi.fn().mockResolvedValue(undefined),
+  deleteSketchFromGitHub: vi.fn().mockResolvedValue(undefined),
 }));
 
 // Cleanup after each test
