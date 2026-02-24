@@ -13,7 +13,19 @@ export default defineConfig({
       formats: ['cjs'],
     },
     rollupOptions: {
-      external: ['electron', 'fs', 'fs/promises', 'path', 'url', 'module'],
+      external: [
+        'electron',
+        'fs',
+        'fs/promises',
+        'path',
+        'url',
+        'module',
+        'simple-git',
+        'child_process',
+        'node:buffer',
+        'node:path',
+        'node:events',
+      ],
       output: {
         entryFileNames: '[name].cjs', // Use .cjs extension for CommonJS in ES module project
       },
@@ -21,4 +33,3 @@ export default defineConfig({
     target: 'node18',
   },
 });
-
