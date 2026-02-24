@@ -6,6 +6,7 @@
  */
 
 import { githubApi } from './githubApi';
+import { isViewerMode } from '@/services/viewerMode';
 import type {
   GitHubFileContent,
   GitHubDirectoryEntry,
@@ -114,7 +115,7 @@ export async function getTree(
   sha: string,
   recursive = true
 ): Promise<GitHubTreeEntry[]> {
-  const url = `https://api.github.com/repos/${owner}/${repo}/git/trees/${sha}${recursive ? '?recursive=1' : ''}`;
+  const url = `${githubApiBase()}/repos/${owner}/${repo}/git/trees/${sha}${recursive ? '?recursive=1' : ''}`;
 
   const response = await fetch(url, {
     headers: buildAuthHeaders(),
@@ -393,7 +394,7 @@ export async function commitMultipleFiles(
 // ============================================================================
 
 async function getTreeSha(owner: string, repo: string, commitSha: string): Promise<string> {
-  const url = `https://api.github.com/repos/${owner}/${repo}/git/commits/${commitSha}`;
+  const url = `${githubApiBase()}/repos/${owner}/${repo}/git/commits/${commitSha}`;
 
   const response = await fetch(url, {
     headers: buildAuthHeaders(),
@@ -419,7 +420,7 @@ async function createTree(
   }>,
   baseTree: string
 ): Promise<string> {
-  const url = `https://api.github.com/repos/${owner}/${repo}/git/trees`;
+  const url = `${githubApiBase()}/repos/${owner}/${repo}/git/trees`;
 
   const response = await fetch(url, {
     method: 'POST',
@@ -446,7 +447,7 @@ async function createCommit(
   treeSha: string,
   parents: string[]
 ): Promise<string> {
-  const url = `https://api.github.com/repos/${owner}/${repo}/git/commits`;
+  const url = `${githubApiBase()}/repos/${owner}/${repo}/git/commits`;
 
   const response = await fetch(url, {
     method: 'POST',
@@ -468,7 +469,7 @@ async function createCommit(
 }
 
 async function updateRef(owner: string, repo: string, ref: string, sha: string): Promise<void> {
-  const url = `https://api.github.com/repos/${owner}/${repo}/git/refs/${ref}`;
+  const url = `${githubApiBase()}/repos/${owner}/${repo}/git/refs/${ref}`;
 
   const response = await fetch(url, {
     method: 'PATCH',
@@ -490,6 +491,14 @@ async function updateRef(owner: string, repo: string, ref: string, sha: string):
 // ============================================================================
 
 /**
+ * Get the GitHub API base URL.
+ * In viewer mode, routes through the Cloudflare Pages Function proxy.
+ */
+function githubApiBase(): string {
+  return isViewerMode() ? '/api/github' : 'https://api.github.com';
+}
+
+/**
  * Decode the obfuscated token from storage
  * Must match the encoding in githubAuth.ts
  */
@@ -498,6 +507,15 @@ function decodeToken(encoded: string): string {
 }
 
 function buildAuthHeaders(): HeadersInit {
+  // In viewer mode, the proxy handles auth server-side
+  if (isViewerMode()) {
+    return {
+      Accept: 'application/vnd.github+json',
+      'X-GitHub-Api-Version': '2022-11-28',
+      'Content-Type': 'application/json',
+    };
+  }
+
   // Get token from github_auth storage (same key as githubAuth.ts)
   // We read directly from localStorage to avoid circular dependency issues
   const storedAuth = localStorage.getItem('github_auth');

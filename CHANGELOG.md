@@ -5,6 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.1.0] - 2026-02-24
+
+### Added
+- **Read-Only Viewer Mode**: Separate Cloudflare Pages deployment for sharing private data models as read-only views
+  - Build-time feature flags (`VITE_VIEWER_*`) lock the app to a specific private GitHub repo
+  - Cloudflare Pages Function proxy (`/api/github/*`) authenticates via GitHub App installation tokens — no credentials exposed to the browser
+  - Server-side proxy enforces GET-only access restricted to the configured repository
+  - GitHub App JWT signing (RS256) with PKCS#1-to-PKCS#8 key conversion using Web Crypto API
+  - Installation token caching with automatic refresh
+  - Auto-redirect from `/` to the configured workspace on load
+  - Conditional routing: viewer mode strips all auth, home, and edit routes
+  - All editing UI hidden: save/commit, create/delete, drag-and-drop, relationship creation, inline editing
+  - Canvas set to view-only: nodes not draggable or connectable, click selects without opening editor
+  - Table editor forced to read-only mode, modal titles show "View:" instead of "Edit:"
+  - Knowledge, Decision, and Sketch panels show content without create/edit/delete controls
+  - Auto-save, beforeunload warnings, and Git panels disabled in viewer mode
+  - BPMN/DMN editors render without save capability
+  - Viewer build script (`cloudflare-build-viewer.sh`) and separate wrangler config (`wrangler.viewer.toml`)
+  - Access controlled via Cloudflare Access IP restrictions (configured externally)
+
+### Changed
+- **GitHub API Layer**: `githubApi.ts` and `githubContentsService.ts` now support proxied requests through `/api/github` when in viewer mode, with auth bypass for server-side token injection
+
+### New Files
+- `frontend/src/services/viewerMode.ts` — `isViewerMode()` utility, single source of truth for viewer conditionals
+- `frontend/src/pages/ViewerRedirect.tsx` — Auto-redirect to configured repo workspace
+- `frontend/functions/api/github/[[path]].ts` — Cloudflare Pages Function GitHub API proxy
+- `frontend/cloudflare-build-viewer.sh` — Viewer-specific build script
+- `wrangler.viewer.toml` — Viewer Cloudflare Pages project config
+
 ## [3.0.1] - 2026-02-04
 
 ### Fixed

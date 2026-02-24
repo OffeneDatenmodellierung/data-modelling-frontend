@@ -11,10 +11,12 @@ import { useSDKModeStore } from './services/sdk/sdkMode';
 import { sdkLoader, SDKLoadError } from './services/sdk/sdkLoader';
 import { getPlatform } from './services/platform/platform';
 import { initializeGitHubStore } from './stores/githubStore';
+import { isViewerMode } from './services/viewerMode';
 import Home from './pages/Home';
 import ModelEditor from './pages/ModelEditor';
 import AuthCallback from './pages/AuthCallback';
 import NotFound from './pages/NotFound';
+import ViewerRedirect from './pages/ViewerRedirect';
 
 // Use HashRouter for Electron (file:// protocol) and BrowserRouter for web
 const Router =
@@ -60,8 +62,9 @@ function App() {
         console.log('[App] SDK WASM loaded successfully');
 
         // Initialize GitHub store for browser mode (revalidate stored token)
+        // Skip in viewer mode — the proxy handles auth server-side
         const isElectron = getPlatform() === 'electron';
-        if (!isElectron) {
+        if (!isElectron && !isViewerMode()) {
           initializeGitHubStore().catch((err) => {
             console.warn('[App] GitHub auth initialization failed:', err);
           });
@@ -118,12 +121,22 @@ function App() {
           <Router>
             <div className="min-h-screen bg-gray-50">
               <Routes>
-                <Route path="/" element={<Home />} />
-                <Route path="/workspace/:workspaceId" element={<ModelEditor />} />
-                {/* GitHub repo workspace URLs have encoded slashes that expand to multiple segments */}
-                <Route path="/workspace/github/*" element={<ModelEditor />} />
-                <Route path="/auth/complete" element={<AuthCallback />} />
-                <Route path="*" element={<NotFound />} />
+                {isViewerMode() ? (
+                  <>
+                    <Route path="/" element={<ViewerRedirect />} />
+                    <Route path="/workspace/github/*" element={<ModelEditor />} />
+                    <Route path="*" element={<ViewerRedirect />} />
+                  </>
+                ) : (
+                  <>
+                    <Route path="/" element={<Home />} />
+                    <Route path="/workspace/:workspaceId" element={<ModelEditor />} />
+                    {/* GitHub repo workspace URLs have encoded slashes that expand to multiple segments */}
+                    <Route path="/workspace/github/*" element={<ModelEditor />} />
+                    <Route path="/auth/complete" element={<AuthCallback />} />
+                    <Route path="*" element={<NotFound />} />
+                  </>
+                )}
               </Routes>
               <ToastContainer />
               <GlobalLoading />

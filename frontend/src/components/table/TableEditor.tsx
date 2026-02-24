@@ -13,6 +13,7 @@ import { ColumnDetailsModal } from './ColumnDetailsModal';
 import { TableMetadataModal } from './TableMetadataModal';
 import { CompoundKeyEditor } from './CompoundKeyEditor';
 import { isValidTableName } from '@/utils/validation';
+import { isViewerMode } from '@/services/viewerMode';
 import { odcsService } from '@/services/sdk/odcsService';
 import { browserFileService } from '@/services/platform/browser';
 import { importExportService } from '@/services/sdk/importExportService';
@@ -81,8 +82,9 @@ export const TableEditor: React.FC<TableEditorProps> = ({ tableId, workspaceId, 
   // Compare domain IDs directly - they should match exactly as strings
   // Note: normalizeUUID generates random UUIDs for non-UUID strings, so we can't use it for comparison
   const tableDomainId = table?.primary_domain_id || null;
-  const isEditable =
-    tableDomainId !== null && selectedDomainId !== null && tableDomainId === selectedDomainId;
+  const isEditable = isViewerMode()
+    ? false
+    : tableDomainId !== null && selectedDomainId !== null && tableDomainId === selectedDomainId;
 
   // Debug logging
   if (table && !isEditable) {
