@@ -11,6 +11,7 @@
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { markPendingChanges } from '@/stores/pendingChanges';
 import { knowledgeService } from '@/services/sdk/knowledgeService';
 import type {
   KnowledgeArticle,
@@ -180,13 +181,7 @@ export const useKnowledgeStore = create<KnowledgeState>()(
           .catch(() => {
             /* Module not available in test environment */
           });
-        import('@/stores/workspaceStore')
-          .then(({ useWorkspaceStore }) => {
-            useWorkspaceStore.getState().setPendingChanges(true);
-          })
-          .catch(() => {
-            /* Module not available in test environment */
-          });
+        markPendingChanges();
       },
 
       updateArticleInStore: (articleId, updates) => {
@@ -214,13 +209,7 @@ export const useKnowledgeStore = create<KnowledgeState>()(
             });
         }
         // Mark workspace as having pending changes
-        import('@/stores/workspaceStore')
-          .then(({ useWorkspaceStore }) => {
-            useWorkspaceStore.getState().setPendingChanges(true);
-          })
-          .catch(() => {
-            /* Module not available in test environment */
-          });
+        markPendingChanges();
       },
 
       removeArticle: (articleId) => {
@@ -246,13 +235,7 @@ export const useKnowledgeStore = create<KnowledgeState>()(
             });
         }
         // Mark workspace as having pending changes
-        import('@/stores/workspaceStore')
-          .then(({ useWorkspaceStore }) => {
-            useWorkspaceStore.getState().setPendingChanges(true);
-          })
-          .catch(() => {
-            /* Module not available in test environment */
-          });
+        markPendingChanges();
       },
 
       // SDK-backed operations

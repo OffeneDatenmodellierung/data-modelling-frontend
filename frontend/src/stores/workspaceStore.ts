@@ -9,6 +9,7 @@ import { workspaceService } from '@/services/api/workspaceService';
 import { useSDKModeStore } from '@/services/sdk/sdkMode';
 // import { localFileService } from '@/services/storage/localFileService';
 import { getPlatform } from '@/services/platform/platform';
+import { registerPendingChangesCallback } from '@/stores/pendingChanges';
 import axios from 'axios';
 import type { Workspace } from '@/types/workspace';
 import type { CreateWorkspaceRequest } from '@/types/api';
@@ -1119,3 +1120,9 @@ export const useWorkspaceStore = create<WorkspaceState>()(
     }
   )
 );
+
+// Register the callback so other stores can mark pending changes
+// without dynamically importing this module (avoids circular deps).
+registerPendingChangesCallback(() => {
+  useWorkspaceStore.getState().setPendingChanges(true);
+});

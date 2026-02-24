@@ -9,6 +9,7 @@ import { DecisionEditor } from './DecisionEditor';
 import { DecisionViewer } from './DecisionViewer';
 import { CollapsibleSidebar } from '@/components/common/CollapsibleSidebar';
 import { useDecisionStore } from '@/stores/decisionStore';
+import { isViewerMode } from '@/services/viewerMode';
 import type { Decision } from '@/types/decision';
 
 export interface DecisionPanelProps {
@@ -71,7 +72,7 @@ export const DecisionPanel: React.FC<DecisionPanelProps> = ({
           workspacePath={workspacePath}
           domainId={domainId}
           onSelectDecision={handleSelectDecision}
-          onCreateDecision={handleCreateDecision}
+          onCreateDecision={isViewerMode() ? undefined : handleCreateDecision}
         />
       </CollapsibleSidebar>
 
@@ -93,21 +94,27 @@ export const DecisionPanel: React.FC<DecisionPanelProps> = ({
               />
             </svg>
             <p className="text-lg font-medium">No decision selected</p>
-            <p className="text-sm mt-1">Select a decision from the list or create a new one</p>
-            <button
-              onClick={handleCreateDecision}
-              className="mt-4 inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 4v16m8-8H4"
-                />
-              </svg>
-              Create Decision
-            </button>
+            <p className="text-sm mt-1">
+              {isViewerMode()
+                ? 'Select a decision from the list to view it'
+                : 'Select a decision from the list or create a new one'}
+            </p>
+            {!isViewerMode() && (
+              <button
+                onClick={handleCreateDecision}
+                className="mt-4 inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 4v16m8-8H4"
+                  />
+                </svg>
+                Create Decision
+              </button>
+            )}
           </div>
         )}
 
@@ -115,7 +122,7 @@ export const DecisionPanel: React.FC<DecisionPanelProps> = ({
           <DecisionViewer
             workspacePath={workspacePath}
             decision={selectedDecision}
-            onEdit={handleEditDecision}
+            onEdit={isViewerMode() ? undefined : handleEditDecision}
             onClose={handleCloseViewer}
           />
         )}

@@ -40,6 +40,7 @@ import { CanvasExport } from './CanvasExport';
 import { useUIStore } from '@/stores/uiStore';
 import { bpmnService } from '@/services/sdk/bpmnService';
 import { dmnService } from '@/services/sdk/dmnService';
+import { isViewerMode } from '@/services/viewerMode';
 
 export interface DomainCanvasProps {
   workspaceId: string;
@@ -1110,12 +1111,12 @@ export const DomainCanvas: React.FC<DomainCanvasProps> = ({ workspaceId, domainI
         onEdgesChange={onEdgesChange}
         onNodeClick={onNodeClick}
         onEdgeClick={onEdgeClick}
-        onConnect={onConnect}
-        onNodeDragStop={onNodeDragStop}
+        onConnect={isViewerMode() ? undefined : onConnect}
+        onNodeDragStop={isViewerMode() ? undefined : onNodeDragStop}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
-        nodesDraggable={true}
-        nodesConnectable={true}
+        nodesDraggable={!isViewerMode()}
+        nodesConnectable={!isViewerMode()}
         elementsSelectable={true}
         fitView
         attributionPosition="bottom-left"
@@ -1131,7 +1132,7 @@ export const DomainCanvas: React.FC<DomainCanvasProps> = ({ workspaceId, domainI
       </ReactFlow>
 
       {/* Create/Import System button - only in Systems view */}
-      {currentView === 'systems' && (
+      {!isViewerMode() && currentView === 'systems' && (
         <>
           <SystemsViewActions domainId={domainId} />
           {/* Show unlinked tables notification - positioned below SystemsViewActions */}
@@ -1158,14 +1159,15 @@ export const DomainCanvas: React.FC<DomainCanvasProps> = ({ workspaceId, domainI
       )}
 
       {/* Create/Import Table buttons - only in Process, Operational, and Analytical views */}
-      {(currentView === 'process' ||
-        currentView === 'operational' ||
-        currentView === 'analytical') && (
-        <>
-          <TableViewActions workspaceId={workspaceId} domainId={domainId} />
-          {currentView === 'process' && <NodeViewActions domainId={domainId} />}
-        </>
-      )}
+      {!isViewerMode() &&
+        (currentView === 'process' ||
+          currentView === 'operational' ||
+          currentView === 'analytical') && (
+          <>
+            <TableViewActions workspaceId={workspaceId} domainId={domainId} />
+            {currentView === 'process' && <NodeViewActions domainId={domainId} />}
+          </>
+        )}
 
       {/* Table Metadata Modal */}
       <TableMetadataModal
@@ -1178,7 +1180,7 @@ export const DomainCanvas: React.FC<DomainCanvasProps> = ({ workspaceId, domainI
       />
 
       {/* System Edit Dialog */}
-      {editingSystemId && (
+      {!isViewerMode() && editingSystemId && (
         <CreateSystemDialog
           domainId={domainId}
           isOpen={showSystemEditDialog}
@@ -1195,7 +1197,7 @@ export const DomainCanvas: React.FC<DomainCanvasProps> = ({ workspaceId, domainI
       )}
 
       {/* Compute Asset Edit Dialog */}
-      {editingAssetId && (
+      {!isViewerMode() && editingAssetId && (
         <ComputeAssetEditor
           asset={computeAssets.find((a) => a.id === editingAssetId)}
           domainId={domainId}
@@ -1208,7 +1210,7 @@ export const DomainCanvas: React.FC<DomainCanvasProps> = ({ workspaceId, domainI
       )}
 
       {/* Relationship Editor */}
-      {showRelationshipEditor && editingRelationshipId && (
+      {!isViewerMode() && showRelationshipEditor && editingRelationshipId && (
         <RelationshipEditor
           relationshipId={editingRelationshipId}
           isOpen={showRelationshipEditor}
@@ -1233,27 +1235,30 @@ export const DomainCanvas: React.FC<DomainCanvasProps> = ({ workspaceId, domainI
           bpmnProps={{
             xml: bpmnProcesses.find((p) => p.id === editingBPMNProcessId)?.bpmn_xml,
             name: bpmnProcesses.find((p) => p.id === editingBPMNProcessId)?.name,
-            onSave: async (xml: string, name: string) => {
-              try {
-                const process = await bpmnService.parseXML(xml);
-                updateBPMNProcess(editingBPMNProcessId, {
-                  ...process,
-                  id: editingBPMNProcessId,
-                  name: name.trim() || process.name || 'Untitled Process',
-                });
-                addToast({
-                  type: 'success',
-                  message: 'BPMN process saved successfully',
-                });
-                setShowBPMNEditor(false);
-                setEditingBPMNProcessId(null);
-              } catch (error) {
-                addToast({
-                  type: 'error',
-                  message: error instanceof Error ? error.message : 'Failed to save BPMN process',
-                });
-              }
-            },
+            onSave: isViewerMode()
+              ? undefined
+              : async (xml: string, name: string) => {
+                  try {
+                    const process = await bpmnService.parseXML(xml);
+                    updateBPMNProcess(editingBPMNProcessId, {
+                      ...process,
+                      id: editingBPMNProcessId,
+                      name: name.trim() || process.name || 'Untitled Process',
+                    });
+                    addToast({
+                      type: 'success',
+                      message: 'BPMN process saved successfully',
+                    });
+                    setShowBPMNEditor(false);
+                    setEditingBPMNProcessId(null);
+                  } catch (error) {
+                    addToast({
+                      type: 'error',
+                      message:
+                        error instanceof Error ? error.message : 'Failed to save BPMN process',
+                    });
+                  }
+                },
           }}
         />
       )}
@@ -1272,37 +1277,42 @@ export const DomainCanvas: React.FC<DomainCanvasProps> = ({ workspaceId, domainI
           dmnProps={{
             xml: dmnDecisions.find((d) => d.id === editingDMNDecisionId)?.dmn_xml,
             name: dmnDecisions.find((d) => d.id === editingDMNDecisionId)?.name,
-            onSave: async (xml: string, name: string) => {
-              try {
-                const decision = await dmnService.parseXML(xml);
-                updateDMNDecision(editingDMNDecisionId, {
-                  ...decision,
-                  id: editingDMNDecisionId,
-                  name: name.trim() || decision.name || 'Untitled Decision',
-                });
-                addToast({
-                  type: 'success',
-                  message: 'DMN decision saved successfully',
-                });
-                setShowDMNEditor(false);
-                setEditingDMNDecisionId(null);
-              } catch (error) {
-                addToast({
-                  type: 'error',
-                  message: error instanceof Error ? error.message : 'Failed to save DMN decision',
-                });
-              }
-            },
+            onSave: isViewerMode()
+              ? undefined
+              : async (xml: string, name: string) => {
+                  try {
+                    const decision = await dmnService.parseXML(xml);
+                    updateDMNDecision(editingDMNDecisionId, {
+                      ...decision,
+                      id: editingDMNDecisionId,
+                      name: name.trim() || decision.name || 'Untitled Decision',
+                    });
+                    addToast({
+                      type: 'success',
+                      message: 'DMN decision saved successfully',
+                    });
+                    setShowDMNEditor(false);
+                    setEditingDMNDecisionId(null);
+                  } catch (error) {
+                    addToast({
+                      type: 'error',
+                      message:
+                        error instanceof Error ? error.message : 'Failed to save DMN decision',
+                    });
+                  }
+                },
           }}
         />
       )}
 
       {/* Unlinked Tables Dialog */}
-      <UnlinkedTablesDialog
-        isOpen={showUnlinkedTablesDialog}
-        onClose={() => setShowUnlinkedTablesDialog(false)}
-        domainId={domainId}
-      />
+      {!isViewerMode() && (
+        <UnlinkedTablesDialog
+          isOpen={showUnlinkedTablesDialog}
+          onClose={() => setShowUnlinkedTablesDialog(false)}
+          domainId={domainId}
+        />
+      )}
 
       {/* System Export Dialog */}
       {exportingSystemId && (

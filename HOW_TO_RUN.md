@@ -42,6 +42,43 @@ This will:
 
 **Note**: The app operates entirely offline. No API server is required.
 
+### Option 3: Read-Only Viewer (Cloudflare Pages)
+
+A separate deployment mode for sharing private data models as read-only views. Uses the same codebase with build-time feature flags.
+
+**How it works**:
+- A Cloudflare Pages Function acts as a server-side proxy to the GitHub API
+- The proxy authenticates using a GitHub App installation token (RS256 JWT)
+- Only GET requests to the configured repository are allowed
+- The browser never sees GitHub credentials
+- All editing UI is hidden; the canvas is view-only
+- Access is controlled via Cloudflare Access IP restrictions
+
+**Deployment**:
+
+1. Create a GitHub App (`contents:read` + `metadata:read` permissions)
+2. Create a Cloudflare Pages project:
+   - Build command: `cd frontend && bash cloudflare-build-viewer.sh`
+   - Build output: `frontend/dist`
+3. Set secrets in Cloudflare dashboard: `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY`, `GITHUB_INSTALLATION_ID`
+4. Set env vars: `VIEWER_OWNER`, `VIEWER_REPO`, `VIEWER_BRANCH`, `VIEWER_WORKSPACE_PATH`
+5. Attach Cloudflare Access policy with IP allowlist
+6. Deploy
+
+**Local testing with Wrangler**:
+```bash
+cd frontend
+VITE_VIEWER_MODE=true VITE_VIEWER_OWNER=org VITE_VIEWER_REPO=repo npm run build
+npx wrangler pages dev dist --binding GITHUB_APP_ID=123 GITHUB_APP_PRIVATE_KEY="$(cat key.pem)" GITHUB_INSTALLATION_ID=456 VIEWER_OWNER=org VIEWER_REPO=repo
+```
+
+**Architecture**:
+```
+Browser ──GET──▶ Cloudflare Pages Function ──GET + Token──▶ GitHub API
+                 (signs JWT, gets install token,
+                  restricts to configured repo)
+```
+
 ## Running Tests
 
 ```bash

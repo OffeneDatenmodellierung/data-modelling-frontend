@@ -10,6 +10,7 @@ import { ArticleViewer } from './ArticleViewer';
 import { KnowledgeSearch } from './KnowledgeSearch';
 import { CollapsibleSidebar } from '@/components/common/CollapsibleSidebar';
 import { useKnowledgeStore } from '@/stores/knowledgeStore';
+import { isViewerMode } from '@/services/viewerMode';
 import type { KnowledgeArticle } from '@/types/knowledge';
 
 export interface KnowledgePanelProps {
@@ -103,7 +104,7 @@ export const KnowledgePanel: React.FC<KnowledgePanelProps> = ({
               workspacePath={workspacePath}
               domainId={domainId}
               onSelectArticle={handleSelectArticle}
-              onCreateArticle={handleCreateArticle}
+              onCreateArticle={isViewerMode() ? undefined : handleCreateArticle}
             />
           )}
         </div>
@@ -127,21 +128,27 @@ export const KnowledgePanel: React.FC<KnowledgePanelProps> = ({
               />
             </svg>
             <p className="text-lg font-medium">No article selected</p>
-            <p className="text-sm mt-1">Select an article from the list or create a new one</p>
-            <button
-              onClick={handleCreateArticle}
-              className="mt-4 inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 4v16m8-8H4"
-                />
-              </svg>
-              Create Article
-            </button>
+            <p className="text-sm mt-1">
+              {isViewerMode()
+                ? 'Select an article from the list to view it'
+                : 'Select an article from the list or create a new one'}
+            </p>
+            {!isViewerMode() && (
+              <button
+                onClick={handleCreateArticle}
+                className="mt-4 inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 4v16m8-8H4"
+                  />
+                </svg>
+                Create Article
+              </button>
+            )}
           </div>
         )}
 
@@ -149,7 +156,7 @@ export const KnowledgePanel: React.FC<KnowledgePanelProps> = ({
           <ArticleViewer
             workspacePath={workspacePath}
             article={selectedArticle}
-            onEdit={handleEditArticle}
+            onEdit={isViewerMode() ? undefined : handleEditArticle}
             onClose={handleCloseViewer}
           />
         )}

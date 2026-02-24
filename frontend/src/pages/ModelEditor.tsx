@@ -49,6 +49,7 @@ import type { SharedResourceReference } from '@/types/domain';
 import { HelpButton, HelpPanel } from '@/components/help';
 import { ValidationWarnings } from '@/components/common/ValidationWarnings';
 import { useHelpPanel } from '@/hooks/useHelpPanel';
+import { isViewerMode } from '@/services/viewerMode';
 
 const ModelEditor: React.FC = () => {
   const params = useParams<{ workspaceId: string; domainId?: string; '*': string }>();
@@ -224,9 +225,9 @@ const ModelEditor: React.FC = () => {
     }
   }, [selectedTableId]);
 
-  // Initialize auto-save when workspace is loaded
+  // Initialize auto-save when workspace is loaded (skip in viewer mode)
   useEffect(() => {
-    if (!workspaceId) {
+    if (!workspaceId || isViewerMode()) {
       return;
     }
 
@@ -287,8 +288,9 @@ const ModelEditor: React.FC = () => {
     previousWorkspaceIdRef.current = workspaceId;
   }, [workspaceId]);
 
-  // Handle browser refresh
+  // Handle browser refresh (skip in viewer mode — no unsaved changes possible)
   useEffect(() => {
+    if (isViewerMode()) return;
     const handleBeforeUnload = async (e: BeforeUnloadEvent) => {
       const { handleBrowserRefresh } = useWorkspaceStore.getState();
       const { pendingChanges } = useWorkspaceStore.getState();
@@ -330,21 +332,24 @@ const ModelEditor: React.FC = () => {
         return;
       }
 
-      // Wait for GitHub authentication to complete
-      const githubState = useGitHubStore.getState();
-      if (!githubState.auth.isAuthenticated) {
-        console.log('[ModelEditor] Waiting for GitHub authentication...');
-        // Give auth a moment to complete (it runs on app init)
-        await new Promise((resolve) => setTimeout(resolve, 1000));
+      // In viewer mode, skip client-side auth — the proxy handles it server-side
+      if (!isViewerMode()) {
+        // Wait for GitHub authentication to complete
+        const githubState = useGitHubStore.getState();
+        if (!githubState.auth.isAuthenticated) {
+          console.log('[ModelEditor] Waiting for GitHub authentication...');
+          // Give auth a moment to complete (it runs on app init)
+          await new Promise((resolve) => setTimeout(resolve, 1000));
 
-        // Check again after waiting
-        const updatedState = useGitHubStore.getState();
-        if (!updatedState.auth.isAuthenticated) {
-          console.log('[ModelEditor] GitHub not authenticated, showing auth dialog');
-          updatedState.setShowAuthDialog(true);
-          setError('Please connect to GitHub to access this workspace');
-          setIsLoading(false);
-          return;
+          // Check again after waiting
+          const updatedState = useGitHubStore.getState();
+          if (!updatedState.auth.isAuthenticated) {
+            console.log('[ModelEditor] GitHub not authenticated, showing auth dialog');
+            updatedState.setShowAuthDialog(true);
+            setError('Please connect to GitHub to access this workspace');
+            setIsLoading(false);
+            return;
+          }
         }
       }
 
@@ -977,7 +982,7 @@ const ModelEditor: React.FC = () => {
           />
 
           {/* Collaboration Status - inline when online */}
-          {mode === 'online' && workspaceId && (
+          {!isViewerMode() && mode === 'online' && workspaceId && (
             <div className="flex items-center gap-2">
               <CollaborationStatus workspaceId={workspaceId} />
               <PresenceIndicator workspaceId={workspaceId} />
@@ -990,16 +995,16 @@ const ModelEditor: React.FC = () => {
           {/* Right side controls */}
           <div className="flex items-center gap-2">
             {/* Git Status Indicator (works in both Electron and GitHub repo mode) */}
-            <GitStatusIndicator />
+            {!isViewerMode() && <GitStatusIndicator />}
 
             {/* GitHub User Menu (Browser mode only) */}
-            {!isElectron() && <GitHubUserMenu />}
+            {!isViewerMode() && !isElectron() && <GitHubUserMenu />}
 
             {/* Validation Warnings */}
-            <ValidationWarnings />
+            {!isViewerMode() && <ValidationWarnings />}
 
             {/* Save/Exit Controls (Online indicator, pending count, Sync/Commit buttons, Exit) */}
-            <SaveExitControls />
+            {!isViewerMode() && <SaveExitControls />}
 
             {/* Refresh button - before Help/Settings */}
             {selectedDomainId && (
@@ -1032,14 +1037,16 @@ const ModelEditor: React.FC = () => {
             {/* Help Button */}
             <HelpButton />
 
-            <button
-              onClick={() => setShowWorkspaceSettings(!showWorkspaceSettings)}
-              className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors"
-              aria-label="Workspace Settings"
-            >
-              Settings
-            </button>
-            {mode === 'online' && workspaceId && (
+            {!isViewerMode() && (
+              <button
+                onClick={() => setShowWorkspaceSettings(!showWorkspaceSettings)}
+                className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors"
+                aria-label="Workspace Settings"
+              >
+                Settings
+              </button>
+            )}
+            {!isViewerMode() && mode === 'online' && workspaceId && (
               <button
                 onClick={() => setShowVersionHistory(!showVersionHistory)}
                 className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors"
@@ -1064,13 +1071,15 @@ const ModelEditor: React.FC = () => {
                 placeholder="Filter by tags (e.g., env:production, product:food)"
               />
             </div>
-            <button
-              onClick={() => setShowSharedResourcePicker(true)}
-              className="px-3 py-1.5 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 whitespace-nowrap"
-              title="Share resources from other domains"
-            >
-              Share Resources
-            </button>
+            {!isViewerMode() && (
+              <button
+                onClick={() => setShowSharedResourcePicker(true)}
+                className="px-3 py-1.5 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 whitespace-nowrap"
+                title="Share resources from other domains"
+              >
+                Share Resources
+              </button>
+            )}
             <BPMNProcessLinks domainId={selectedDomainId} />
           </>
         )}
@@ -1131,19 +1140,21 @@ const ModelEditor: React.FC = () => {
         </div>
 
         {/* Git Version Control Panel */}
-        <GitPanel />
+        {!isViewerMode() && <GitPanel />}
       </div>
 
       {/* BPMN/DMN creation is now only available inside CADS nodes (AI/ML/App) */}
 
       {/* Conflict Resolver */}
-      <ConflictResolver
-        isOpen={showConflictResolver}
-        onClose={() => setShowConflictResolver(false)}
-      />
+      {!isViewerMode() && (
+        <ConflictResolver
+          isOpen={showConflictResolver}
+          onClose={() => setShowConflictResolver(false)}
+        />
+      )}
 
       {/* Workspace Settings Dialog */}
-      {showWorkspaceSettings && workspaceId && (
+      {!isViewerMode() && showWorkspaceSettings && workspaceId && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-4">
@@ -1195,13 +1206,15 @@ const ModelEditor: React.FC = () => {
       )}
 
       {/* Import/Export Dialog */}
-      <ImportExportDialog
-        isOpen={showImportExportDialog}
-        onClose={() => setShowImportExportDialog(false)}
-      />
+      {!isViewerMode() && (
+        <ImportExportDialog
+          isOpen={showImportExportDialog}
+          onClose={() => setShowImportExportDialog(false)}
+        />
+      )}
 
       {/* GitHub Dialogs (Browser mode only) */}
-      {!isElectron() && (
+      {!isViewerMode() && !isElectron() && (
         <>
           <GitHubAuthDialog />
           <GitHubRepoSelector />
@@ -1231,7 +1244,7 @@ const ModelEditor: React.FC = () => {
                 setSelectedTable(null);
               }
             }}
-            title={`Edit: ${tableName}`}
+            title={isViewerMode() ? `View: ${tableName}` : `Edit: ${tableName}`}
             size="lg"
             initialPosition={{
               x: Math.max(50, posX),
@@ -1273,25 +1286,27 @@ const ModelEditor: React.FC = () => {
             y: window.innerHeight / 2 - 200,
           }}
         >
-          <div className="flex gap-2 mb-4 border-b border-gray-200 pb-4">
-            <button
-              onClick={() => {
-                if (selectedTableId) {
-                  openTableEditor(selectedTableId);
-                }
-                setShowTableProperties(false);
-              }}
-              className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
-            >
-              Edit Table
-            </button>
-          </div>
+          {!isViewerMode() && (
+            <div className="flex gap-2 mb-4 border-b border-gray-200 pb-4">
+              <button
+                onClick={() => {
+                  if (selectedTableId) {
+                    openTableEditor(selectedTableId);
+                  }
+                  setShowTableProperties(false);
+                }}
+                className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
+              >
+                Edit Table
+              </button>
+            </div>
+          )}
           <TableProperties tableId={selectedTableId} workspaceId={workspaceId ?? ''} />
         </DraggableModal>
       )}
 
       {/* Create Table Dialog */}
-      {selectedDomainId && (
+      {!isViewerMode() && selectedDomainId && (
         <CreateTableDialog
           workspaceId={workspaceId ?? ''}
           domainId={selectedDomainId}
@@ -1305,7 +1320,7 @@ const ModelEditor: React.FC = () => {
       )}
 
       {/* Create System Dialog */}
-      {selectedDomainId && (
+      {!isViewerMode() && selectedDomainId && (
         <CreateSystemDialog
           domainId={selectedDomainId}
           isOpen={showCreateSystemDialog}
@@ -1319,7 +1334,7 @@ const ModelEditor: React.FC = () => {
       )}
 
       {/* Shared Resource Picker Dialog */}
-      {selectedDomainId && (
+      {!isViewerMode() && selectedDomainId && (
         <SharedResourcePicker
           isOpen={showSharedResourcePicker}
           onClose={() => setShowSharedResourcePicker(false)}

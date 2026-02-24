@@ -31,6 +31,54 @@ This will:
 
 **Note**: No API server is required. The app operates entirely offline.
 
+### Option 3: Read-Only Viewer (Cloudflare Pages)
+
+Deploy a read-only viewer for a private GitHub repo:
+
+**Prerequisites**:
+- A GitHub App with `contents:read` and `metadata:read` permissions, installed on the target org
+- A Cloudflare Pages project
+
+**Setup**:
+
+1. Create GitHub App and note the App ID, Private Key, and Installation ID
+2. Create a Cloudflare Pages project connected to this repo
+3. Set the build command: `cd frontend && bash cloudflare-build-viewer.sh`
+4. Set the build output directory: `frontend/dist`
+5. Configure environment variables in Cloudflare Pages dashboard:
+
+   **Secrets** (encrypted):
+   - `GITHUB_APP_ID` — numeric App ID
+   - `GITHUB_APP_PRIVATE_KEY` — PEM private key
+   - `GITHUB_INSTALLATION_ID` — installation ID on the target org
+
+   **Environment variables** (plain text):
+   - `VIEWER_OWNER` — GitHub org/user owning the repo
+   - `VIEWER_REPO` — repository name
+   - `VIEWER_BRANCH` — branch to display (default: `main`)
+   - `VIEWER_WORKSPACE_PATH` — workspace path within the repo (optional)
+
+6. Attach a Cloudflare Access policy with an IP allowlist for access control
+7. Deploy — the viewer auto-redirects to the configured workspace on load
+
+**Local testing**:
+```bash
+cd frontend
+
+# Set viewer env vars
+export VITE_VIEWER_MODE=true
+export VITE_VIEWER_OWNER=your-org
+export VITE_VIEWER_REPO=your-repo
+export VITE_VIEWER_BRANCH=main
+
+# Run dev server (viewer UI without proxy)
+npm run dev
+
+# Or build and test with Wrangler (includes proxy)
+npm run build
+npx wrangler pages dev dist
+```
+
 ## Running Tests
 
 ```bash

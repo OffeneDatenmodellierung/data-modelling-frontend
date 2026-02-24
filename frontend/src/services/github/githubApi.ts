@@ -4,6 +4,7 @@
  */
 
 import { githubAuth } from './githubAuth';
+import { isViewerMode } from '@/services/viewerMode';
 import type {
   GitHubApiError,
   GitHubApiResponse,
@@ -35,7 +36,7 @@ import type {
   GitHubUpdateBranchResult,
 } from '@/types/github';
 
-const API_BASE = 'https://api.github.com';
+const API_BASE = isViewerMode() ? '/api/github' : 'https://api.github.com';
 const API_VERSION = '2022-11-28';
 
 /**
@@ -91,9 +92,12 @@ function buildHeaders(additionalHeaders?: Record<string, string>): Headers {
     ...additionalHeaders,
   });
 
-  const token = githubAuth.getToken();
-  if (token) {
-    headers.set('Authorization', `Bearer ${token}`);
+  // In viewer mode, the proxy adds auth server-side
+  if (!isViewerMode()) {
+    const token = githubAuth.getToken();
+    if (token) {
+      headers.set('Authorization', `Bearer ${token}`);
+    }
   }
 
   return headers;
@@ -124,7 +128,7 @@ async function apiRequest<T>(
     throw new Error(`Rate limited. Resets at ${resetTime}`);
   }
 
-  if (!githubAuth.isAuthenticated()) {
+  if (!isViewerMode() && !githubAuth.isAuthenticated()) {
     throw new Error('Not authenticated with GitHub');
   }
 
@@ -1082,7 +1086,7 @@ async function graphqlRequest<T>(
     throw new Error(`Rate limited. Resets at ${resetTime}`);
   }
 
-  if (!githubAuth.isAuthenticated()) {
+  if (!isViewerMode() && !githubAuth.isAuthenticated()) {
     throw new Error('Not authenticated with GitHub');
   }
 

@@ -10,6 +10,7 @@ import { ExcalidrawEditor } from '@/components/editors/ExcalidrawEditor';
 import { CollapsibleSidebar } from '@/components/common/CollapsibleSidebar';
 import { useSketchStore } from '@/stores/sketchStore';
 import { useWorkspaceStore } from '@/stores/workspaceStore';
+import { isViewerMode } from '@/services/viewerMode';
 import type { Sketch } from '@/types/sketch';
 
 export interface SketchPanelProps {
@@ -92,7 +93,7 @@ export const SketchPanel: React.FC<SketchPanelProps> = ({
         <SketchList
           domainId={domainId}
           onSelectSketch={handleSelectSketch}
-          onCreateSketch={handleCreateSketch}
+          onCreateSketch={isViewerMode() ? undefined : handleCreateSketch}
         />
       </CollapsibleSidebar>
 
@@ -114,29 +115,35 @@ export const SketchPanel: React.FC<SketchPanelProps> = ({
               />
             </svg>
             <p className="text-lg font-medium">No sketch selected</p>
-            <p className="text-sm mt-1">Select a sketch from the list or create a new one</p>
-            <button
-              onClick={handleCreateSketch}
-              className="mt-4 inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 4v16m8-8H4"
-                />
-              </svg>
-              Create Sketch
-            </button>
+            <p className="text-sm mt-1">
+              {isViewerMode()
+                ? 'Select a sketch from the list to view it'
+                : 'Select a sketch from the list or create a new one'}
+            </p>
+            {!isViewerMode() && (
+              <button
+                onClick={handleCreateSketch}
+                className="mt-4 inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 4v16m8-8H4"
+                  />
+                </svg>
+                Create Sketch
+              </button>
+            )}
           </div>
         )}
 
         {mode === 'view' && selectedSketch && (
           <SketchViewer
             sketch={selectedSketch}
-            onEdit={handleEditSketch}
-            onDelete={handleDeleteComplete}
+            onEdit={isViewerMode() ? undefined : handleEditSketch}
+            onDelete={isViewerMode() ? undefined : handleDeleteComplete}
           />
         )}
 

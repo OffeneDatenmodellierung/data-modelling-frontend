@@ -19,6 +19,7 @@ A domain-centric data modelling application built with React and Electron. Creat
 - **Import/Export**: Support for ODCS, SQL, AVRO, JSON Schema, and Protobuf formats
 - **Cross-Platform**: Electron desktop app (macOS, Windows, Linux)
 - **Domain-Centric**: Organize data models by business domains with systems, tables, relationships, BPMN processes, and DMN decisions
+- **Read-Only Viewer** (v3.1.0): Separate Cloudflare Pages deployment for sharing private models via GitHub App proxy
 - **Decision Logs** (SDK 1.13.6+): MADR-format Architecture Decision Records with status workflow
 - **Knowledge Base** (SDK 1.13.6+): Documentation articles with types (Guide, Tutorial, Reference, etc.)
 
@@ -271,6 +272,27 @@ Press **F1** or **Cmd+?** (Ctrl+? on Windows) to open the searchable help panel:
 - Getting started guides
 - Keyboard shortcuts reference
 - Contextual help based on current view
+
+### Read-Only Viewer Mode (v3.1.0)
+
+Deploy a **separate, read-only instance** of the modeller to share private data models with stakeholders. The viewer uses the same codebase with build-time feature flags — no fork required.
+
+**Key Features**:
+- Locked to a single private GitHub repo (configured at build time)
+- Server-side GitHub App authentication via Cloudflare Pages Function — no credentials in the browser
+- GET-only proxy restricts API access to the configured repository
+- All editing UI hidden: no save, commit, create, delete, or drag-and-drop
+- Canvas is view-only: click to select and inspect, but no modifications
+- Access controlled via Cloudflare Access IP restrictions
+
+**Deployment**:
+1. Create a GitHub App with `contents:read` + `metadata:read` permissions
+2. Create a Cloudflare Pages project with build command: `cd frontend && bash cloudflare-build-viewer.sh`
+3. Set secrets: `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY`, `GITHUB_INSTALLATION_ID`
+4. Set env vars: `VIEWER_OWNER`, `VIEWER_REPO`, `VIEWER_BRANCH`, `VIEWER_WORKSPACE_PATH`
+5. Attach a Cloudflare Access policy with IP allowlist
+
+See [CHANGELOG.md](CHANGELOG.md) for full details.
 
 ## Offline-First Architecture
 

@@ -1,11 +1,8 @@
 {
   "name": "open-data-modelling",
-  "version": "3.0.1",
+  "version": "3.1.0",
   "description": "Open Data Modelling - A domain-centric data modeling application",
   "main": "dist-electron/main.cjs",
-  "directories": {
-    "test": "tests"
-  },
   "scripts": {
     "build:wasm": "bash scripts/build-wasm.sh || echo 'WASM SDK build skipped (SDK not found or wasm-pack not installed)'",
     "prebuild": "npm run build:wasm || true",
