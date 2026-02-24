@@ -11,6 +11,7 @@
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { markPendingChanges } from '@/stores/pendingChanges';
 import { decisionService } from '@/services/sdk/decisionService';
 import type { Decision, DecisionIndex, DecisionFilter, DecisionOption } from '@/types/decision';
 import { DecisionStatus, DecisionCategory, generateDecisionNumber } from '@/types/decision';
@@ -150,13 +151,7 @@ export const useDecisionStore = create<DecisionState>()(
             /* Module not available in test environment */
           });
         // Mark workspace as having pending changes
-        import('@/stores/workspaceStore')
-          .then(({ useWorkspaceStore }) => {
-            useWorkspaceStore.getState().setPendingChanges(true);
-          })
-          .catch(() => {
-            /* Module not available in test environment */
-          });
+        markPendingChanges();
       },
 
       updateDecisionInStore: (decisionId, updates) => {
@@ -184,13 +179,7 @@ export const useDecisionStore = create<DecisionState>()(
             });
         }
         // Mark workspace as having pending changes
-        import('@/stores/workspaceStore')
-          .then(({ useWorkspaceStore }) => {
-            useWorkspaceStore.getState().setPendingChanges(true);
-          })
-          .catch(() => {
-            /* Module not available in test environment */
-          });
+        markPendingChanges();
       },
 
       removeDecision: (decisionId) => {
@@ -216,13 +205,7 @@ export const useDecisionStore = create<DecisionState>()(
             });
         }
         // Mark workspace as having pending changes
-        import('@/stores/workspaceStore')
-          .then(({ useWorkspaceStore }) => {
-            useWorkspaceStore.getState().setPendingChanges(true);
-          })
-          .catch(() => {
-            /* Module not available in test environment */
-          });
+        markPendingChanges();
       },
 
       // SDK-backed operations

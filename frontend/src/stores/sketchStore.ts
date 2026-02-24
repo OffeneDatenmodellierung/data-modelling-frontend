@@ -9,6 +9,7 @@
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { markPendingChanges } from '@/stores/pendingChanges';
 import { sketchService } from '@/services/sdk/sketchService';
 import type {
   Sketch,
@@ -146,9 +147,7 @@ export const useSketchStore = create<SketchState>()(
           filteredSketches: applyFilter(sketches, filter),
         });
         // Mark workspace as having pending changes
-        import('@/stores/workspaceStore').then(({ useWorkspaceStore }) => {
-          useWorkspaceStore.getState().setPendingChanges(true);
-        });
+        markPendingChanges();
         // Sync to GitHub if in repo mode
         import('@/utils/githubRepoSync')
           .then(({ syncSketchToGitHub }) => {
@@ -174,9 +173,7 @@ export const useSketchStore = create<SketchState>()(
             selectedSketch?.id === sketchId ? (updatedSketch ?? null) : selectedSketch,
         });
         // Mark workspace as having pending changes
-        import('@/stores/workspaceStore').then(({ useWorkspaceStore }) => {
-          useWorkspaceStore.getState().setPendingChanges(true);
-        });
+        markPendingChanges();
         // Sync to GitHub if in repo mode
         if (updatedSketch) {
           import('@/utils/githubRepoSync')
@@ -202,9 +199,7 @@ export const useSketchStore = create<SketchState>()(
           selectedSketch: selectedSketch?.id === sketchId ? null : selectedSketch,
         });
         // Mark workspace as having pending changes
-        import('@/stores/workspaceStore').then(({ useWorkspaceStore }) => {
-          useWorkspaceStore.getState().setPendingChanges(true);
-        });
+        markPendingChanges();
         // Delete from GitHub if in repo mode
         if (sketchToRemove) {
           import('@/utils/githubRepoSync')

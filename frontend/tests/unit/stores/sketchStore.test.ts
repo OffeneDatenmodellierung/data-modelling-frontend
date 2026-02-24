@@ -9,16 +9,6 @@ import { useSketchStore } from '@/stores/sketchStore';
 import { sketchService } from '@/services/sdk/sketchService';
 import type { Sketch, SketchType, SketchStatus } from '@/types/sketch';
 
-// Mock workspaceStore to prevent "Closing rpc while fetch was pending" errors
-// sketchStore dynamically imports workspaceStore which has side effects (axios, platform)
-vi.mock('@/stores/workspaceStore', () => ({
-  useWorkspaceStore: {
-    getState: vi.fn(() => ({
-      setPendingChanges: vi.fn(),
-    })),
-  },
-}));
-
 // Mock sketchService
 vi.mock('@/services/sdk/sketchService', () => ({
   sketchService: {
