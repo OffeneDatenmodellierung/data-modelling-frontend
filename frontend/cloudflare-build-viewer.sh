@@ -3,6 +3,9 @@ set -e
 
 echo "Starting Cloudflare Pages VIEWER build..."
 
+# Increase Node.js heap size for large builds
+export NODE_OPTIONS="--max-old-space-size=4096"
+
 # Standard Cloudflare build vars
 export VITE_OFFLINE_MODE="true"
 export VITE_BASE_PATH="/"
