@@ -6,7 +6,7 @@
 import React, { useState } from 'react';
 
 export interface UrlImportProps {
-  onImport: (content: string) => void;
+  onImport: (content: string, sourceUrl?: string) => void;
   label?: string;
   placeholder?: string;
 }
@@ -49,7 +49,7 @@ export const UrlImport: React.FC<UrlImportProps> = ({
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       const content = await response.text();
-      onImport(content);
+      onImport(content, url);
       setUrl(''); // Clear URL after successful import
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch content from URL');
@@ -99,6 +99,3 @@ export const UrlImport: React.FC<UrlImportProps> = ({
     </div>
   );
 };
-
-
-

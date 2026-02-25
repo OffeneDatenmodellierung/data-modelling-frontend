@@ -198,6 +198,7 @@ export const DomainCanvas: React.FC<DomainCanvasProps> = ({ workspaceId, domainI
           workspace_id: table.workspace_id,
           domain_id: table.primary_domain_id || domainId,
           tables: [table],
+          contractMetadata: { name: table.name },
         };
         const yamlContent = await odcsService.toYAML(workspace);
         const fileName = `${systemPrefix}${table.name.replace(/\s+/g, '_')}.odcs.yaml`;

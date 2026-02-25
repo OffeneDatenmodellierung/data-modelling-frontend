@@ -54,6 +54,7 @@ interface DomainLoadResult {
   knowledgeArticles: KnowledgeArticle[];
   decisionRecords: Decision[];
   sketches: Sketch[];
+  failedOdcsFiles: string[];
 }
 
 export class WorkspaceV2Loader {
@@ -142,6 +143,7 @@ export class WorkspaceV2Loader {
     const allKnowledgeArticles: KnowledgeArticle[] = [];
     const allDecisionRecords: Decision[] = [];
     const allSketches: Sketch[] = [];
+    const allFailedOdcsFiles: string[] = [];
 
     for (const result of domainResults) {
       domains.push(result.domain);
@@ -154,6 +156,7 @@ export class WorkspaceV2Loader {
       allKnowledgeArticles.push(...result.knowledgeArticles);
       allDecisionRecords.push(...result.decisionRecords);
       allSketches.push(...result.sketches);
+      allFailedOdcsFiles.push(...result.failedOdcsFiles);
     }
 
     // 4.5 Load ALL KB articles and ADRs at workspace level
@@ -267,6 +270,7 @@ export class WorkspaceV2Loader {
       knowledgeArticles?: KnowledgeArticle[];
       decisionRecords?: Decision[];
       sketches?: Sketch[];
+      failedOdcsFiles?: string[];
     } = {
       id: workspaceId,
       name: workspaceName,
@@ -323,6 +327,15 @@ export class WorkspaceV2Loader {
     if (allSketches.length > 0) {
       workspace.sketches = allSketches;
       console.log(`[WorkspaceV2Loader] Added ${allSketches.length} sketch(es) to workspace`);
+    }
+
+    // Track failed ODCS files so the saver can protect them from deletion
+    if (allFailedOdcsFiles.length > 0) {
+      workspace.failedOdcsFiles = allFailedOdcsFiles;
+      console.warn(
+        `[WorkspaceV2Loader] ${allFailedOdcsFiles.length} ODCS file(s) failed to parse and will be preserved on save:`,
+        allFailedOdcsFiles
+      );
     }
 
     console.log('[WorkspaceV2Loader] Loaded workspace with', domains.length, 'domains');
@@ -403,6 +416,7 @@ export class WorkspaceV2Loader {
     const allKnowledgeArticles: KnowledgeArticle[] = [];
     const allDecisionRecords: Decision[] = [];
     const allSketches: Sketch[] = [];
+    const allFailedOdcsFiles: string[] = [];
 
     for (const result of domainResults) {
       domains.push(result.domain);
@@ -415,6 +429,7 @@ export class WorkspaceV2Loader {
       allKnowledgeArticles.push(...result.knowledgeArticles);
       allDecisionRecords.push(...result.decisionRecords);
       allSketches.push(...result.sketches);
+      allFailedOdcsFiles.push(...result.failedOdcsFiles);
     }
 
     // 4.5 Load ALL KB articles and ADRs at workspace level
@@ -496,6 +511,7 @@ export class WorkspaceV2Loader {
       knowledgeArticles?: KnowledgeArticle[];
       decisionRecords?: Decision[];
       sketches?: Sketch[];
+      failedOdcsFiles?: string[];
     } = {
       id: workspaceId,
       name: workspaceName,
@@ -517,6 +533,15 @@ export class WorkspaceV2Loader {
     if (allKnowledgeArticles.length > 0) workspace.knowledgeArticles = allKnowledgeArticles;
     if (allDecisionRecords.length > 0) workspace.decisionRecords = allDecisionRecords;
     if (allSketches.length > 0) workspace.sketches = allSketches;
+
+    // Track failed ODCS files so the saver can protect them from deletion
+    if (allFailedOdcsFiles.length > 0) {
+      workspace.failedOdcsFiles = allFailedOdcsFiles;
+      console.warn(
+        `[WorkspaceV2Loader] ${allFailedOdcsFiles.length} ODCS file(s) failed to parse and will be preserved on save:`,
+        allFailedOdcsFiles
+      );
+    }
 
     console.log('[WorkspaceV2Loader] Loaded workspace from strings:', {
       domains: domains.length,
@@ -558,7 +583,11 @@ export class WorkspaceV2Loader {
     });
 
     // Load tables
-    const tables = await this.loadTables(domainFiles.odcs, domainSpec, workspaceId);
+    const { tables, failedFiles: failedOdcsFiles } = await this.loadTables(
+      domainFiles.odcs,
+      domainSpec,
+      workspaceId
+    );
 
     // Load products
     const products = await this.loadProducts(domainFiles.odps, domainSpec);
@@ -579,7 +608,14 @@ export class WorkspaceV2Loader {
     const sketches: Sketch[] = [];
 
     // Convert systems from DomainV2 format to System format
-    const systems = this.loadSystems(domainSpec.systems || [], domainSpec.id, workspaceId, tables);
+    // Pass failedOdcsFiles so systems with failed ODCS files preserve their table_ids from workspace.yaml
+    const systems = this.loadSystems(
+      domainSpec.systems || [],
+      domainSpec.id,
+      workspaceId,
+      tables,
+      failedOdcsFiles
+    );
 
     // Construct Domain object (SDK schema has simpler DomainV2 structure)
     const domain: Domain = {
@@ -614,6 +650,7 @@ export class WorkspaceV2Loader {
       knowledgeArticles,
       decisionRecords,
       sketches,
+      failedOdcsFiles,
     };
   }
 
@@ -647,7 +684,11 @@ export class WorkspaceV2Loader {
     });
 
     // Load tables
-    const tables = await this.loadTablesFromStrings(domainFiles.odcs, domainSpec, workspaceId);
+    const { tables, failedFiles: failedOdcsFiles } = await this.loadTablesFromStrings(
+      domainFiles.odcs,
+      domainSpec,
+      workspaceId
+    );
 
     // Load products
     const products = await this.loadProductsFromStrings(domainFiles.odps, domainSpec);
@@ -668,7 +709,14 @@ export class WorkspaceV2Loader {
     const sketches: Sketch[] = [];
 
     // Convert systems from DomainV2 format to System format
-    const systems = this.loadSystems(domainSpec.systems || [], domainSpec.id, workspaceId, tables);
+    // Pass failedOdcsFiles so systems with failed ODCS files preserve their table_ids
+    const systems = this.loadSystems(
+      domainSpec.systems || [],
+      domainSpec.id,
+      workspaceId,
+      tables,
+      failedOdcsFiles
+    );
 
     // Construct Domain object
     const domain: Domain = {
@@ -703,6 +751,7 @@ export class WorkspaceV2Loader {
       knowledgeArticles,
       decisionRecords,
       sketches,
+      failedOdcsFiles,
     };
   }
 
@@ -770,8 +819,9 @@ export class WorkspaceV2Loader {
     files: Array<{ name: string; content: string }>,
     domainSpec: DomainV2,
     workspaceId: string
-  ): Promise<Table[]> {
+  ): Promise<{ tables: Table[]; failedFiles: string[] }> {
     const tables: Table[] = [];
+    const failedFiles: string[] = [];
 
     for (const file of files) {
       try {
@@ -799,10 +849,18 @@ export class WorkspaceV2Loader {
         console.error(`[WorkspaceV2Loader] Failed to load table from ${file.name}:`, error);
         // Record validation issue for the failed file
         this.recordValidationIssue(error, 'table', file.name, file.name);
+        // Track the failed file name so it can be preserved on save
+        const fileName = file.name.includes('/')
+          ? file.name.split('/').pop() || file.name
+          : file.name;
+        failedFiles.push(fileName);
+        console.warn(
+          `[WorkspaceV2Loader] ODCS file "${fileName}" failed to parse - will be preserved on next save`
+        );
       }
     }
 
-    return tables;
+    return { tables, failedFiles };
   }
 
   /**
@@ -1024,7 +1082,8 @@ export class WorkspaceV2Loader {
     systemSpecs: SystemV2[],
     domainId: string,
     _workspaceId: string,
-    tables: Table[]
+    tables: Table[],
+    failedOdcsFiles: string[] = []
   ): System[] {
     const systems: System[] = [];
 
@@ -1040,6 +1099,13 @@ export class WorkspaceV2Loader {
           tableIds = matchedIds;
           console.log(
             `[WorkspaceV2Loader] System "${spec.name}" matched ${matchedIds.length}/${spec.table_ids.length} table_ids from workspace.yaml`
+          );
+        } else if (failedOdcsFiles.length > 0) {
+          // table_ids exist but none match, AND there were ODCS parse failures
+          // Preserve the original table_ids from workspace.yaml to prevent data loss
+          tableIds = [...spec.table_ids];
+          console.warn(
+            `[WorkspaceV2Loader] System "${spec.name}" has ${spec.table_ids.length} table_ids preserved from workspace.yaml (ODCS file failed to parse - preserving to prevent data loss)`
           );
         } else {
           // table_ids exist but none match - fall through to metadata.system_id matching
@@ -1251,8 +1317,9 @@ export class WorkspaceV2Loader {
     files: File[],
     domainSpec: DomainV2,
     workspaceId: string
-  ): Promise<Table[]> {
+  ): Promise<{ tables: Table[]; failedFiles: string[] }> {
     const tables: Table[] = [];
+    const failedFiles: string[] = [];
 
     for (const file of files) {
       try {
@@ -1279,11 +1346,19 @@ export class WorkspaceV2Loader {
           }
         }
       } catch (error) {
+        const fileName =
+          ((file as any).webkitRelativePath || file.name).split('/').pop() || file.name;
+        failedFiles.push(fileName);
         console.error(`[WorkspaceV2Loader] Failed to load table from ${file.name}:`, error);
+        console.warn(
+          `[WorkspaceV2Loader] ODCS file "${fileName}" failed to parse - will be preserved on next save`
+        );
+        // Record validation issue so it appears in the ValidationWarnings panel
+        this.recordValidationIssue(error, 'table', fileName, fileName, fileName);
       }
     }
 
-    return tables;
+    return { tables, failedFiles };
   }
 
   /**

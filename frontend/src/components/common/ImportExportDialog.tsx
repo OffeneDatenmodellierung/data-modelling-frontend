@@ -14,6 +14,7 @@ import { useModelStore } from '@/stores/modelStore';
 import { useWorkspaceStore } from '@/stores/workspaceStore';
 import { useUIStore } from '@/stores/uiStore';
 import type { Table } from '@/types/table';
+import { SOURCE_TOPIC_KEY } from '@/utils/customProperties';
 
 export interface ImportExportDialogProps {
   isOpen: boolean;
@@ -59,7 +60,8 @@ export const ImportExportDialog: React.FC<ImportExportDialogProps> = ({ isOpen, 
     setIsProcessing(true);
     try {
       const content = await file.text();
-      await handleImportContent(content, importFormat);
+      const sourceName = file.name.replace(/\.[^/.]+$/, '');
+      await handleImportContent(content, importFormat, sourceName);
       addToast({
         type: 'success',
         message: `Successfully imported from ${file.name}`,
@@ -76,10 +78,22 @@ export const ImportExportDialog: React.FC<ImportExportDialogProps> = ({ isOpen, 
     }
   };
 
-  const handleUrlImport = async (content: string) => {
+  const handleUrlImport = async (content: string, sourceUrl?: string) => {
     setIsProcessing(true);
     try {
-      await handleImportContent(content, importFormat);
+      let sourceName: string | undefined;
+      if (sourceUrl) {
+        try {
+          const urlObj = new URL(sourceUrl);
+          const lastSegment = urlObj.pathname.split('/').filter(Boolean).pop();
+          if (lastSegment) {
+            sourceName = lastSegment.replace(/\.[^/.]+$/, '');
+          }
+        } catch {
+          /* leave undefined */
+        }
+      }
+      await handleImportContent(content, importFormat, sourceName);
       addToast({
         type: 'success',
         message: 'Successfully imported from URL',
@@ -99,7 +113,21 @@ export const ImportExportDialog: React.FC<ImportExportDialogProps> = ({ isOpen, 
   const handlePasteImport = async (content: string) => {
     setIsProcessing(true);
     try {
-      await handleImportContent(content, importFormat);
+      // Try to extract a schema title for source_topic
+      let sourceName: string | undefined;
+      try {
+        const parsed = JSON.parse(content);
+        sourceName = parsed.title || parsed.$id;
+        if (sourceName && sourceName.includes('/')) {
+          sourceName = sourceName
+            .split('/')
+            .pop()
+            ?.replace(/\.[^/.]+$/, '');
+        }
+      } catch {
+        /* Not JSON or no title — leave undefined */
+      }
+      await handleImportContent(content, importFormat, sourceName);
       addToast({
         type: 'success',
         message: 'Successfully imported from pasted content',
@@ -116,7 +144,11 @@ export const ImportExportDialog: React.FC<ImportExportDialogProps> = ({ isOpen, 
     }
   };
 
-  const handleImportContent = async (content: string, format: ImportFormat) => {
+  const handleImportContent = async (
+    content: string,
+    format: ImportFormat,
+    sourceName?: string
+  ) => {
     console.log('[ImportExportDialog] handleImportContent called with format:', format);
     console.log('[ImportExportDialog] Content length:', content.length);
     console.log('[ImportExportDialog] Content preview:', content.substring(0, 200));
@@ -329,6 +361,18 @@ export const ImportExportDialog: React.FC<ImportExportDialogProps> = ({ isOpen, 
             created_at: table.created_at || new Date().toISOString(),
             last_modified_at: table.last_modified_at || new Date().toISOString(),
           };
+
+          // Stamp source_topic from import source name (if provided and not already set)
+          if (sourceName) {
+            const existingProps = mappedTable.customProperties || [];
+            const hasSourceTopic = existingProps.some((p) => p.property === SOURCE_TOPIC_KEY);
+            if (!hasSourceTopic) {
+              mappedTable.customProperties = [
+                ...existingProps,
+                { property: SOURCE_TOPIC_KEY, value: sourceName },
+              ];
+            }
+          }
 
           // Normalize all UUIDs in the table (columns, compound keys, etc.)
           const normalizedTable = normalizeWorkspaceUUIDs({ tables: [mappedTable] }).tables[0];
