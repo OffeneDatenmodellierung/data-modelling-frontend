@@ -49,6 +49,23 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   const pathSegments = context.params.path as string[];
   const githubPath = '/' + pathSegments.join('/');
 
+  // Debug endpoint: /api/github/_debug — shows which env keys are available (not values)
+  if (githubPath === '/_debug') {
+    const envKeys = [
+      'GITHUB_APP_ID', 'GITHUB_APP_PRIVATE_KEY', 'GITHUB_INSTALLATION_ID',
+      'VIEWER_OWNER', 'VIEWER_REPO', 'VITE_VIEWER_OWNER', 'VITE_VIEWER_REPO',
+      'VITE_VIEWER_MODE', 'VITE_VIEWER_BRANCH',
+    ];
+    const status: Record<string, string> = {};
+    for (const key of envKeys) {
+      const val = (context.env as Record<string, string | undefined>)[key];
+      status[key] = val ? `set (${val.length} chars)` : 'NOT SET';
+    }
+    return new Response(JSON.stringify({ envStatus: status }, null, 2), {
+      headers: { 'Content-Type': 'application/json', ...corsHeaders() },
+    });
+  }
+
   // Security: restrict to configured repository only
   // Support both VIEWER_OWNER and VITE_VIEWER_OWNER naming conventions
   const viewerOwner = context.env.VIEWER_OWNER || context.env.VITE_VIEWER_OWNER;
