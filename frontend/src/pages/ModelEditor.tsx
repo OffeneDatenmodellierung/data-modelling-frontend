@@ -49,11 +49,61 @@ import type { SharedResourceReference } from '@/types/domain';
 import { HelpButton, HelpPanel } from '@/components/help';
 import { ValidationWarnings } from '@/components/common/ValidationWarnings';
 import { useHelpPanel } from '@/hooks/useHelpPanel';
-import { isViewerMode } from '@/services/viewerMode';
+import { isViewerMode, getViewerConfig } from '@/services/viewerMode';
 import { ViewerBranchSwitcher } from '@/components/viewer/ViewerBranchSwitcher';
 import { useKnowledgeStore } from '@/stores/knowledgeStore';
 import { useDecisionStore } from '@/stores/decisionStore';
 import { useSketchStore } from '@/stores/sketchStore';
+
+/**
+ * Parse a GitHub workspace URL segment into its parts.
+ * Handles branch names containing slashes (e.g., "feature/my-branch") by
+ * using the known workspace path suffix to determine where the branch ends.
+ */
+function parseGitHubWorkspaceUrl(urlSegment: string): {
+  owner: string;
+  repo: string;
+  branch: string;
+  workspacePath: string;
+} | null {
+  // urlSegment format: owner/repo/branch.../workspacePath
+  const parts = urlSegment.split('/');
+  if (parts.length < 3) return null;
+
+  const owner = parts[0]!;
+  const repo = parts[1]!;
+  const rest = parts.slice(2);
+
+  // In viewer mode, we know the workspace path from config, so we can
+  // extract branch names that contain slashes
+  if (isViewerMode()) {
+    const config = getViewerConfig();
+    const knownPath = config.workspacePath || '_root_';
+    const knownPathParts = knownPath.split('/');
+
+    // Try to match the known workspace path at the end of the URL
+    if (rest.length > knownPathParts.length) {
+      const tailParts = rest.slice(rest.length - knownPathParts.length);
+      if (tailParts.join('/') === knownPath) {
+        const branchParts = rest.slice(0, rest.length - knownPathParts.length);
+        return {
+          owner,
+          repo,
+          branch: branchParts.join('/'),
+          workspacePath: knownPath,
+        };
+      }
+    }
+  }
+
+  // Default: first segment after owner/repo is the branch, rest is workspace path
+  return {
+    owner,
+    repo,
+    branch: rest[0]!,
+    workspacePath: rest.slice(1).join('/') || '_root_',
+  };
+}
 
 const ModelEditor: React.FC = () => {
   const params = useParams<{ workspaceId: string; domainId?: string; '*': string }>();
@@ -65,14 +115,7 @@ const ModelEditor: React.FC = () => {
   // Parse viewer URL parts for the branch switcher
   const viewerUrlParts = useMemo(() => {
     if (!isViewerMode() || !workspaceId?.startsWith('github/')) return null;
-    const parts = workspaceId.substring(7).split('/');
-    if (parts.length < 3) return null;
-    return {
-      owner: parts[0]!,
-      repo: parts[1]!,
-      branch: parts[2]!,
-      workspacePath: parts.slice(3).join('/') || '_root_',
-    };
+    return parseGitHubWorkspaceUrl(workspaceId.substring(7));
   }, [workspaceId]);
   const { fetchWorkspace, workspaces, setCurrentWorkspace } = useWorkspaceStore();
   const {
@@ -377,18 +420,16 @@ const ModelEditor: React.FC = () => {
       }
 
       // Parse the GitHub URL: github/owner/repo/branch/workspacePath
-      const parts = workspaceId.substring(7).split('/');
-      if (parts.length < 3) {
+      // Uses parseGitHubWorkspaceUrl to handle branch names with slashes
+      const parsed = parseGitHubWorkspaceUrl(workspaceId.substring(7));
+      if (!parsed) {
         setError('Invalid GitHub workspace URL');
         setIsLoading(false);
         return;
       }
 
-      const owner = parts[0]!;
-      const repo = parts[1]!;
-      const branch = parts[2]!;
-      const pathParts = parts.slice(3);
-      const workspacePath = pathParts.join('/') || '_root_';
+      const { owner, repo, branch, workspacePath } = parsed;
+      const pathParts = workspacePath === '_root_' ? [] : workspacePath.split('/');
       const workspaceName =
         workspacePath === '_root_' ? repo : pathParts[pathParts.length - 1] || repo;
 
