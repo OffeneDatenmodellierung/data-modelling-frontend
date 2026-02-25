@@ -230,6 +230,7 @@ export const TableMetadataModal: React.FC<TableMetadataModalProps> = ({
       onClose={onClose}
       title={`Table Metadata: ${table.name}`}
       size="lg"
+      zIndex={100}
       initialPosition={{
         x: Math.max(50, window.innerWidth / 2 - 400),
         y: Math.max(50, window.innerHeight / 2 - 300),

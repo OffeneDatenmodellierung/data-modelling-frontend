@@ -719,6 +719,7 @@ export const ColumnDetailsModal: React.FC<ColumnDetailsModalProps> = ({
       title={readOnly ? `View Column: ${column.name}` : `Column Details: ${column.name}`}
       size="lg"
       initialPosition={{ x: 100, y: 50 }}
+      zIndex={100}
     >
       <div className="flex flex-col h-[600px]">
         {/* Tab Navigation */}
