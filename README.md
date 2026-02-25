@@ -435,4 +435,6 @@ See [CHANGELOG.md](CHANGELOG.md) for a detailed list of changes.
 
 ## License
 
-ISC
+MIT License
+
+Copyright (c) 2026 OffeneDatenmodellierung

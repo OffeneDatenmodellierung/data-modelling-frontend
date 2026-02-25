@@ -4,6 +4,7 @@
  */
 
 import React, { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { trapFocus, generateAriaId } from '@/utils/accessibility';
 
 export interface DraggableModalProps {
@@ -227,7 +228,7 @@ export const DraggableModal: React.FC<DraggableModalProps> = ({
     xxl: 850,
   };
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 overflow-hidden pointer-events-none"
       style={{ zIndex }}
@@ -351,6 +352,7 @@ export const DraggableModal: React.FC<DraggableModalProps> = ({
           />
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
