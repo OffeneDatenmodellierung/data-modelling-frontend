@@ -10,7 +10,6 @@ import { useUIStore } from '@/stores/uiStore';
 import { useSDKModeStore } from '@/services/sdk/sdkMode';
 import { relationshipService } from '@/services/api/relationshipService';
 import { checkCircularRelationshipWarning } from '@/utils/validation';
-import { isViewerMode } from '@/services/viewerMode';
 import type { Relationship } from '@/types/relationship';
 
 export interface UseCanvasReturn {
@@ -43,9 +42,7 @@ export function useCanvas(_workspaceId: string, domainId: string): UseCanvasRetu
   const onNodeClick = useCallback(
     (_event: React.MouseEvent, node: Node) => {
       setSelectedTable(node.id);
-      if (!isViewerMode()) {
-        openTableEditor(node.id); // Open the table editor modal
-      }
+      openTableEditor(node.id); // Opens in read-only mode when in viewer mode
     },
     [setSelectedTable, openTableEditor]
   );

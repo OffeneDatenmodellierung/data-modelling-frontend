@@ -780,7 +780,9 @@ export const TableEditor: React.FC<TableEditorProps> = ({ tableId, workspaceId, 
             <div>
               <h3 className="text-sm font-semibold text-yellow-800">Read-Only View</h3>
               <p className="text-xs text-yellow-700">
-                This table belongs to another domain. Switch to the primary domain to edit.
+                {isViewerMode()
+                  ? 'You are viewing this table in read-only mode.'
+                  : 'This table belongs to another domain. Switch to the primary domain to edit.'}
               </p>
             </div>
           </div>
@@ -789,12 +791,20 @@ export const TableEditor: React.FC<TableEditorProps> = ({ tableId, workspaceId, 
         {/* Table Header */}
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold text-gray-900">{table.name}</h2>
-          <button
-            onClick={onClose}
-            className="px-3 py-1 text-sm bg-gray-600 text-white rounded hover:bg-gray-700"
-          >
-            Close
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowTableMetadata(true)}
+              className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
+            >
+              Table Metadata
+            </button>
+            <button
+              onClick={onClose}
+              className="px-3 py-1 text-sm bg-gray-600 text-white rounded hover:bg-gray-700"
+            >
+              Close
+            </button>
+          </div>
         </div>
 
         {/* Basic Information */}
@@ -912,6 +922,9 @@ export const TableEditor: React.FC<TableEditorProps> = ({ tableId, workspaceId, 
                   <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
                     Description
                   </th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                    Details
+                  </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
@@ -939,6 +952,14 @@ export const TableEditor: React.FC<TableEditorProps> = ({ tableId, workspaceId, 
                       )}
                     </td>
                     <td className="px-3 py-2 text-sm text-gray-600">{column.description || '—'}</td>
+                    <td className="px-3 py-2 text-sm">
+                      <button
+                        onClick={() => setSelectedColumnId(column.id)}
+                        className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
+                      >
+                        View
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -1000,6 +1021,25 @@ export const TableEditor: React.FC<TableEditorProps> = ({ tableId, workspaceId, 
               ))}
             </div>
           </div>
+        )}
+
+        {/* Table Metadata Modal (read-only, no onSave) */}
+        <TableMetadataModal
+          table={table}
+          isOpen={showTableMetadata}
+          onClose={() => setShowTableMetadata(false)}
+        />
+
+        {/* Column Details Modal (read-only, no-op onSave) */}
+        {selectedColumnId && table.columns.find((c) => c.id === selectedColumnId) && (
+          <ColumnDetailsModal
+            column={table.columns.find((c) => c.id === selectedColumnId)!}
+            tableId={tableId}
+            workspaceId={workspaceId}
+            isOpen={!!selectedColumnId}
+            onClose={() => setSelectedColumnId(null)}
+            onSave={async () => {}}
+          />
         )}
       </div>
     );
