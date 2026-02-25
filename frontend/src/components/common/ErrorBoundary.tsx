@@ -58,6 +58,17 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     });
   };
 
+  handleResetState = async (): Promise<void> => {
+    try {
+      const { resetApplicationState } = await import('@/utils/resetApplicationState');
+      await resetApplicationState();
+    } catch (error) {
+      console.error('[ErrorBoundary] Failed to reset application state:', error);
+    }
+    // Full page reload for a completely clean state
+    window.location.href = '/';
+  };
+
   render(): ReactNode {
     if (this.state.hasError) {
       // Use custom fallback if provided
@@ -117,6 +128,13 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
                 aria-label="Try again"
               >
                 Try Again
+              </button>
+              <button
+                onClick={this.handleResetState}
+                className="flex-1 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2"
+                aria-label="Reset application state and retry"
+              >
+                Reset &amp; Retry
               </button>
               <button
                 onClick={() => {
