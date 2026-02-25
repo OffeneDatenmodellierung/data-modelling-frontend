@@ -7,6 +7,9 @@ set -e
 
 echo "🚀 Starting Cloudflare Pages build..."
 
+# Increase Node.js heap size for large builds
+export NODE_OPTIONS="--max-old-space-size=4096"
+
 # Set environment variables for Cloudflare Pages
 export VITE_OFFLINE_MODE="true"
 export VITE_BASE_PATH="/"
