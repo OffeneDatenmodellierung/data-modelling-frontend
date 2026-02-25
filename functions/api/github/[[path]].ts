@@ -14,8 +14,11 @@ interface Env {
   GITHUB_APP_ID: string;
   GITHUB_APP_PRIVATE_KEY: string;
   GITHUB_INSTALLATION_ID: string;
-  VIEWER_OWNER: string;
-  VIEWER_REPO: string;
+  // Support both VIEWER_OWNER and VITE_VIEWER_OWNER naming conventions
+  VIEWER_OWNER?: string;
+  VIEWER_REPO?: string;
+  VITE_VIEWER_OWNER?: string;
+  VITE_VIEWER_REPO?: string;
 }
 
 // In-memory token cache (per isolate, resets on cold start)
@@ -47,7 +50,19 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   const githubPath = '/' + pathSegments.join('/');
 
   // Security: restrict to configured repository only
-  const allowedPrefix = `/repos/${context.env.VIEWER_OWNER}/${context.env.VIEWER_REPO}`;
+  // Support both VIEWER_OWNER and VITE_VIEWER_OWNER naming conventions
+  const viewerOwner = context.env.VIEWER_OWNER || context.env.VITE_VIEWER_OWNER;
+  const viewerRepo = context.env.VIEWER_REPO || context.env.VITE_VIEWER_REPO;
+
+  if (!viewerOwner || !viewerRepo) {
+    console.error('[GitHub Proxy] VIEWER_OWNER/VIEWER_REPO not configured');
+    return new Response(
+      JSON.stringify({ error: 'Server misconfiguration', message: 'VIEWER_OWNER and VIEWER_REPO must be set' }),
+      { status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders() } }
+    );
+  }
+
+  const allowedPrefix = `/repos/${viewerOwner}/${viewerRepo}`;
   if (!githubPath.startsWith(allowedPrefix)) {
     return new Response('Forbidden: access restricted to the configured repository.', {
       status: 403,
