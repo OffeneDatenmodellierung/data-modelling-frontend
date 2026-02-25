@@ -44,7 +44,7 @@
     "@tanstack/react-query": "^5.90.16",
     "@types/js-yaml": "^4.0.9",
     "@types/jszip": "^3.4.0",
-    "axios": "^1.13.2",
+    "axios": "^1.13.5",
     "bpmn-js": "^18.9.1",
     "diff": "^8.0.3",
     "dmn-js": "^17.5.0",
