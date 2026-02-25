@@ -45,7 +45,7 @@ export const TableEditor: React.FC<TableEditorProps> = ({ tableId, workspaceId, 
   const [name, setName] = useState(table?.name || '');
   const [alias, setAlias] = useState(table?.alias || '');
   const [description, setDescription] = useState(table?.description || '');
-  const [dataLevel, setDataLevel] = useState<DataLevel>(table?.data_level || 'operational');
+  const [dataLevel, setDataLevel] = useState<DataLevel | ''>(table?.data_level || '');
   const [physicalName, setPhysicalName] = useState(table?.physicalName || '');
   const [businessName, setBusinessName] = useState(table?.businessName || '');
   const [columns, setColumns] = useState<Column[]>(table?.columns || []);
@@ -106,7 +106,7 @@ export const TableEditor: React.FC<TableEditorProps> = ({ tableId, workspaceId, 
       setName(table.name);
       setAlias(table.alias || '');
       setDescription(table.description || '');
-      setDataLevel(table.data_level || 'operational');
+      setDataLevel(table.data_level || '');
       setPhysicalName(table.physicalName || '');
       setBusinessName(table.businessName || '');
 
@@ -283,7 +283,7 @@ export const TableEditor: React.FC<TableEditorProps> = ({ tableId, workspaceId, 
     setHasUnsavedChanges(true);
   };
 
-  const handleDataLevelChange = async (newLevel: DataLevel) => {
+  const handleDataLevelChange = async (newLevel: DataLevel | '') => {
     setDataLevel(newLevel);
 
     // Update both the data_level field and the dm_level tag
@@ -292,11 +292,15 @@ export const TableEditor: React.FC<TableEditorProps> = ({ tableId, workspaceId, 
     // Remove existing dm_level tag if present (tags are strings like "dm_level:Gold")
     const filteredTags = currentTags.filter((tag) => !tag.toLowerCase().startsWith('dm_level:'));
 
-    // Add new dm_level tag (capitalize first letter for display)
-    const levelDisplay = newLevel.charAt(0).toUpperCase() + newLevel.slice(1);
-    const newTags = [...filteredTags, `dm_level:${levelDisplay}`];
-
-    updateTable(tableId, { data_level: newLevel, tags: newTags });
+    if (newLevel) {
+      // Add new dm_level tag (capitalize first letter for display)
+      const levelDisplay = newLevel.charAt(0).toUpperCase() + newLevel.slice(1);
+      const newTags = [...filteredTags, `dm_level:${levelDisplay}`];
+      updateTable(tableId, { data_level: newLevel, tags: newTags });
+    } else {
+      // Clear the data level
+      updateTable(tableId, { data_level: undefined, tags: filteredTags });
+    }
     setHasUnsavedChanges(true);
   };
 
@@ -365,7 +369,7 @@ export const TableEditor: React.FC<TableEditorProps> = ({ tableId, workspaceId, 
         name,
         alias: alias || undefined,
         description: description || undefined,
-        data_level: dataLevel,
+        data_level: dataLevel || undefined,
         columns: updatedColumns,
         compoundKeys: compoundKeys, // Always include, even if empty array
         metadata: metadata, // Always include metadata object
@@ -1278,9 +1282,10 @@ export const TableEditor: React.FC<TableEditorProps> = ({ tableId, workspaceId, 
           <select
             id="table-data-level"
             value={dataLevel}
-            onChange={(e) => handleDataLevelChange(e.target.value as DataLevel)}
+            onChange={(e) => handleDataLevelChange(e.target.value as DataLevel | '')}
             className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
+            <option value="">Not Set</option>
             <option value="operational">Operational</option>
             <option value="bronze">Bronze</option>
             <option value="silver">Silver</option>
