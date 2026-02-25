@@ -10,6 +10,7 @@ import { useModelStore } from '@/stores/modelStore';
 import { useUIStore } from '@/stores/uiStore';
 import { useSDKModeStore } from '@/services/sdk/sdkMode';
 import type { Table, Owner, SLA, Role, SupportChannel, Pricing, TeamMember } from '@/types/table';
+import { getSourceTopic, SOURCE_TOPIC_KEY } from '@/utils/customProperties';
 
 export interface TableMetadataModalProps {
   table: Table | null;
@@ -40,6 +41,7 @@ export const TableMetadataModal: React.FC<TableMetadataModalProps> = ({
   const [internalMetadata, setInternalMetadata] = useState<Record<string, unknown>>({});
   const [qualityRules, setQualityRules] = useState<Record<string, unknown>>({});
   const [status, setStatus] = useState<string>('');
+  const [sourceTopic, setSourceTopic] = useState<string>('');
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -99,6 +101,7 @@ export const TableMetadataModal: React.FC<TableMetadataModalProps> = ({
       setQualityRules(table.quality_rules || {});
       // Read status from customProperties (ODCS compliant)
       setStatus(getStatusFromCustomProperties(table.customProperties));
+      setSourceTopic(getSourceTopic(table.customProperties) || '');
       setHasUnsavedChanges(false);
     }
   }, [table]);
@@ -121,12 +124,16 @@ export const TableMetadataModal: React.FC<TableMetadataModalProps> = ({
         (t) => (t.username && t.username.trim().length > 0) || (t.name && t.name.trim().length > 0)
       );
 
-      // Build customProperties with status (ODCS compliant)
+      // Build customProperties with managed keys (ODCS compliant)
       const updatedCustomProperties: Array<{ property: string; value: unknown }> = [
-        // Keep existing customProperties except status
-        ...(table.customProperties || []).filter((p) => p.property !== 'status'),
+        // Keep existing customProperties except managed keys
+        ...(table.customProperties || []).filter(
+          (p) => p.property !== 'status' && p.property !== SOURCE_TOPIC_KEY
+        ),
         // Add status if set
         ...(status ? [{ property: 'status', value: status }] : []),
+        // Add source_topic if set
+        ...(sourceTopic.trim() ? [{ property: SOURCE_TOPIC_KEY, value: sourceTopic.trim() }] : []),
       ];
 
       const updates: Partial<Table> = {
@@ -289,6 +296,33 @@ export const TableMetadataModal: React.FC<TableMetadataModalProps> = ({
             ) : (
               <span className="text-gray-900 capitalize">{status || 'Not set'}</span>
             )}
+          </div>
+          {/* Source Topic */}
+          <div className="mt-3">
+            <label
+              htmlFor="table-source-topic"
+              className="block text-sm font-medium text-gray-600 mb-1"
+            >
+              Source Topic
+            </label>
+            {isEditable ? (
+              <input
+                id="table-source-topic"
+                type="text"
+                value={sourceTopic}
+                onChange={(e) => {
+                  setSourceTopic(e.target.value);
+                  setHasUnsavedChanges(true);
+                }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                placeholder="e.g., order-events, user-profiles"
+              />
+            ) : (
+              <span className="text-gray-900">{sourceTopic || 'Not set'}</span>
+            )}
+            <p className="mt-1 text-xs text-gray-500">
+              Groups tables from the same schema or topic
+            </p>
           </div>
         </div>
 

@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.2.0] - 2026-02-25
+
+### Added
+- **Source Topic Label on Canvas**: Tables with a `source_topic` custom property now display it as a subtitle below the table name on the canvas, visible in all views (Systems, Operational, Analytical)
+- **Source Topic Field in Table Metadata**: New editable "Source Topic" field in the Table Metadata modal, allowing users to group tables from the same schema or topic
+- **Auto-populate Source Topic on Import**: When importing from a file, URL, or pasted JSON Schema, the source name is automatically set as the `source_topic` on imported tables
+- **Custom Properties Helper Utility**: New shared `customProperties.ts` utility with `getSourceTopic()` and `setSourceTopic()` helpers
+
+### Fixed
+- **Data Contract Name Bug**: Fixed ODCS data contract root-level `name` being set to the first table name instead of the system/file name. Now correctly passes `contractMetadata.name` from all export call sites (WorkspaceV2Saver, SystemExportDialog, TableEditor, DomainCanvas, LocalFileService, ElectronFileService)
+- **ODCL Import CustomProperties Lost**: Fixed `normalizeTable()` in odcsService not returning `customProperties`, causing them to be silently dropped during ODCL imports
+
+### New Files
+- `frontend/src/utils/customProperties.ts` — Shared helpers for reserved customProperties keys (source_topic)
+- `frontend/tests/unit/utils/customProperties.test.ts` — Unit tests for customProperties helpers
+
 ## [3.1.1] - 2026-02-25
 
 ### Fixed

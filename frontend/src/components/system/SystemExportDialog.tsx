@@ -84,6 +84,7 @@ export const SystemExportDialog: React.FC<SystemExportDialogProps> = ({
           const workspace = {
             tables: selectedTables,
             relationships: [],
+            contractMetadata: { name: systemName },
           };
           const content = await odcsService.toYAML(workspace as any);
           downloadFile(content, `${systemName}.odcs.yaml`, 'application/yaml');

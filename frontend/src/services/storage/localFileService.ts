@@ -1039,7 +1039,10 @@ class LocalFileService {
       }
     }
 
-    const yamlContent = await odcsService.toYAML({ tables: [table] } as any);
+    const yamlContent = await odcsService.toYAML({
+      tables: [table],
+      contractMetadata: { name: table.name },
+    } as any);
     const filename = `${systemName}${table.name}.odcs.yaml`;
     browserFileService.downloadFile(yamlContent, filename, 'text/yaml');
   }

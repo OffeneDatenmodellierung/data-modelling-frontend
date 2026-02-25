@@ -351,7 +351,10 @@ class ElectronFileService {
 
     const filename = `${systemPrefix}${table.name}.odcs.yaml`;
     const tableYamlPath = joinPath(domainPath, filename);
-    const yamlContent = await odcsService.toYAML({ tables: [table] } as any);
+    const yamlContent = await odcsService.toYAML({
+      tables: [table],
+      contractMetadata: { name: table.name },
+    } as any);
     await platformFileService.writeFile(tableYamlPath, yamlContent);
   }
 

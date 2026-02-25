@@ -2431,6 +2431,7 @@ class ODCSService {
       is_owned_by_domain: true, // Default to true for imported tables
       // Load compound keys (composite primary/unique keys) from YAML
       compoundKeys: this.normalizeCompoundKeys(item, tableId, now, normalizedColumns),
+      customProperties: item.customProperties || item.custom_properties,
       created_at: item.created_at || now,
       last_modified_at: item.last_modified_at || now,
     };

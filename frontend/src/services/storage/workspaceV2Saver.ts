@@ -239,7 +239,12 @@ export class WorkspaceV2Saver {
         try {
           // Wrap all system tables in workspace format expected by SDK
           // Include system_id so it becomes the contract.id in the ODCS file
-          const tableWorkspace = { tables: systemTables, relationships: [], system_id: systemId };
+          const tableWorkspace = {
+            tables: systemTables,
+            relationships: [],
+            system_id: systemId,
+            contractMetadata: { name: systemName },
+          };
           const content = await odcsService.toYAML(tableWorkspace as any);
           files.push({ name: fileName, content, directory: 'odcs' });
           console.log(
@@ -264,7 +269,11 @@ export class WorkspaceV2Saver {
         );
 
         try {
-          const tableWorkspace = { tables: [table], relationships: [] };
+          const tableWorkspace = {
+            tables: [table],
+            relationships: [],
+            contractMetadata: { name: table.name },
+          };
           const content = await odcsService.toYAML(tableWorkspace as any);
           files.push({ name: fileName, content, directory: 'odcs' });
         } catch (error) {

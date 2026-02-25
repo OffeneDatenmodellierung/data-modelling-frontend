@@ -8,6 +8,7 @@ import { Handle, Position, NodeProps } from 'reactflow';
 import { useModelStore } from '@/stores/modelStore';
 import type { Table, QualityTier } from '@/types/table';
 import { getTableAriaLabel } from '@/utils/accessibility';
+import { getSourceTopic } from '@/utils/customProperties';
 
 export interface TableNodeData {
   table: Table;
@@ -178,6 +179,7 @@ export const CanvasNode: React.FC<NodeProps<TableNodeData>> = memo(({ data, sele
   // Get quality tier and determine title bar color
   const qualityTier: QualityTier =
     (table.metadata?.quality_tier as QualityTier) || table.data_level || 'operational';
+  const sourceTopic = getSourceTopic(table.customProperties);
   const titleBarColor = useMemo(() => {
     // Cross-domain tables use pastel shades
     if (isCrossDomain) {
@@ -400,8 +402,18 @@ export const CanvasNode: React.FC<NodeProps<TableNodeData>> = memo(({ data, sele
       <div
         className={`px-3 py-2 ${titleBarColor} text-white font-semibold rounded-t-lg flex items-center justify-between`}
       >
-        <span>{table.name}</span>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-col min-w-0">
+          <span className="truncate">{table.name}</span>
+          {sourceTopic && (
+            <span
+              className="text-xs font-normal text-white text-opacity-70 truncate"
+              title={`Source: ${sourceTopic}`}
+            >
+              {sourceTopic}
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-2 flex-shrink-0">
           {qualityTier !== 'operational' && (
             <span
               className="text-xs bg-black bg-opacity-20 px-2 py-0.5 rounded capitalize"
