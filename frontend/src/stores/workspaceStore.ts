@@ -495,6 +495,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                 bpmnProcesses,
                 dmnDecisions,
                 systems,
+                failedOdcsFiles,
               } = modelStoreModule.useModelStore.getState();
 
               if (getPlatform() === 'electron') {
@@ -550,6 +551,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                     const { sketches } = sketchStoreModule.useSketchStore.getState();
 
                     // Save workspace in V2 format (flat files)
+                    // Pass failedOdcsFiles as protected files to prevent deletion of ODCS files that failed to parse
                     await electronFileServiceModule.electronFileService.saveWorkspaceV2(
                       workspacePath,
                       workspace,
@@ -563,7 +565,8 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                       dmnDecisions,
                       articles,
                       decisions,
-                      sketches
+                      sketches,
+                      failedOdcsFiles
                     );
 
                     set({ pendingChanges: false, lastSavedAt: new Date().toISOString() });
@@ -664,7 +667,12 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                         );
 
                         // Save using File System Access API
-                        await WorkspaceV2Saver.saveWithFileSystemAPI(files, directoryHandle);
+                        // Pass failedOdcsFiles as protected files to prevent deletion of ODCS files that failed to parse
+                        await WorkspaceV2Saver.saveWithFileSystemAPI(
+                          files,
+                          directoryHandle,
+                          failedOdcsFiles
+                        );
 
                         console.log(
                           '[WorkspaceStore] Auto-saved to disk in V2 format (directory handle cached)'
@@ -795,6 +803,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                 bpmnProcesses,
                 dmnDecisions,
                 systems,
+                failedOdcsFiles: manualSaveFailedFiles,
               } = modelStoreModule.useModelStore.getState();
 
               const { articles } = knowledgeStoreModule.useKnowledgeStore.getState();
@@ -815,7 +824,8 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                 dmnDecisions,
                 articles,
                 decisions,
-                sketches
+                sketches,
+                manualSaveFailedFiles
               );
 
               set({ pendingChanges: false, lastSavedAt: new Date().toISOString() });
@@ -1033,6 +1043,18 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             if ((workspace as any).decisionRecords) {
               const { useDecisionStore } = await import('@/stores/decisionStore');
               useDecisionStore.getState().setDecisions((workspace as any).decisionRecords);
+            }
+
+            // Track ODCS files that failed to parse (to protect them from deletion on save)
+            const reloadFailedFiles = (workspace as any).failedOdcsFiles as string[] | undefined;
+            if (reloadFailedFiles && reloadFailedFiles.length > 0) {
+              modelStore.setFailedOdcsFiles(reloadFailedFiles);
+              console.warn(
+                `[WorkspaceStore] ${reloadFailedFiles.length} ODCS file(s) failed to parse on reload:`,
+                reloadFailedFiles
+              );
+            } else {
+              modelStore.setFailedOdcsFiles([]);
             }
 
             // Select first domain if available

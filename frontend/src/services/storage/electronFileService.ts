@@ -974,11 +974,14 @@ class ElectronFileService {
     allDmnDecisions: DMNDecision[],
     allKnowledgeArticles: import('@/types/knowledge').KnowledgeArticle[] = [],
     allDecisionRecords: import('@/types/decision').Decision[] = [],
-    allSketches: import('@/types/sketch').Sketch[] = []
+    allSketches: import('@/types/sketch').Sketch[] = [],
+    protectedFiles: string[] = []
   ): Promise<void> {
     if (getPlatform() !== 'electron') {
       throw new Error('Electron file service can only be used in Electron environment');
     }
+
+    const protectedFileSet = new Set(protectedFiles);
 
     // Generate v2 files
     const files = await WorkspaceV2Saver.generateFiles(
@@ -1024,8 +1027,15 @@ class ElectronFileService {
         );
 
         // If it's a workspace file but not in our expected files, mark for deletion
+        // BUT never delete files that failed to parse on load (protected)
         if (isWorkspaceFile && !expectedFiles.has(fileName)) {
-          filesToDelete.push(fileName);
+          if (protectedFileSet.has(fileName)) {
+            console.log(
+              `[ElectronFileService] Preserving "${fileName}" (ODCS parse failed on load - not deleting)`
+            );
+          } else {
+            filesToDelete.push(fileName);
+          }
         }
       }
 

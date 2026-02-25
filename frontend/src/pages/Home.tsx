@@ -465,6 +465,17 @@ const Home: React.FC = () => {
         useSketchStore.getState().setSketches((workspace as any).sketches);
       }
 
+      // Track ODCS files that failed to parse (to protect them from deletion on save)
+      const failedOdcsFiles = (workspace as any).failedOdcsFiles as string[] | undefined;
+      if (failedOdcsFiles && failedOdcsFiles.length > 0) {
+        modelStore.setFailedOdcsFiles(failedOdcsFiles);
+        addToast({
+          type: 'warning',
+          message: `${failedOdcsFiles.length} data contract file(s) failed to load and will be preserved: ${failedOdcsFiles.join(', ')}. Check the console for details.`,
+          duration: 15000,
+        });
+      }
+
       // Select first domain if available
       if ((workspace as any).domains && (workspace as any).domains.length > 0) {
         const firstDomainId = (workspace as any).domains[0].id;

@@ -716,8 +716,10 @@ will be synchronized with the workspace settings.
    */
   static async saveWithFileSystemAPI(
     files: SavedFile[],
-    directoryHandle: FileSystemDirectoryHandle
+    directoryHandle: FileSystemDirectoryHandle,
+    protectedFiles: string[] = []
   ): Promise<void> {
+    const protectedFileSet = new Set(protectedFiles);
     // Build set of expected file paths (directory/filename or just filename for root)
     const expectedFilePaths = new Set(
       files.map((f) => (f.directory ? `${f.directory}/${f.name}` : f.name))
@@ -754,8 +756,15 @@ will be synchronized with the workspace settings.
           );
 
           // If it's a workspace file but not in our expected files, mark for deletion
+          // BUT never delete files that failed to parse on load (protected)
           if (isWorkspaceFile && !expectedFilePaths.has(name)) {
-            filesToDelete.push(name);
+            if (protectedFileSet.has(name)) {
+              console.log(
+                `[WorkspaceV2Saver] Preserving "${name}" (ODCS parse failed on load - not deleting)`
+              );
+            } else {
+              filesToDelete.push(name);
+            }
           }
         }
       }
@@ -792,7 +801,13 @@ will be synchronized with the workspace settings.
           if (handle.kind === 'file') {
             const fullPath = `${dir}/${name}`;
             if (!expectedFilePaths.has(fullPath)) {
-              filesToDelete.push(name);
+              if (protectedFileSet.has(name)) {
+                console.log(
+                  `[WorkspaceV2Saver] Preserving "${dir}/${name}" (ODCS parse failed on load - not deleting)`
+                );
+              } else {
+                filesToDelete.push(name);
+              }
             }
           }
         }

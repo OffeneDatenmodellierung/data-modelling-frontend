@@ -585,6 +585,16 @@ const ModelEditor: React.FC = () => {
             setSelectedDomain(domainToSelect);
           }
 
+          // Track ODCS files that failed to parse
+          if (loadedWorkspace.failedOdcsFiles && loadedWorkspace.failedOdcsFiles.length > 0) {
+            useModelStore.getState().setFailedOdcsFiles(loadedWorkspace.failedOdcsFiles);
+            addToast({
+              type: 'warning',
+              message: `${loadedWorkspace.failedOdcsFiles.length} data contract file(s) failed to load: ${loadedWorkspace.failedOdcsFiles.join(', ')}. Check the console for details.`,
+              duration: 15000,
+            });
+          }
+
           // Verify the state was set correctly
           const finalState = useModelStore.getState();
           console.log('[ModelEditor] Final state after loading GitHub workspace:', {
