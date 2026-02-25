@@ -1039,6 +1039,7 @@ export const TableEditor: React.FC<TableEditorProps> = ({ tableId, workspaceId, 
             isOpen={!!selectedColumnId}
             onClose={() => setSelectedColumnId(null)}
             onSave={async () => {}}
+            readOnly
           />
         )}
       </div>
