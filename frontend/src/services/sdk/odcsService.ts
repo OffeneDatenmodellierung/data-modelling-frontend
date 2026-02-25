@@ -251,9 +251,20 @@ class ODCSService {
       };
     } catch (error) {
       console.error('[ODCSService] V2 parsing failed:', error);
-      throw new Error(
-        `Failed to parse ODCS YAML with V2 methods: ${error instanceof Error ? error.message : 'Unknown error'}`
-      );
+      // SDK WASM errors are often JSON objects/strings, not Error instances.
+      // Preserve the original message so callers can detect specific error types (e.g. "duplicate entry").
+      let errorMessage: string;
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (typeof error === 'string') {
+        errorMessage = error;
+      } else if (error && typeof error === 'object') {
+        // SDK returns JSON objects like { error_type, message, code }
+        errorMessage = (error as any).message || JSON.stringify(error);
+      } else {
+        errorMessage = String(error);
+      }
+      throw new Error(`Failed to parse ODCS YAML with V2 methods: ${errorMessage}`);
     }
   }
 
