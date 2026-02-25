@@ -172,6 +172,9 @@ async function getInstallationToken(env: Env): Promise<string> {
   // Generate JWT signed with the App's private key
   const jwt = await generateJWT(env.GITHUB_APP_ID, env.GITHUB_APP_PRIVATE_KEY);
 
+  // Use VIEWER_REPO with VITE_ prefix fallback (consistent with request handler)
+  const viewerRepo = env.VIEWER_REPO || env.VITE_VIEWER_REPO;
+
   // Exchange JWT for an installation access token
   const response = await fetch(
     `https://api.github.com/app/installations/${env.GITHUB_INSTALLATION_ID}/access_tokens`,
@@ -185,7 +188,7 @@ async function getInstallationToken(env: Env): Promise<string> {
       },
       body: JSON.stringify({
         // Scope token to the minimum required permissions on a single repo
-        repositories: [env.VIEWER_REPO],
+        repositories: [viewerRepo],
         permissions: { contents: 'read', metadata: 'read' },
       }),
     }
