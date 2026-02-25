@@ -75,7 +75,7 @@ class ODCSService {
           '[ODCSService] SDK parse failed due to duplicate keys - auto-fixing by deduplicating YAML'
         );
         try {
-          const parsed = yaml.load(yamlContent);
+          const parsed = yaml.load(yamlContent, { json: true });
           const deduplicated = yaml.dump(parsed, { lineWidth: -1, noRefs: true });
           const result = await this.parseYAMLv2(deduplicated);
           console.log('[ODCSService] Successfully parsed after deduplication');
