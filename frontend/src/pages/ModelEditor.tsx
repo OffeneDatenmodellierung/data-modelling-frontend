@@ -3,7 +3,7 @@
  * Main page for editing data models with infinite canvas
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { DomainCanvas } from '@/components/canvas/DomainCanvas';
 import { DomainSelector } from '@/components/domain/DomainSelector';
@@ -50,6 +50,7 @@ import { HelpButton, HelpPanel } from '@/components/help';
 import { ValidationWarnings } from '@/components/common/ValidationWarnings';
 import { useHelpPanel } from '@/hooks/useHelpPanel';
 import { isViewerMode } from '@/services/viewerMode';
+import { ViewerBranchSwitcher } from '@/components/viewer/ViewerBranchSwitcher';
 import { useKnowledgeStore } from '@/stores/knowledgeStore';
 import { useDecisionStore } from '@/stores/decisionStore';
 import { useSketchStore } from '@/stores/sketchStore';
@@ -60,6 +61,19 @@ const ModelEditor: React.FC = () => {
   // GitHub repo routes (/workspace/github/*) where the path contains encoded slashes
   const workspaceId = params['*'] ? `github/${params['*']}` : params.workspaceId;
   const domainId = params.domainId;
+
+  // Parse viewer URL parts for the branch switcher
+  const viewerUrlParts = useMemo(() => {
+    if (!isViewerMode() || !workspaceId?.startsWith('github/')) return null;
+    const parts = workspaceId.substring(7).split('/');
+    if (parts.length < 3) return null;
+    return {
+      owner: parts[0]!,
+      repo: parts[1]!,
+      branch: parts[2]!,
+      workspacePath: parts.slice(3).join('/') || '_root_',
+    };
+  }, [workspaceId]);
   const { fetchWorkspace, workspaces, setCurrentWorkspace } = useWorkspaceStore();
   const {
     selectedDomainId,
@@ -1021,6 +1035,16 @@ const ModelEditor: React.FC = () => {
             className="h-8 w-auto flex-shrink-0"
             style={{ maxHeight: '32px' }}
           />
+
+          {/* Viewer Branch Switcher */}
+          {viewerUrlParts && (
+            <ViewerBranchSwitcher
+              owner={viewerUrlParts.owner}
+              repo={viewerUrlParts.repo}
+              currentBranch={viewerUrlParts.branch}
+              workspacePath={viewerUrlParts.workspacePath}
+            />
+          )}
 
           {/* Collaboration Status - inline when online */}
           {!isViewerMode() && mode === 'online' && workspaceId && (
