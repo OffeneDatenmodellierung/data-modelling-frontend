@@ -11,6 +11,13 @@ export VITE_OFFLINE_MODE="true"
 export VITE_BASE_PATH="/"
 export CLOUDFLARE_PAGES="true"
 
+# Debug: show which VITE_VIEWER vars are available
+echo "Environment check:"
+echo "  VITE_VIEWER_MODE=${VITE_VIEWER_MODE:-(not set)}"
+echo "  VITE_VIEWER_OWNER=${VITE_VIEWER_OWNER:-(not set)}"
+echo "  VITE_VIEWER_REPO=${VITE_VIEWER_REPO:-(not set)}"
+echo "  VITE_VIEWER_BRANCH=${VITE_VIEWER_BRANCH:-(not set)}"
+
 # Viewer-specific vars (VITE_VIEWER_* set in Cloudflare Pages dashboard)
 : "${VITE_VIEWER_MODE:?VITE_VIEWER_MODE must be set}"
 : "${VITE_VIEWER_OWNER:?VITE_VIEWER_OWNER must be set}"
