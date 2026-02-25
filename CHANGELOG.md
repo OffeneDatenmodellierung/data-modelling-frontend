@@ -5,6 +5,45 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.2.0] - 2026-02-25
+
+### Added
+- **Source Topic Label on Canvas**: Tables with a `source_topic` custom property now display it as a subtitle below the table name on the canvas, visible in all views (Systems, Operational, Analytical)
+- **Source Topic Label on System View**: Table cards in the Systems View now show the source topic in brackets after the table name
+- **Source Topic Field in Table Metadata**: New editable "Source Topic" field in the Table Metadata modal, allowing users to group tables from the same schema or topic
+- **Auto-populate Source Topic on Import**: When importing from a file, URL, or pasted JSON Schema, the source name is automatically set as the `source_topic` on imported tables
+- **Custom Properties Helper Utility**: New shared `customProperties.ts` utility with `getSourceTopic()` and `setSourceTopic()` helpers
+- **Failed ODCS Load Alerting**: Toast warnings and ValidationWarnings panel entries when ODCS files fail to parse, so users are aware of issues without silent data loss
+
+### Fixed
+- **Critical: Data Loss from ODCS Parse Failures**: Fixed a bug where tables would be permanently deleted if their ODCS file failed to parse on load. The saver's stale file cleanup would delete the unparsed file, and workspace.yaml would be overwritten with empty `table_ids`. Now: failed files are tracked, protected from deletion, and `table_ids` are preserved in workspace.yaml across save/load cycles
+- **ODCS Duplicate Key Self-Corruption**: Fixed the serializer (`odcsService.toYAMLv2`) writing duplicate YAML keys (e.g. `description`) when a field existed both as a top-level property and in `customProperties`. The customProperties filter now excludes all standard ODCS fields at both table and column level
+- **ODCS Duplicate Key Auto-Repair**: When the SDK rejects a YAML file due to duplicate keys, the parser now automatically deduplicates by round-tripping through js-yaml (which silently resolves duplicates) and retries. Already-corrupted files self-heal on next load
+- **Data Contract Name Bug**: Fixed ODCS data contract root-level `name` being set to the first table name instead of the system/file name. Now correctly passes `contractMetadata.name` from all export call sites (WorkspaceV2Saver, SystemExportDialog, TableEditor, DomainCanvas, LocalFileService, ElectronFileService)
+- **ODCL Import CustomProperties Lost**: Fixed `normalizeTable()` in odcsService not returning `customProperties`, causing them to be silently dropped during ODCL imports
+
+### New Files
+- `frontend/src/utils/customProperties.ts` — Shared helpers for reserved customProperties keys (source_topic)
+- `frontend/tests/unit/utils/customProperties.test.ts` — Unit tests for customProperties helpers
+
+## [3.1.1] - 2026-02-25
+
+### Fixed
+- **GitHub Session State Corruption**: Fixed React error #185 (Maximum update depth exceeded) that occurred on browser refresh/restart when using GitHub as the backend
+  - Root cause: persisted Zustand stores rehydrated with stale data while non-persisted stores started empty, causing infinite re-renders in DomainCanvas
+  - Clear all content stores on initial mount for GitHub workspaces, not just on workspace switch
+  - Remove stale workspace data from workspaceStore before loading fresh GitHub data
+  - Clear stores before branch-switch reload to prevent stale state carry-over
+  - Replace async dynamic imports with synchronous `getState().reset()` calls for knowledge/decision stores
+
+### Added
+- **Reset Application State Utility**: New `resetApplicationState()` shared utility that clears all workspace data, filters, and cached content while preserving GitHub connection settings and authentication
+- **ErrorBoundary Reset Button**: Added "Reset & Retry" button to the error boundary fallback UI, allowing users to recover from errors without losing GitHub connection settings
+- **Workspace Settings Troubleshooting**: Added "Troubleshooting" section in Workspace Settings with a "Reset Application State" button and confirmation dialog
+
+### New Files
+- `frontend/src/utils/resetApplicationState.ts` — Shared utility for resetting application state while preserving connection settings
+
 ## [3.1.0] - 2026-02-24
 
 ### Added

@@ -55,6 +55,9 @@ interface ModelState {
   openTableEditorIds: string[]; // Array of table IDs with open editors
   focusedTableEditorId: string | null; // Which editor is currently focused (in front)
 
+  // ODCS files that failed to parse on load (preserved to prevent data loss)
+  failedOdcsFiles: string[];
+
   // Tag filter backup (stored when filtering is active)
   originalTables?: Table[];
   originalComputeAssets?: ComputeAsset[];
@@ -62,6 +65,7 @@ interface ModelState {
   originalSystems?: System[];
 
   // Actions
+  setFailedOdcsFiles: (files: string[]) => void;
   setTables: (tables: Table[]) => void;
   setRelationships: (relationships: Relationship[]) => void;
   setDomains: (domains: Domain[]) => void;
@@ -249,10 +253,14 @@ export const useModelStore = create<ModelState>((set, get) => ({
   isLoading: false,
   error: null,
 
+  // ODCS files that failed to parse on load
+  failedOdcsFiles: [],
+
   // Multi-editor state
   openTableEditorIds: [],
   focusedTableEditorId: null,
 
+  setFailedOdcsFiles: (files) => set({ failedOdcsFiles: files }),
   setTables: (tables) => set({ tables }),
   setRelationships: (relationships) => set({ relationships }),
   setDomains: (domains) => set({ domains }),

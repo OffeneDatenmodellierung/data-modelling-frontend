@@ -1039,7 +1039,10 @@ class LocalFileService {
       }
     }
 
-    const yamlContent = await odcsService.toYAML({ tables: [table] } as any);
+    const yamlContent = await odcsService.toYAML({
+      tables: [table],
+      contractMetadata: { name: table.name },
+    } as any);
     const filename = `${systemName}${table.name}.odcs.yaml`;
     browserFileService.downloadFile(yamlContent, filename, 'text/yaml');
   }
@@ -1120,7 +1123,8 @@ class LocalFileService {
     allDmnDecisions: DMNDecision[],
     allKnowledgeArticles: import('@/types/knowledge').KnowledgeArticle[] = [],
     allDecisionRecords: import('@/types/decision').Decision[] = [],
-    allSketches: import('@/types/sketch').Sketch[] = []
+    allSketches: import('@/types/sketch').Sketch[] = [],
+    protectedFiles: string[] = []
   ): Promise<void> {
     console.log('[LocalFileService] Saving workspace in V2 format:', workspace.name);
 
@@ -1146,7 +1150,7 @@ class LocalFileService {
     if ('showDirectoryPicker' in window) {
       try {
         const directoryHandle = await (window as any).showDirectoryPicker();
-        await WorkspaceV2Saver.saveWithFileSystemAPI(files, directoryHandle);
+        await WorkspaceV2Saver.saveWithFileSystemAPI(files, directoryHandle, protectedFiles);
         console.log('[LocalFileService] Saved workspace using File System Access API');
         return;
       } catch (error) {

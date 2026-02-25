@@ -10,6 +10,7 @@ import { useUIStore } from '@/stores/uiStore';
 import type { Workspace } from '@/types/workspace';
 import { AutoSaveSettings } from '@/components/settings/AutoSaveSettings';
 import { sdkLoader } from '@/services/sdk/sdkLoader';
+import { resetApplicationState } from '@/utils/resetApplicationState';
 
 // App version from build-time constant
 declare const __APP_VERSION__: string;
@@ -38,6 +39,8 @@ export const WorkspaceSettings: React.FC<WorkspaceSettingsProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [newCollaboratorEmail, setNewCollaboratorEmail] = useState('');
   const [newCollaboratorAccess, setNewCollaboratorAccess] = useState<'read' | 'edit'>('edit');
+  const [isResetting, setIsResetting] = useState(false);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
 
   useEffect(() => {
     const ws = workspaces.find((w) => w.id === workspaceId);
@@ -174,6 +177,22 @@ export const WorkspaceSettings: React.FC<WorkspaceSettingsProps> = ({
     }
   };
 
+  const handleResetState = async () => {
+    setIsResetting(true);
+    try {
+      await resetApplicationState();
+      window.location.href = '/';
+    } catch (error) {
+      console.error('[WorkspaceSettings] Reset failed:', error);
+      addToast({
+        type: 'error',
+        message: 'Failed to reset application state',
+      });
+      setIsResetting(false);
+      setShowResetConfirm(false);
+    }
+  };
+
   if (!workspace) {
     return <div className={className}>Workspace not found</div>;
   }
@@ -263,6 +282,47 @@ export const WorkspaceSettings: React.FC<WorkspaceSettingsProps> = ({
               </span>
             </div>
           </div>
+        </div>
+
+        {/* Troubleshooting - Reset Application State */}
+        <div className="mb-6 border-t pt-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">Troubleshooting</h3>
+          <p className="text-sm text-gray-600 mb-4">
+            If you are experiencing issues such as stale data, rendering errors, or corrupted state,
+            you can reset the application state. This will clear all workspace data, filters, and
+            cached content while preserving your GitHub connection and authentication.
+          </p>
+          {!showResetConfirm ? (
+            <button
+              onClick={() => setShowResetConfirm(true)}
+              className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 focus:outline-none focus:ring-2 focus:ring-amber-500"
+            >
+              Reset Application State
+            </button>
+          ) : (
+            <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
+              <p className="text-sm font-medium text-amber-800 mb-3">
+                Are you sure? This will clear all workspace data and navigate to the home page. Your
+                GitHub authentication and connection settings will be preserved.
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleResetState}
+                  disabled={isResetting}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
+                >
+                  {isResetting ? 'Resetting...' : 'Confirm Reset'}
+                </button>
+                <button
+                  onClick={() => setShowResetConfirm(false)}
+                  disabled={isResetting}
+                  className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Collaborators Section (disabled - offline mode only) */}

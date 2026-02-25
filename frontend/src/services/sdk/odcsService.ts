@@ -63,8 +63,30 @@ class ODCSService {
     console.log('[ODCSService] SDK module loaded for ODCS parsing');
     console.log('[ODCSService] Using SDK 2.0.6+ V2 methods for ODCS parsing');
 
-    // SDK 2.0.6+: Use V2 methods for native ODCSContract with lossless round-trip
-    return await this.parseYAMLv2(yamlContent);
+    try {
+      // SDK 2.0.6+: Use V2 methods for native ODCSContract with lossless round-trip
+      return await this.parseYAMLv2(yamlContent);
+    } catch (error) {
+      // If SDK fails due to duplicate keys, auto-fix by round-tripping through js-yaml
+      // js-yaml silently deduplicates (last value wins), producing valid YAML for the SDK
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      if (errorMsg.includes('duplicate entry') || errorMsg.includes('duplicate key')) {
+        console.warn(
+          '[ODCSService] SDK parse failed due to duplicate keys - auto-fixing by deduplicating YAML'
+        );
+        try {
+          const parsed = yaml.load(yamlContent, { json: true });
+          const deduplicated = yaml.dump(parsed, { lineWidth: -1, noRefs: true });
+          const result = await this.parseYAMLv2(deduplicated);
+          console.log('[ODCSService] Successfully parsed after deduplication');
+          return result;
+        } catch (retryError) {
+          console.error('[ODCSService] Failed to parse even after deduplication:', retryError);
+          throw error; // Throw the original error
+        }
+      }
+      throw error;
+    }
   }
 
   /**
@@ -229,9 +251,20 @@ class ODCSService {
       };
     } catch (error) {
       console.error('[ODCSService] V2 parsing failed:', error);
-      throw new Error(
-        `Failed to parse ODCS YAML with V2 methods: ${error instanceof Error ? error.message : 'Unknown error'}`
-      );
+      // SDK WASM errors are often JSON objects/strings, not Error instances.
+      // Preserve the original message so callers can detect specific error types (e.g. "duplicate entry").
+      let errorMessage: string;
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (typeof error === 'string') {
+        errorMessage = error;
+      } else if (error && typeof error === 'object') {
+        // SDK returns JSON objects like { error_type, message, code }
+        errorMessage = (error as any).message || JSON.stringify(error);
+      } else {
+        errorMessage = String(error);
+      }
+      throw new Error(`Failed to parse ODCS YAML with V2 methods: ${errorMessage}`);
     }
   }
 
@@ -1083,7 +1116,26 @@ class ODCSService {
           authoritativeDefinitions: table.authoritativeDefinitions,
         }),
         ...(table.tags && table.tags.length > 0 && { tags: table.tags }),
-        ...(table.customProperties && { customProperties: table.customProperties }),
+        // Filter customProperties to exclude fields already serialized as top-level schema properties
+        // This prevents duplicate keys in the YAML output
+        ...(() => {
+          if (!table.customProperties || !Array.isArray(table.customProperties)) return {};
+          const excludedTableProps = new Set([
+            'name',
+            'physicalName',
+            'physicalType',
+            'businessName',
+            'description',
+            'dataGranularityDescription',
+            'authoritativeDefinitions',
+            'tags',
+            'id',
+          ]);
+          const filtered = table.customProperties.filter(
+            (p: any) => !excludedTableProps.has(p.property)
+          );
+          return filtered.length > 0 ? { customProperties: filtered } : {};
+        })(),
       };
 
       // Build properties array from columns, handling nested structures
@@ -1139,12 +1191,39 @@ class ODCSService {
           // Build customProperties array including order and is_foreign_key
           ...(() => {
             const customProps: Array<{ property: string; value: unknown }> = [];
-            // Add existing customProperties, excluding order and is_foreign_key (we'll add those fresh)
+            // Add existing customProperties, excluding fields that are already serialized as top-level ODCS properties
+            // This prevents duplicate keys in the YAML output (e.g., 'description' appearing twice)
+            const excludedProperties = new Set([
+              'order',
+              'is_foreign_key',
+              'name',
+              'physicalName',
+              'logicalType',
+              'physicalType',
+              'businessName',
+              'description',
+              'required',
+              'primaryKey',
+              'primaryKeyPosition',
+              'unique',
+              'partitioned',
+              'partitionKeyPosition',
+              'clustered',
+              'classification',
+              'criticalDataElement',
+              'encryptedName',
+              'transformSourceObjects',
+              'transformLogic',
+              'transformDescription',
+              'examples',
+              'logicalTypeOptions',
+              'authoritativeDefinitions',
+              'tags',
+              'quality',
+            ]);
             if (col.customProperties && Array.isArray(col.customProperties)) {
               customProps.push(
-                ...col.customProperties.filter(
-                  (p: any) => p.property !== 'order' && p.property !== 'is_foreign_key'
-                )
+                ...col.customProperties.filter((p: any) => !excludedProperties.has(p.property))
               );
             }
             // Always add current order value (from col.order, which reflects UI changes)
@@ -2431,6 +2510,7 @@ class ODCSService {
       is_owned_by_domain: true, // Default to true for imported tables
       // Load compound keys (composite primary/unique keys) from YAML
       compoundKeys: this.normalizeCompoundKeys(item, tableId, now, normalizedColumns),
+      customProperties: item.customProperties || item.custom_properties,
       created_at: item.created_at || now,
       last_modified_at: item.last_modified_at || now,
     };

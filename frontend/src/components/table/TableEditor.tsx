@@ -559,7 +559,7 @@ export const TableEditor: React.FC<TableEditorProps> = ({ tableId, workspaceId, 
 
     try {
       // Create a workspace object with just this table
-      const workspace = { tables: [table] } as any;
+      const workspace = { tables: [table], contractMetadata: { name: table.name } } as any;
 
       // Get system name prefix if table belongs to a system
       let systemPrefix = '';

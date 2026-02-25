@@ -50,6 +50,9 @@ import { HelpButton, HelpPanel } from '@/components/help';
 import { ValidationWarnings } from '@/components/common/ValidationWarnings';
 import { useHelpPanel } from '@/hooks/useHelpPanel';
 import { isViewerMode } from '@/services/viewerMode';
+import { useKnowledgeStore } from '@/stores/knowledgeStore';
+import { useDecisionStore } from '@/stores/decisionStore';
+import { useSketchStore } from '@/stores/sketchStore';
 
 const ModelEditor: React.FC = () => {
   const params = useParams<{ workspaceId: string; domainId?: string; '*': string }>();
@@ -255,14 +258,25 @@ const ModelEditor: React.FC = () => {
     };
   }, [domains, selectedDomainId]);
 
-  // Clear model store when workspace changes (not on initial mount or same workspace reload)
-  // This prevents stale data from appearing when switching to a different workspace
+  // Clear model store when workspace changes or on initial mount for GitHub workspaces
+  // This prevents stale persisted data from causing state corruption on session reload
   const previousWorkspaceIdRef = React.useRef<string | undefined>(undefined);
   useEffect(() => {
-    // Only clear if switching TO a different workspace (not on initial mount)
-    if (previousWorkspaceIdRef.current && previousWorkspaceIdRef.current !== workspaceId) {
+    const isInitialMount = previousWorkspaceIdRef.current === undefined;
+    const isWorkspaceSwitch =
+      previousWorkspaceIdRef.current !== undefined &&
+      previousWorkspaceIdRef.current !== workspaceId;
+    const isGitHubWorkspace = workspaceId?.startsWith('github/');
+
+    // Clear stores when:
+    // 1. Switching between different workspaces (existing behavior)
+    // 2. Initial mount of a GitHub workspace (prevents stale persisted state from previous session)
+    if (isWorkspaceSwitch || (isInitialMount && isGitHubWorkspace)) {
       const modelStore = useModelStore.getState();
-      console.log('[ModelEditor] Workspace changed - clearing stores for new workspace');
+      console.log('[ModelEditor] Clearing stores for workspace load', {
+        reason: isWorkspaceSwitch ? 'workspace-switch' : 'github-initial-mount',
+        workspaceId,
+      });
       modelStore.setTables([]);
       modelStore.setRelationships([]);
       modelStore.setSystems([]);
@@ -275,15 +289,10 @@ const ModelEditor: React.FC = () => {
       modelStore.setSelectedTable(null);
       modelStore.setSelectedSystem(null);
 
-      // Also clear knowledge and decision stores (including filters)
-      // These are synchronous to avoid race conditions
-      import('@/stores/knowledgeStore').then(({ useKnowledgeStore }) => {
-        useKnowledgeStore.getState().setArticles([]);
-        useKnowledgeStore.getState().setFilter({});
-      });
-      import('@/stores/decisionStore').then(({ useDecisionStore }) => {
-        useDecisionStore.getState().setDecisions([]);
-      });
+      // Reset persisted content stores synchronously (already imported at top of file)
+      useKnowledgeStore.getState().reset();
+      useDecisionStore.getState().reset();
+      useSketchStore.getState().reset();
     }
     previousWorkspaceIdRef.current = workspaceId;
   }, [workspaceId]);
@@ -428,6 +437,19 @@ const ModelEditor: React.FC = () => {
 
         // Handle GitHub repo mode - load workspace content from GitHub
         if (workspaceId.startsWith('github/')) {
+          // Remove stale workspace entry from workspaceStore before loading fresh data
+          // This prevents persisted domain objects from conflicting with fresh GitHub data
+          const staleWorkspace = useWorkspaceStore
+            .getState()
+            .workspaces.find((w) => w.id === workspaceId);
+          if (staleWorkspace) {
+            console.log(
+              '[ModelEditor] Removing stale workspace entry before GitHub reload:',
+              workspaceId
+            );
+            useWorkspaceStore.getState().removeWorkspace(workspaceId);
+          }
+
           const githubRepoState = useGitHubRepoStore.getState();
           const { workspace: githubWorkspace } = githubRepoState;
 
@@ -513,7 +535,6 @@ const ModelEditor: React.FC = () => {
 
           // Set knowledge articles and decision records to their respective stores
           if (loadedWorkspace.knowledgeArticles && loadedWorkspace.knowledgeArticles.length > 0) {
-            const { useKnowledgeStore } = await import('@/stores/knowledgeStore');
             useKnowledgeStore.getState().setArticles(loadedWorkspace.knowledgeArticles);
             console.log(
               '[ModelEditor] Set knowledge articles:',
@@ -521,7 +542,6 @@ const ModelEditor: React.FC = () => {
             );
           }
           if (loadedWorkspace.decisionRecords && loadedWorkspace.decisionRecords.length > 0) {
-            const { useDecisionStore } = await import('@/stores/decisionStore');
             useDecisionStore.getState().setDecisions(loadedWorkspace.decisionRecords);
             console.log(
               '[ModelEditor] Set decision records:',
@@ -563,6 +583,16 @@ const ModelEditor: React.FC = () => {
           if (domainToSelect) {
             console.log('[ModelEditor] Setting selected domain:', domainToSelect);
             setSelectedDomain(domainToSelect);
+          }
+
+          // Track ODCS files that failed to parse
+          if (loadedWorkspace.failedOdcsFiles && loadedWorkspace.failedOdcsFiles.length > 0) {
+            useModelStore.getState().setFailedOdcsFiles(loadedWorkspace.failedOdcsFiles);
+            addToast({
+              type: 'warning',
+              message: `${loadedWorkspace.failedOdcsFiles.length} data contract file(s) failed to load: ${loadedWorkspace.failedOdcsFiles.join(', ')}. Check the console for details.`,
+              duration: 15000,
+            });
           }
 
           // Verify the state was set correctly
@@ -848,6 +878,17 @@ const ModelEditor: React.FC = () => {
       });
 
       setIsLoading(true);
+
+      // Clear existing data before loading new branch content
+      const modelStore = useModelStore.getState();
+      modelStore.setTables([]);
+      modelStore.setRelationships([]);
+      modelStore.setSystems([]);
+      modelStore.setProducts([]);
+      modelStore.setComputeAssets([]);
+      useKnowledgeStore.getState().reset();
+      useDecisionStore.getState().reset();
+      useSketchStore.getState().reset();
 
       try {
         // Import the V2 loader for loading workspace from GitHub files
