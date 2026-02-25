@@ -56,12 +56,14 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       'VIEWER_OWNER', 'VIEWER_REPO', 'VITE_VIEWER_OWNER', 'VITE_VIEWER_REPO',
       'VITE_VIEWER_MODE', 'VITE_VIEWER_BRANCH',
     ];
-    const status: Record<string, string> = {};
+    const envStatus: Record<string, string> = {};
     for (const key of envKeys) {
       const val = (context.env as Record<string, string | undefined>)[key];
-      status[key] = val ? `set (${val.length} chars)` : 'NOT SET';
+      envStatus[key] = val ? `set (${val.length} chars)` : 'NOT SET';
     }
-    return new Response(JSON.stringify({ envStatus: status }, null, 2), {
+    // List all keys actually present on context.env
+    const allEnvKeys = Object.keys(context.env).sort();
+    return new Response(JSON.stringify({ envStatus, allEnvKeys }, null, 2), {
       headers: { 'Content-Type': 'application/json', ...corsHeaders() },
     });
   }
