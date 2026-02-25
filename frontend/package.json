@@ -34,8 +34,8 @@
     "pre-commit": "lint-staged"
   },
   "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "author": "OffeneDatenmodellierung",
+  "license": "MIT",
   "type": "module",
   "dependencies": {
     "@excalidraw/excalidraw": "^0.18.0",
