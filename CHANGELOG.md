@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.1.1] - 2026-02-25
+
+### Fixed
+- **GitHub Session State Corruption**: Fixed React error #185 (Maximum update depth exceeded) that occurred on browser refresh/restart when using GitHub as the backend
+  - Root cause: persisted Zustand stores rehydrated with stale data while non-persisted stores started empty, causing infinite re-renders in DomainCanvas
+  - Clear all content stores on initial mount for GitHub workspaces, not just on workspace switch
+  - Remove stale workspace data from workspaceStore before loading fresh GitHub data
+  - Clear stores before branch-switch reload to prevent stale state carry-over
+  - Replace async dynamic imports with synchronous `getState().reset()` calls for knowledge/decision stores
+
+### Added
+- **Reset Application State Utility**: New `resetApplicationState()` shared utility that clears all workspace data, filters, and cached content while preserving GitHub connection settings and authentication
+- **ErrorBoundary Reset Button**: Added "Reset & Retry" button to the error boundary fallback UI, allowing users to recover from errors without losing GitHub connection settings
+- **Workspace Settings Troubleshooting**: Added "Troubleshooting" section in Workspace Settings with a "Reset Application State" button and confirmation dialog
+
+### New Files
+- `frontend/src/utils/resetApplicationState.ts` — Shared utility for resetting application state while preserving connection settings
+
 ## [3.1.0] - 2026-02-24
 
 ### Added
