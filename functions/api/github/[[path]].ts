@@ -71,6 +71,20 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   }
 
   try {
+    // Validate GitHub App credentials are configured
+    if (!context.env.GITHUB_APP_ID || !context.env.GITHUB_APP_PRIVATE_KEY || !context.env.GITHUB_INSTALLATION_ID) {
+      const missing = [
+        !context.env.GITHUB_APP_ID && 'GITHUB_APP_ID',
+        !context.env.GITHUB_APP_PRIVATE_KEY && 'GITHUB_APP_PRIVATE_KEY',
+        !context.env.GITHUB_INSTALLATION_ID && 'GITHUB_INSTALLATION_ID',
+      ].filter(Boolean);
+      console.error('[GitHub Proxy] Missing credentials:', missing.join(', '));
+      return new Response(
+        JSON.stringify({ error: 'Server misconfiguration', message: `Missing GitHub App credentials: ${missing.join(', ')}` }),
+        { status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders() } }
+      );
+    }
+
     // Get or refresh the GitHub App installation token
     const token = await getInstallationToken(context.env);
 
