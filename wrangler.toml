@@ -1,7 +1,0 @@
-name = "data-modelling-frontend"
-compatibility_date = "2024-12-01"
-pages_build_output_dir = "frontend/dist"
-
-# Preserve environment variables configured in the Cloudflare Pages dashboard.
-# Without this, wrangler.toml overrides dashboard vars (including VITE_VIEWER_*).
-keep_vars = true
