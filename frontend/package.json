@@ -38,7 +38,10 @@
     "pre-commit": "lint-staged"
   },
   "keywords": [],
-  "author": "OffeneDatenmodellierung",
+  "author": {
+    "name": "OffeneDatenmodellierung",
+    "email": "info@opendatamodelling.com"
+  },
   "license": "MIT",
   "type": "module",
   "dependencies": {
