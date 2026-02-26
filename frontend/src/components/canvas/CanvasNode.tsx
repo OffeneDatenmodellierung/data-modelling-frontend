@@ -54,6 +54,9 @@ export const CanvasNode: React.FC<NodeProps<TableNodeData>> = memo(({ data, sele
   const visibleColumns = useMemo(() => {
     if (!showColumns) return [];
 
+    // Filter to root-level columns only (exclude nested children of array/object types)
+    const rootColumns = table.columns.filter((col) => !col.parent_column_id);
+
     let cols: typeof table.columns = [];
     if (modelType === 'logical') {
       // Logical view: show only keys (primary keys, foreign keys, and unique indexes)
@@ -61,14 +64,14 @@ export const CanvasNode: React.FC<NodeProps<TableNodeData>> = memo(({ data, sele
       const compoundKeyColumnIds = new Set(
         (table.compoundKeys || []).flatMap((ck) => ck.column_ids)
       );
-      cols = table.columns.filter(
+      cols = rootColumns.filter(
         (col) =>
           (col.is_primary_key || col.is_foreign_key || col.is_unique) &&
           !compoundKeyColumnIds.has(col.id)
       );
     } else if (modelType === 'physical') {
-      // Physical view: show all columns
-      cols = table.columns;
+      // Physical view: show all root-level columns
+      cols = rootColumns;
     }
 
     // Sort by order
@@ -209,7 +212,8 @@ export const CanvasNode: React.FC<NodeProps<TableNodeData>> = memo(({ data, sele
     }
   }, [qualityTier, isCrossDomain]);
 
-  const ariaLabel = getTableAriaLabel(table.name, table.columns.length);
+  const rootColumnCount = table.columns.filter((col) => !col.parent_column_id).length;
+  const ariaLabel = getTableAriaLabel(table.name, rootColumnCount);
 
   return (
     <div
