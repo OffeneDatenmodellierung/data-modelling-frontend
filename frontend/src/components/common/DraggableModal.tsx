@@ -53,7 +53,9 @@ export const DraggableModal: React.FC<DraggableModalProps> = ({
   } | null>(null);
   const hasFocusedRef = useRef(false);
   const onCloseRef = useRef(onClose);
-  onCloseRef.current = onClose;
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
   const titleId = generateAriaId('modal-title');
   const descriptionId = generateAriaId('modal-description');
 
