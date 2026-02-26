@@ -901,7 +901,7 @@ export const TableEditor: React.FC<TableEditorProps> = ({ tableId, workspaceId, 
         {/* Columns */}
         <div>
           <h3 className="text-md font-semibold text-gray-900 mb-3">
-            Columns ({table.columns.length})
+            Columns ({table.columns.filter((col) => !col.parent_column_id).length})
           </h3>
           <div className="border border-gray-300 rounded-md overflow-x-auto">
             <table className="w-full divide-y divide-gray-200 table-fixed">
@@ -926,70 +926,92 @@ export const TableEditor: React.FC<TableEditorProps> = ({ tableId, workspaceId, 
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {table.columns.map((column) => (
-                  <tr
-                    key={column.id}
-                    className="hover:bg-gray-50 cursor-pointer"
-                    onClick={() => setSelectedColumnId(column.id)}
-                  >
-                    <td className="px-2 py-2 text-sm">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedColumnId(column.id);
-                        }}
-                        className="p-1 text-gray-400 hover:text-blue-600 rounded hover:bg-blue-50"
-                        title={`View ${column.name} details`}
+                {(() => {
+                  const renderReadOnlyRows = (
+                    parentId: string | undefined,
+                    depth: number
+                  ): React.ReactNode[] => {
+                    const cols = table.columns
+                      .filter((col) =>
+                        parentId === undefined
+                          ? !col.parent_column_id
+                          : col.parent_column_id === parentId
+                      )
+                      .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+
+                    return cols.flatMap((column) => [
+                      <tr
+                        key={column.id}
+                        className={`hover:bg-gray-50 cursor-pointer ${depth > 0 ? 'bg-gray-50/50' : ''}`}
+                        onClick={() => setSelectedColumnId(column.id)}
                       >
-                        <svg
-                          className="w-4 h-4"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                          />
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-                          />
-                        </svg>
-                      </button>
-                    </td>
-                    <td className="px-3 py-2 text-sm font-medium text-gray-900 truncate">
-                      {column.name}
-                    </td>
-                    <td className="px-3 py-2 text-sm text-gray-700 truncate">{column.data_type}</td>
-                    <td className="px-3 py-2 text-sm text-gray-700 text-center">
-                      {column.nullable ? (
-                        <span className="text-green-600">✓</span>
-                      ) : (
-                        <span className="text-red-600">✗</span>
-                      )}
-                    </td>
-                    <td className="px-3 py-2 text-sm">
-                      {column.is_primary_key && (
-                        <span className="inline-block px-2 py-0.5 text-xs bg-blue-100 text-blue-800 rounded mr-1">
-                          PK
-                        </span>
-                      )}
-                      {column.is_foreign_key && (
-                        <span className="inline-block px-2 py-0.5 text-xs bg-purple-100 text-purple-800 rounded">
-                          FK
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-3 py-2 text-sm text-gray-600 truncate">
-                      {column.description || '—'}
-                    </td>
-                  </tr>
-                ))}
+                        <td className="px-2 py-2 text-sm">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedColumnId(column.id);
+                            }}
+                            className="p-1 text-gray-400 hover:text-blue-600 rounded hover:bg-blue-50"
+                            title={`View ${column.name} details`}
+                          >
+                            <svg
+                              className="w-4 h-4"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                              />
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                              />
+                            </svg>
+                          </button>
+                        </td>
+                        <td className="px-3 py-2 text-sm font-medium text-gray-900 truncate">
+                          <span style={{ paddingLeft: `${depth * 1.25}rem` }}>
+                            {depth > 0 && <span className="text-gray-400 mr-1">└</span>}
+                            {column.name}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 text-sm text-gray-700 truncate">
+                          {column.data_type}
+                        </td>
+                        <td className="px-3 py-2 text-sm text-gray-700 text-center">
+                          {column.nullable ? (
+                            <span className="text-green-600">✓</span>
+                          ) : (
+                            <span className="text-red-600">✗</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2 text-sm">
+                          {column.is_primary_key && (
+                            <span className="inline-block px-2 py-0.5 text-xs bg-blue-100 text-blue-800 rounded mr-1">
+                              PK
+                            </span>
+                          )}
+                          {column.is_foreign_key && (
+                            <span className="inline-block px-2 py-0.5 text-xs bg-purple-100 text-purple-800 rounded">
+                              FK
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2 text-sm text-gray-600 truncate">
+                          {column.description || '—'}
+                        </td>
+                      </tr>,
+                      ...renderReadOnlyRows(column.id, depth + 1),
+                    ]);
+                  };
+                  return renderReadOnlyRows(undefined, 0);
+                })()}
               </tbody>
             </table>
           </div>
