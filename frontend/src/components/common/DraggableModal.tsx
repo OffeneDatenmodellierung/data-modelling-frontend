@@ -52,6 +52,8 @@ export const DraggableModal: React.FC<DraggableModalProps> = ({
     height: number;
   } | null>(null);
   const hasFocusedRef = useRef(false);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
   const titleId = generateAriaId('modal-title');
   const descriptionId = generateAriaId('modal-description');
 
@@ -198,7 +200,7 @@ export const DraggableModal: React.FC<DraggableModalProps> = ({
     // Handle Escape key
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        onClose();
+        onCloseRef.current();
       }
     };
     document.addEventListener('keydown', handleEscape);
@@ -208,7 +210,7 @@ export const DraggableModal: React.FC<DraggableModalProps> = ({
       document.body.style.overflow = '';
       document.removeEventListener('keydown', handleEscape);
     };
-  }, [isOpen, onClose]);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
