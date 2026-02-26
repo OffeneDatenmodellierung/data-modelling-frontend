@@ -2,6 +2,10 @@
   "name": "open-data-modelling",
   "version": "3.2.1",
   "description": "Open Data Modelling - A domain-centric data modeling application",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/OffeneDatenmodellierung/data-modelling-frontend.git"
+  },
   "main": "dist-electron/main.cjs",
   "scripts": {
     "build:wasm": "bash scripts/build-wasm.sh || echo 'WASM SDK build skipped (SDK not found or wasm-pack not installed)'",
