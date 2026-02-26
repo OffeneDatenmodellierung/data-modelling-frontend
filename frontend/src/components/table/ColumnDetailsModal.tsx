@@ -16,6 +16,7 @@ export interface ColumnDetailsModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (columnId: string, updates: Partial<Column>) => Promise<void>;
+  readOnly?: boolean;
 }
 
 export interface QualityRule {
@@ -337,6 +338,7 @@ export const ColumnDetailsModal: React.FC<ColumnDetailsModalProps> = ({
   isOpen,
   onClose,
   onSave,
+  readOnly = false,
 }) => {
   const { addToast } = useUIStore();
 
@@ -714,9 +716,10 @@ export const ColumnDetailsModal: React.FC<ColumnDetailsModalProps> = ({
     <DraggableModal
       isOpen={isOpen}
       onClose={onClose}
-      title={`Column Details: ${column.name}`}
+      title={readOnly ? `View Column: ${column.name}` : `Column Details: ${column.name}`}
       size="lg"
       initialPosition={{ x: 100, y: 50 }}
+      zIndex={100}
     >
       <div className="flex flex-col h-[600px]">
         {/* Tab Navigation */}
@@ -738,7 +741,10 @@ export const ColumnDetailsModal: React.FC<ColumnDetailsModalProps> = ({
         </div>
 
         {/* Tab Content */}
-        <div className="flex-1 overflow-y-auto pr-2">
+        <fieldset
+          disabled={readOnly}
+          className={`flex-1 overflow-y-auto pr-2 ${readOnly ? '[&_input]:bg-gray-50 [&_textarea]:bg-gray-50 [&_select]:bg-gray-50' : ''}`}
+        >
           {/* Basic Tab */}
           {activeTab === 'basic' && (
             <div className="space-y-6">
@@ -1383,7 +1389,7 @@ export const ColumnDetailsModal: React.FC<ColumnDetailsModalProps> = ({
               )}
             </div>
           )}
-        </div>
+        </fieldset>
 
         {/* Actions */}
         <div className="flex justify-end gap-2 pt-4 mt-4 border-t border-gray-200">
@@ -1392,15 +1398,17 @@ export const ColumnDetailsModal: React.FC<ColumnDetailsModalProps> = ({
             className="px-4 py-2 text-sm text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors"
             disabled={isSaving}
           >
-            Cancel
+            {readOnly ? 'Close' : 'Cancel'}
           </button>
-          <button
-            onClick={handleSave}
-            className="px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            disabled={isSaving}
-          >
-            {isSaving ? 'Saving...' : 'Save Changes'}
-          </button>
+          {!readOnly && (
+            <button
+              onClick={handleSave}
+              className="px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              disabled={isSaving}
+            >
+              {isSaving ? 'Saving...' : 'Save Changes'}
+            </button>
+          )}
         </div>
       </div>
     </DraggableModal>

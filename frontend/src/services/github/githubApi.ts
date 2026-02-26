@@ -108,7 +108,10 @@ function buildHeaders(additionalHeaders?: Record<string, string>): Headers {
  */
 async function parseError(response: Response): Promise<GitHubApiError> {
   try {
-    return await response.json();
+    const body = await response.json();
+    return {
+      message: body.message || body.error || `HTTP ${response.status}: ${response.statusText}`,
+    };
   } catch {
     return { message: `HTTP ${response.status}: ${response.statusText}` };
   }

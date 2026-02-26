@@ -49,6 +49,25 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   const pathSegments = context.params.path as string[];
   const githubPath = '/' + pathSegments.join('/');
 
+  // Debug endpoint: /api/github/_debug — shows which env keys are available (not values)
+  if (githubPath === '/_debug') {
+    const envKeys = [
+      'GITHUB_APP_ID', 'GITHUB_APP_PRIVATE_KEY', 'GITHUB_INSTALLATION_ID',
+      'VIEWER_OWNER', 'VIEWER_REPO', 'VITE_VIEWER_OWNER', 'VITE_VIEWER_REPO',
+      'VITE_VIEWER_MODE', 'VITE_VIEWER_BRANCH',
+    ];
+    const envStatus: Record<string, string> = {};
+    for (const key of envKeys) {
+      const val = (context.env as Record<string, string | undefined>)[key];
+      envStatus[key] = val ? `set (${val.length} chars)` : 'NOT SET';
+    }
+    // List all keys actually present on context.env
+    const allEnvKeys = Object.keys(context.env).sort();
+    return new Response(JSON.stringify({ envStatus, allEnvKeys }, null, 2), {
+      headers: { 'Content-Type': 'application/json', ...corsHeaders() },
+    });
+  }
+
   // Security: restrict to configured repository only
   // Support both VIEWER_OWNER and VITE_VIEWER_OWNER naming conventions
   const viewerOwner = context.env.VIEWER_OWNER || context.env.VITE_VIEWER_OWNER;
@@ -71,6 +90,20 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   }
 
   try {
+    // Validate GitHub App credentials are configured
+    if (!context.env.GITHUB_APP_ID || !context.env.GITHUB_APP_PRIVATE_KEY || !context.env.GITHUB_INSTALLATION_ID) {
+      const missing = [
+        !context.env.GITHUB_APP_ID && 'GITHUB_APP_ID',
+        !context.env.GITHUB_APP_PRIVATE_KEY && 'GITHUB_APP_PRIVATE_KEY',
+        !context.env.GITHUB_INSTALLATION_ID && 'GITHUB_INSTALLATION_ID',
+      ].filter(Boolean);
+      console.error('[GitHub Proxy] Missing credentials:', missing.join(', '));
+      return new Response(
+        JSON.stringify({ error: 'Server misconfiguration', message: `Missing GitHub App credentials: ${missing.join(', ')}` }),
+        { status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders() } }
+      );
+    }
+
     // Get or refresh the GitHub App installation token
     const token = await getInstallationToken(context.env);
 
@@ -139,6 +172,9 @@ async function getInstallationToken(env: Env): Promise<string> {
   // Generate JWT signed with the App's private key
   const jwt = await generateJWT(env.GITHUB_APP_ID, env.GITHUB_APP_PRIVATE_KEY);
 
+  // Use VIEWER_REPO with VITE_ prefix fallback (consistent with request handler)
+  const viewerRepo = env.VIEWER_REPO || env.VITE_VIEWER_REPO;
+
   // Exchange JWT for an installation access token
   const response = await fetch(
     `https://api.github.com/app/installations/${env.GITHUB_INSTALLATION_ID}/access_tokens`,
@@ -152,7 +188,7 @@ async function getInstallationToken(env: Env): Promise<string> {
       },
       body: JSON.stringify({
         // Scope token to the minimum required permissions on a single repo
-        repositories: [env.VIEWER_REPO],
+        repositories: [viewerRepo],
         permissions: { contents: 'read', metadata: 'read' },
       }),
     }
