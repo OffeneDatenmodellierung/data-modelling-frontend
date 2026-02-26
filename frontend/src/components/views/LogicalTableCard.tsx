@@ -16,7 +16,7 @@ export interface LogicalTableCardProps {
 export const LogicalTableCard: React.FC<LogicalTableCardProps> = ({ table, onClick, selected }) => {
   // Show only keys (primary keys and foreign keys)
   const keyColumns = table.columns.filter(
-    (col) => col.is_primary_key || col.is_foreign_key
+    (col) => !col.parent_column_id && (col.is_primary_key || col.is_foreign_key)
   );
 
   return (
@@ -41,12 +41,8 @@ export const LogicalTableCard: React.FC<LogicalTableCardProps> = ({ table, onCli
         <div className="space-y-1">
           {keyColumns.map((col) => (
             <div key={col.id} className="flex items-center gap-2 text-sm">
-              {col.is_primary_key && (
-                <span className="text-yellow-600 font-bold text-xs">PK</span>
-              )}
-              {col.is_foreign_key && (
-                <span className="text-green-600 font-bold text-xs">FK</span>
-              )}
+              {col.is_primary_key && <span className="text-yellow-600 font-bold text-xs">PK</span>}
+              {col.is_foreign_key && <span className="text-green-600 font-bold text-xs">FK</span>}
               <span className="text-gray-700">{col.name}</span>
             </div>
           ))}
@@ -57,6 +53,3 @@ export const LogicalTableCard: React.FC<LogicalTableCardProps> = ({ table, onCli
     </div>
   );
 };
-
-
-

@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.2.1] - 2026-02-26
+
+### Fixed
+- **Nested column duplicate display**: Nested fields inside array/object columns (e.g. `timeOfScore`, `participantName` inside `participantAScores`) were appearing as duplicate top-level fields in the canvas card view, read-only table editor, and logical table card
+  - Canvas node (physical view) now only shows root-level columns
+  - Canvas node (logical view) filters nested columns from key display
+  - Read-only table editor now renders columns hierarchically with indentation and tree connectors
+  - Logical table card excludes nested columns from key column list
+  - Aria label column count reflects root-level columns only
+
 ## [3.2.0] - 2026-02-25
 
 ### Added
