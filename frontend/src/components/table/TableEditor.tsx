@@ -904,20 +904,20 @@ export const TableEditor: React.FC<TableEditorProps> = ({ tableId, workspaceId, 
             Columns ({table.columns.filter((col) => !col.parent_column_id).length})
           </h3>
           <div className="border border-gray-300 rounded-md overflow-x-auto">
-            <table className="w-full divide-y divide-gray-200 table-fixed">
+            <table className="w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
                   <th className="w-10 px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase"></th>
-                  <th className="w-[140px] px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">
                     Name
                   </th>
-                  <th className="w-[100px] px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">
                     Type
                   </th>
-                  <th className="w-[70px] px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">
+                  <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase whitespace-nowrap">
                     Nullable
                   </th>
-                  <th className="w-[60px] px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">
                     Keys
                   </th>
                   <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
@@ -975,13 +975,13 @@ export const TableEditor: React.FC<TableEditorProps> = ({ tableId, workspaceId, 
                             </svg>
                           </button>
                         </td>
-                        <td className="px-3 py-2 text-sm font-medium text-gray-900 truncate">
+                        <td className="px-3 py-2 text-sm font-medium text-gray-900 whitespace-nowrap">
                           <span style={{ paddingLeft: `${depth * 1.25}rem` }}>
                             {depth > 0 && <span className="text-gray-400 mr-1">└</span>}
                             {column.name}
                           </span>
                         </td>
-                        <td className="px-3 py-2 text-sm text-gray-700 truncate">
+                        <td className="px-3 py-2 text-sm text-gray-700 whitespace-nowrap">
                           {column.data_type}
                         </td>
                         <td className="px-3 py-2 text-sm text-gray-700 text-center">
@@ -1003,7 +1003,7 @@ export const TableEditor: React.FC<TableEditorProps> = ({ tableId, workspaceId, 
                             </span>
                           )}
                         </td>
-                        <td className="px-3 py-2 text-sm text-gray-600 truncate">
+                        <td className="px-3 py-2 text-sm text-gray-600">
                           {column.description || '—'}
                         </td>
                       </tr>,
