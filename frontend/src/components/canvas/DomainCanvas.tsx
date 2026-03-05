@@ -30,6 +30,7 @@ import { DataProductView } from '@/components/views/DataProductView';
 import { SystemsViewActions } from '@/components/views/SystemsViewActions';
 import { TableViewActions } from '@/components/views/TableViewActions';
 import { NodeViewActions } from '@/components/views/NodeViewActions';
+import { MetricViewActions } from '@/components/views/MetricViewActions';
 import { TableMetadataModal } from '@/components/table/TableMetadataModal';
 import { CreateSystemDialog } from '@/components/system/CreateSystemDialog';
 import { UnlinkedTablesDialog } from '@/components/system/UnlinkedTablesDialog';
@@ -1273,6 +1274,7 @@ export const DomainCanvas: React.FC<DomainCanvasProps> = ({ workspaceId, domainI
           <>
             <TableViewActions workspaceId={workspaceId} domainId={domainId} />
             {currentView === 'process' && <NodeViewActions domainId={domainId} />}
+            {currentView === 'analytical' && <MetricViewActions domainId={domainId} />}
           </>
         )}
 

@@ -10,7 +10,17 @@ import { useModelStore } from '@/stores/modelStore';
 import { useUIStore } from '@/stores/uiStore';
 import { useSDKModeStore } from '@/services/sdk/sdkMode';
 import type { Table, Owner, SLA, Role, SupportChannel, Pricing, TeamMember } from '@/types/table';
-import { getSourceTopic, SOURCE_TOPIC_KEY } from '@/utils/customProperties';
+import {
+  getSourceTopic,
+  SOURCE_TOPIC_KEY,
+  CATALOG_KEY,
+  SCHEMA_KEY,
+  getCatalog,
+  getSchema,
+  RESOURCE_TYPE_KEY,
+  getResourceType,
+} from '@/utils/customProperties';
+import type { ResourceType } from '@/utils/customProperties';
 
 export interface TableMetadataModalProps {
   table: Table | null;
@@ -42,6 +52,9 @@ export const TableMetadataModal: React.FC<TableMetadataModalProps> = ({
   const [qualityRules, setQualityRules] = useState<Record<string, unknown>>({});
   const [status, setStatus] = useState<string>('');
   const [sourceTopic, setSourceTopic] = useState<string>('');
+  const [catalog, setCatalog] = useState<string>('');
+  const [schema, setSchema] = useState<string>('');
+  const [resourceType, setResourceType] = useState<ResourceType | undefined>(undefined);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -102,6 +115,9 @@ export const TableMetadataModal: React.FC<TableMetadataModalProps> = ({
       // Read status from customProperties (ODCS compliant)
       setStatus(getStatusFromCustomProperties(table.customProperties));
       setSourceTopic(getSourceTopic(table.customProperties) || '');
+      setCatalog(getCatalog(table.customProperties) || '');
+      setSchema(getSchema(table.customProperties) || '');
+      setResourceType(getResourceType(table.customProperties));
       setHasUnsavedChanges(false);
     }
   }, [table]);
@@ -128,12 +144,23 @@ export const TableMetadataModal: React.FC<TableMetadataModalProps> = ({
       const updatedCustomProperties: Array<{ property: string; value: unknown }> = [
         // Keep existing customProperties except managed keys
         ...(table.customProperties || []).filter(
-          (p) => p.property !== 'status' && p.property !== SOURCE_TOPIC_KEY
+          (p) =>
+            p.property !== 'status' &&
+            p.property !== SOURCE_TOPIC_KEY &&
+            p.property !== CATALOG_KEY &&
+            p.property !== SCHEMA_KEY &&
+            p.property !== RESOURCE_TYPE_KEY
         ),
         // Add status if set
         ...(status ? [{ property: 'status', value: status }] : []),
         // Add source_topic if set
         ...(sourceTopic.trim() ? [{ property: SOURCE_TOPIC_KEY, value: sourceTopic.trim() }] : []),
+        // Add catalog if set
+        ...(catalog.trim() ? [{ property: CATALOG_KEY, value: catalog.trim() }] : []),
+        // Add schema if set
+        ...(schema.trim() ? [{ property: SCHEMA_KEY, value: schema.trim() }] : []),
+        // Add resource_type if not default (table)
+        ...(resourceType ? [{ property: RESOURCE_TYPE_KEY, value: resourceType }] : []),
       ];
 
       const updates: Partial<Table> = {
@@ -323,6 +350,82 @@ export const TableMetadataModal: React.FC<TableMetadataModalProps> = ({
             )}
             <p className="mt-1 text-xs text-gray-500">
               Groups tables from the same schema or topic
+            </p>
+          </div>
+          {/* Catalog */}
+          <div className="mt-3">
+            <label htmlFor="table-catalog" className="block text-sm font-medium text-gray-600 mb-1">
+              Catalog
+            </label>
+            {isEditable ? (
+              <input
+                id="table-catalog"
+                type="text"
+                value={catalog}
+                onChange={(e) => {
+                  setCatalog(e.target.value);
+                  setHasUnsavedChanges(true);
+                }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                placeholder="e.g., raw, curated, analytics"
+              />
+            ) : (
+              <span className="text-gray-900">{catalog || 'Not set'}</span>
+            )}
+            <p className="mt-1 text-xs text-gray-500">Database catalog for this table</p>
+          </div>
+          {/* Schema */}
+          <div className="mt-3">
+            <label htmlFor="table-schema" className="block text-sm font-medium text-gray-600 mb-1">
+              Schema
+            </label>
+            {isEditable ? (
+              <input
+                id="table-schema"
+                type="text"
+                value={schema}
+                onChange={(e) => {
+                  setSchema(e.target.value);
+                  setHasUnsavedChanges(true);
+                }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                placeholder="e.g., sales, finance, marketing"
+              />
+            ) : (
+              <span className="text-gray-900">{schema || 'Not set'}</span>
+            )}
+            <p className="mt-1 text-xs text-gray-500">Database schema for this table</p>
+          </div>
+          {/* Resource Type */}
+          <div className="mt-3">
+            <label
+              htmlFor="table-resource-type"
+              className="block text-sm font-medium text-gray-600 mb-1"
+            >
+              Resource Type
+            </label>
+            {isEditable ? (
+              <select
+                id="table-resource-type"
+                value={resourceType || 'table'}
+                onChange={(e) => {
+                  const val = e.target.value as ResourceType;
+                  setResourceType(val === 'table' ? undefined : val);
+                  setHasUnsavedChanges(true);
+                }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+              >
+                <option value="table">Table</option>
+                <option value="view">View</option>
+                <option value="materialized_view">Materialized View</option>
+              </select>
+            ) : (
+              <span className="text-gray-900 capitalize">
+                {resourceType ? resourceType.replace('_', ' ') : 'Table'}
+              </span>
+            )}
+            <p className="mt-1 text-xs text-gray-500">
+              Whether this resource is a table, view, or materialized view
             </p>
           </div>
         </div>

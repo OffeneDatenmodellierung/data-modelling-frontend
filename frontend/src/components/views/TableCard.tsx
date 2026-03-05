@@ -7,7 +7,7 @@
 import React from 'react';
 import type { Table } from '@/types/table';
 import type { QualityTier } from '@/types/table';
-import { getSourceTopic } from '@/utils/customProperties';
+import { getSourceTopic, getCatalogSchema, getResourceType } from '@/utils/customProperties';
 
 export interface TableCardProps {
   table: Table;
@@ -105,6 +105,14 @@ export const TableCard: React.FC<TableCardProps> = ({
             ) : null;
           })()}
         </div>
+        {(() => {
+          const cs = getCatalogSchema(table.customProperties);
+          return cs ? (
+            <div className="text-xs text-gray-400 truncate mb-1" title={`Location: ${cs}`}>
+              {cs}
+            </div>
+          ) : null;
+        })()}
 
         {/* Data level badge and BPMN indicator */}
         <div className="mb-2 flex items-center gap-1 flex-wrap">
@@ -115,6 +123,28 @@ export const TableCard: React.FC<TableCardProps> = ({
             {levelLabel}
           </span>
           {/* BPMN Model Indicator */}
+          {(() => {
+            const rt = getResourceType(table.customProperties);
+            if (rt === 'view')
+              return (
+                <span
+                  className="inline-block px-2 py-0.5 text-xs font-medium rounded bg-blue-100 text-blue-700"
+                  title="View"
+                >
+                  View
+                </span>
+              );
+            if (rt === 'materialized_view')
+              return (
+                <span
+                  className="inline-block px-2 py-0.5 text-xs font-medium rounded bg-purple-100 text-purple-700"
+                  title="Materialized View"
+                >
+                  MV
+                </span>
+              );
+            return null;
+          })()}
           {hasBPMNLink && (
             <button
               onClick={(e) => {
