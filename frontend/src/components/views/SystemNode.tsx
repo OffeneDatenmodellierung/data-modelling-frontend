@@ -40,6 +40,7 @@ export interface SystemNodeData {
   onMetricViewEdit?: (viewId: string) => void; // Handler for metric view edit
   onMetricViewDelete?: (viewId: string) => void; // Handler for metric view delete
   onMetricViewExport?: (viewId: string) => void; // Handler for metric view export
+  onMetricViewView?: (viewId: string) => void; // Handler for metric view click (view/edit)
   currentView?: 'systems' | 'etl' | 'operational' | 'analytical' | 'products';
   isShared?: boolean; // True if this is a shared resource from another domain
 }
@@ -75,6 +76,7 @@ export const SystemNode: React.FC<SystemNodeProps> = ({ data, selected }) => {
     onMetricViewEdit,
     onMetricViewDelete,
     onMetricViewExport,
+    onMetricViewView,
     currentView,
     isShared = false,
   } = data;
@@ -526,6 +528,7 @@ export const SystemNode: React.FC<SystemNodeProps> = ({ data, selected }) => {
                   <MetricViewCard
                     key={view.id}
                     metricView={view}
+                    onClick={onMetricViewView ? () => onMetricViewView(view.id) : undefined}
                     onEdit={onMetricViewEdit}
                     onDelete={onMetricViewDelete}
                     onExport={onMetricViewExport}

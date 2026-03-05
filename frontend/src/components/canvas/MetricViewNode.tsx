@@ -14,6 +14,7 @@ export interface MetricViewNodeData {
   onEdit?: (viewId: string) => void;
   onDelete?: (viewId: string) => void;
   onExport?: (viewId: string) => void;
+  onView?: (viewId: string) => void;
   isShared?: boolean;
 }
 
@@ -23,7 +24,7 @@ export interface MetricViewNodeProps {
 }
 
 export const MetricViewNode: React.FC<MetricViewNodeProps> = ({ data, selected }) => {
-  const { metricView, onEdit, onDelete, onExport, isShared = false } = data;
+  const { metricView, onEdit, onDelete, onExport, onView, isShared = false } = data;
   const isMaterialized = metricView.view_type === 'materialized';
 
   // Gold-to-purple gradient for title bar
@@ -292,7 +293,11 @@ export const MetricViewNode: React.FC<MetricViewNodeProps> = ({ data, selected }
       )}
 
       {/* Node content */}
-      <div className="p-3">
+      <div
+        className="p-3"
+        onClick={onView ? () => onView(metricView.id) : undefined}
+        style={onView ? { cursor: 'pointer' } : undefined}
+      >
         {/* Type badge and materialization indicator */}
         <div className="mb-2 flex items-center gap-1 flex-wrap">
           <span className="inline-block px-2 py-0.5 text-xs font-medium rounded bg-purple-100 text-purple-700">

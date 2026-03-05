@@ -36,6 +36,7 @@ import { CreateSystemDialog } from '@/components/system/CreateSystemDialog';
 import { UnlinkedTablesDialog } from '@/components/system/UnlinkedTablesDialog';
 import { SystemExportDialog } from '@/components/system/SystemExportDialog';
 import { ComputeAssetEditor } from '@/components/asset/ComputeAssetEditor';
+import { MetricViewEditor } from '@/components/asset/MetricViewEditor';
 import { RelationshipEditor } from '@/components/relationship/RelationshipEditor';
 import { EditorModal } from '@/components/editors/EditorModal';
 import { CanvasExport } from './CanvasExport';
@@ -112,6 +113,10 @@ export const DomainCanvas: React.FC<DomainCanvasProps> = ({ workspaceId, domainI
   // State for compute asset edit dialog
   const [editingAssetId, setEditingAssetId] = React.useState<string | null>(null);
   const [showAssetEditDialog, setShowAssetEditDialog] = React.useState(false);
+
+  // State for metric view editor
+  const [editingMetricViewId, setEditingMetricViewId] = React.useState<string | null>(null);
+  const [showMetricViewEditor, setShowMetricViewEditor] = React.useState(false);
 
   // State for unlinked tables dialog
   const [showUnlinkedTablesDialog, setShowUnlinkedTablesDialog] = React.useState(false);
@@ -308,12 +313,10 @@ export const DomainCanvas: React.FC<DomainCanvasProps> = ({ workspaceId, domainI
     [computeAssets, systems]
   );
 
-  // Handle metric view edit (placeholder - opens toast for now)
-  const handleMetricViewEdit = React.useCallback((_viewId: string) => {
-    useUIStore.getState().addToast({
-      type: 'info',
-      message: 'Metric view editor coming soon',
-    });
+  // Handle metric view edit
+  const handleMetricViewEdit = React.useCallback((viewId: string) => {
+    setEditingMetricViewId(viewId);
+    setShowMetricViewEditor(true);
   }, []);
 
   // Handle metric view delete
@@ -817,9 +820,10 @@ export const DomainCanvas: React.FC<DomainCanvasProps> = ({ workspaceId, domainI
             onAssetExport: handleAssetExport,
             onAssetBPMNClick: handleAssetBPMNClick,
             onAssetDMNClick: handleAssetDMNClick,
-            onMetricViewEdit: handleMetricViewEdit,
-            onMetricViewDelete: handleMetricViewDelete,
+            onMetricViewEdit: isViewerMode() ? undefined : handleMetricViewEdit,
+            onMetricViewDelete: isViewerMode() ? undefined : handleMetricViewDelete,
             onMetricViewExport: handleMetricViewExport,
+            onMetricViewView: handleMetricViewEdit,
             currentView: currentView,
           },
           selected: selectedSystemId === system.id,
@@ -926,9 +930,10 @@ export const DomainCanvas: React.FC<DomainCanvasProps> = ({ workspaceId, domainI
                 metricView: view,
                 nodeType: 'metric-view' as const,
                 isShared: false,
-                onEdit: handleMetricViewEdit,
-                onDelete: handleMetricViewDelete,
+                onEdit: isViewerMode() ? undefined : handleMetricViewEdit,
+                onDelete: isViewerMode() ? undefined : handleMetricViewDelete,
                 onExport: handleMetricViewExport,
+                onView: handleMetricViewEdit,
               },
               selected: false,
             };
@@ -1314,6 +1319,19 @@ export const DomainCanvas: React.FC<DomainCanvasProps> = ({ workspaceId, domainI
           onClose={() => {
             setShowAssetEditDialog(false);
             setEditingAssetId(null);
+          }}
+        />
+      )}
+
+      {/* Metric View Editor (renders in both normal and viewer mode) */}
+      {editingMetricViewId && (
+        <MetricViewEditor
+          metricView={metricViews.find((v) => v.id === editingMetricViewId)}
+          domainId={domainId}
+          isOpen={showMetricViewEditor}
+          onClose={() => {
+            setShowMetricViewEditor(false);
+            setEditingMetricViewId(null);
           }}
         />
       )}
