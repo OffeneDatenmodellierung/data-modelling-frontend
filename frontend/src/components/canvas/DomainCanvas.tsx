@@ -1115,6 +1115,7 @@ export const DomainCanvas: React.FC<DomainCanvasProps> = ({ workspaceId, domainI
     tableIds: string[];
     assetIds: string[];
     systemIds: string[];
+    metricViewIds: string[];
     currentView: ViewMode;
     tableDataHash?: string;
   }
@@ -1123,6 +1124,7 @@ export const DomainCanvas: React.FC<DomainCanvasProps> = ({ workspaceId, domainI
     tableIds: [],
     assetIds: [],
     systemIds: [],
+    metricViewIds: [],
     currentView: 'systems',
   });
 
@@ -1131,6 +1133,7 @@ export const DomainCanvas: React.FC<DomainCanvasProps> = ({ workspaceId, domainI
     const currentTableIds = visibleTables.map((t) => t.id).sort();
     const currentAssetIds = domainComputeAssets.map((a) => a.id).sort();
     const currentSystemIds = domainSystems.map((s) => s.id).sort();
+    const currentMetricViewIds = domainMetricViews.map((v) => v.id).sort();
 
     // Create a hash of table data to detect changes (not just IDs)
     // Include compoundKeys, metadata.indexes, and tags in the hash to detect changes
@@ -1144,6 +1147,7 @@ export const DomainCanvas: React.FC<DomainCanvasProps> = ({ workspaceId, domainI
     const prevTableIds = prevDataRef.current.tableIds;
     const prevAssetIds = prevDataRef.current.assetIds;
     const prevSystemIds = prevDataRef.current.systemIds;
+    const prevMetricViewIds = prevDataRef.current.metricViewIds;
     const prevView = prevDataRef.current.currentView;
     const prevTableDataHash = prevDataRef.current.tableDataHash || '';
 
@@ -1157,10 +1161,20 @@ export const DomainCanvas: React.FC<DomainCanvasProps> = ({ workspaceId, domainI
     const systemsChanged =
       currentSystemIds.length !== prevSystemIds.length ||
       currentSystemIds.some((id, idx) => id !== prevSystemIds[idx]);
+    const metricViewsChanged =
+      currentMetricViewIds.length !== prevMetricViewIds.length ||
+      currentMetricViewIds.some((id, idx) => id !== prevMetricViewIds[idx]);
     const viewChanged = currentView !== prevView;
     const tableDataChanged = currentTableDataHash !== prevTableDataHash;
 
-    if (tablesChanged || assetsChanged || systemsChanged || viewChanged || tableDataChanged) {
+    if (
+      tablesChanged ||
+      assetsChanged ||
+      systemsChanged ||
+      metricViewsChanged ||
+      viewChanged ||
+      tableDataChanged
+    ) {
       setNodes((currentNodes) => {
         // When VIEW changes, use initialNodes positions directly (from viewPositions[currentView])
         // This ensures each view loads its own saved positions, not the previous view's positions
@@ -1185,6 +1199,7 @@ export const DomainCanvas: React.FC<DomainCanvasProps> = ({ workspaceId, domainI
         tableIds: currentTableIds,
         assetIds: currentAssetIds,
         systemIds: currentSystemIds,
+        metricViewIds: currentMetricViewIds,
         currentView,
         tableDataHash: currentTableDataHash,
       };
@@ -1192,7 +1207,15 @@ export const DomainCanvas: React.FC<DomainCanvasProps> = ({ workspaceId, domainI
     // Note: We don't update positions from store when data hasn't changed
     // ReactFlow manages positions during drag, and positions are saved via onNodeDragStop
     // This prevents overriding user drags
-  }, [visibleTables, domainComputeAssets, domainSystems, currentView, initialNodes, setNodes]);
+  }, [
+    visibleTables,
+    domainComputeAssets,
+    domainMetricViews,
+    domainSystems,
+    currentView,
+    initialNodes,
+    setNodes,
+  ]);
 
   useEffect(() => {
     console.log('[DomainCanvas] Updating edges:', {

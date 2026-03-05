@@ -614,7 +614,12 @@ export class WorkspaceV2Loader {
     const assets = await this.loadAssets(domainFiles.cads, domainSpec);
 
     // Load metric views
-    const metricViews = await this.loadMetricViews(domainFiles.dbmv, domainSpec);
+    const { views: metricViews, viewSystemNameMap } = await this.loadMetricViews(
+      domainFiles.dbmv,
+      domainSpec,
+      workspaceName,
+      domainSpec.name
+    );
 
     // Load processes
     const processes = await this.loadProcesses(domainFiles.bpmn, domainSpec);
@@ -637,6 +642,10 @@ export class WorkspaceV2Loader {
       tables,
       failedOdcsFiles
     );
+
+    // Auto-assign metric views to systems based on DBMV filename
+    // DBMV files are named {workspace}_{domain}_{system}.dbmv.yaml
+    this.assignMetricViewsToSystems(systems, metricViews, viewSystemNameMap);
 
     // Construct Domain object (SDK schema has simpler DomainV2 structure)
     const domain: Domain = {
@@ -721,7 +730,12 @@ export class WorkspaceV2Loader {
     const assets = await this.loadAssetsFromStrings(domainFiles.cads, domainSpec);
 
     // Load metric views
-    const metricViews = await this.loadMetricViewsFromStrings(domainFiles.dbmv, domainSpec);
+    const { views: metricViews, viewSystemNameMap } = await this.loadMetricViewsFromStrings(
+      domainFiles.dbmv,
+      domainSpec,
+      workspaceName,
+      domainSpec.name
+    );
 
     // Load processes
     const processes = await this.loadProcessesFromStrings(domainFiles.bpmn, domainSpec);
@@ -744,6 +758,9 @@ export class WorkspaceV2Loader {
       tables,
       failedOdcsFiles
     );
+
+    // Auto-assign metric views to systems based on DBMV filename
+    this.assignMetricViewsToSystems(systems, metricViews, viewSystemNameMap);
 
     // Construct Domain object
     const domain: Domain = {
@@ -972,22 +989,40 @@ export class WorkspaceV2Loader {
    */
   private static async loadMetricViewsFromStrings(
     files: Array<{ name: string; content: string }>,
-    domainSpec: DomainV2
-  ): Promise<MetricView[]> {
+    domainSpec: DomainV2,
+    workspaceName: string,
+    domainName: string
+  ): Promise<{ views: MetricView[]; viewSystemNameMap: Map<string, string> }> {
     const views: MetricView[] = [];
+    const viewSystemNameMap = new Map<string, string>();
+
+    // Build prefix to extract system name from filename
+    // Pattern: {workspace}_{domain}_{system}.dbmv.yaml
+    const prefix = `${workspaceName}_${domainName}_`.toLowerCase();
 
     for (const file of files) {
       try {
         const parsed = await dbmvService.parseYAML(file.content);
 
+        // Extract system name from filename
+        const fileName = file.name.split('/').pop() || file.name;
+        let systemName: string | undefined;
+        const fileNameLower = fileName.toLowerCase();
+        if (fileNameLower.startsWith(prefix)) {
+          systemName = fileName.substring(prefix.length).replace(/\.dbmv\.yaml$/i, '');
+        }
+
         for (const view of parsed) {
           view.domain_id = domainSpec.id;
           views.push(view);
+          if (systemName) {
+            viewSystemNameMap.set(view.id, systemName);
+          }
         }
 
         if (parsed.length > 0) {
           console.log(
-            `[WorkspaceV2Loader] Loaded ${parsed.length} metric view(s) from ${file.name}`
+            `[WorkspaceV2Loader] Loaded ${parsed.length} metric view(s) from ${file.name}${systemName ? ` (system: ${systemName})` : ''}`
           );
         }
       } catch (error) {
@@ -995,7 +1030,7 @@ export class WorkspaceV2Loader {
       }
     }
 
-    return views;
+    return { views, viewSystemNameMap };
   }
 
   /**
@@ -1248,6 +1283,39 @@ export class WorkspaceV2Loader {
   }
 
   /**
+   * Auto-assign metric views to systems based on DBMV filename system name extraction.
+   * Only assigns if the system doesn't already have metric_view_ids from workspace.yaml.
+   */
+  private static assignMetricViewsToSystems(
+    systems: System[],
+    metricViews: MetricView[],
+    viewSystemNameMap: Map<string, string>
+  ): void {
+    if (metricViews.length === 0 || viewSystemNameMap.size === 0) return;
+
+    for (const system of systems) {
+      // Skip if system already has metric_view_ids from workspace.yaml
+      if (system.metric_view_ids && system.metric_view_ids.length > 0) continue;
+
+      // Find metric views whose DBMV filename matches this system name (case-insensitive)
+      const systemNameLower = system.name.toLowerCase();
+      const matchedViewIds = metricViews
+        .filter((v) => {
+          const viewSystemName = viewSystemNameMap.get(v.id);
+          return viewSystemName && viewSystemName.toLowerCase() === systemNameLower;
+        })
+        .map((v) => v.id);
+
+      if (matchedViewIds.length > 0) {
+        system.metric_view_ids = matchedViewIds;
+        console.log(
+          `[WorkspaceV2Loader] Auto-assigned ${matchedViewIds.length} metric view(s) to system "${system.name}" from DBMV filename`
+        );
+      }
+    }
+  }
+
+  /**
    * Load relationships from workspace.yaml
    */
   private static loadRelationships(
@@ -1475,22 +1543,43 @@ export class WorkspaceV2Loader {
   /**
    * Load DBMV metric views from files
    */
-  private static async loadMetricViews(files: File[], domainSpec: DomainV2): Promise<MetricView[]> {
+  private static async loadMetricViews(
+    files: File[],
+    domainSpec: DomainV2,
+    workspaceName: string,
+    domainName: string
+  ): Promise<{ views: MetricView[]; viewSystemNameMap: Map<string, string> }> {
     const views: MetricView[] = [];
+    const viewSystemNameMap = new Map<string, string>();
+
+    // Build prefix to extract system name from filename
+    // Pattern: {workspace}_{domain}_{system}.dbmv.yaml
+    const prefix = `${workspaceName}_${domainName}_`.toLowerCase();
 
     for (const file of files) {
       try {
         const content = await browserFileService.readFile(file);
         const parsed = await dbmvService.parseYAML(content);
 
+        // Extract system name from filename
+        const fileName = file.name.split('/').pop() || file.name;
+        let systemName: string | undefined;
+        const fileNameLower = fileName.toLowerCase();
+        if (fileNameLower.startsWith(prefix)) {
+          systemName = fileName.substring(prefix.length).replace(/\.dbmv\.yaml$/i, '');
+        }
+
         for (const view of parsed) {
           view.domain_id = domainSpec.id;
           views.push(view);
+          if (systemName) {
+            viewSystemNameMap.set(view.id, systemName);
+          }
         }
 
         if (parsed.length > 0) {
           console.log(
-            `[WorkspaceV2Loader] Loaded ${parsed.length} metric view(s) from ${file.name}`
+            `[WorkspaceV2Loader] Loaded ${parsed.length} metric view(s) from ${file.name}${systemName ? ` (system: ${systemName})` : ''}`
           );
         }
       } catch (error) {
@@ -1498,7 +1587,7 @@ export class WorkspaceV2Loader {
       }
     }
 
-    return views;
+    return { views, viewSystemNameMap };
   }
 
   /**

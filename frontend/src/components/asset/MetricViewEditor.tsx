@@ -32,7 +32,14 @@ export const MetricViewEditor: React.FC<MetricViewEditorProps> = ({
   isOpen,
   onClose,
 }) => {
-  const { addMetricView, updateMetricView, selectedDomainId } = useModelStore();
+  const {
+    addMetricView,
+    updateMetricView,
+    selectedDomainId,
+    selectedSystemId,
+    systems,
+    updateSystem,
+  } = useModelStore();
   const { addToast } = useUIStore();
 
   const isEditable = !isViewerMode() && (!metricView || metricView.domain_id === selectedDomainId);
@@ -238,14 +245,25 @@ export const MetricViewEditor: React.FC<MetricViewEditorProps> = ({
       addToast({ type: 'success', message: `Metric view "${name.trim()}" updated` });
     } else {
       const { generateUUID } = await import('@/utils/validation');
+      const newId = generateUUID();
       addMetricView({
         ...viewData,
-        id: generateUUID(),
+        id: newId,
         domain_id: domainId,
         dimensions: filteredDimensions,
         measures: filteredMeasures,
         created_at: new Date().toISOString(),
       } as MetricView);
+
+      // If a system is selected, add the metric view to that system
+      if (selectedSystemId) {
+        const selectedSystem = systems.find((s) => s.id === selectedSystemId);
+        if (selectedSystem) {
+          const updatedIds = [...(selectedSystem.metric_view_ids || []), newId];
+          updateSystem(selectedSystemId, { metric_view_ids: Array.from(new Set(updatedIds)) });
+        }
+      }
+
       addToast({ type: 'success', message: `Metric view "${name.trim()}" created` });
     }
 
