@@ -17,6 +17,7 @@ A domain-centric data modelling application built with React and Electron. Creat
 - **Help Panel** (v3.0.0): Searchable in-app documentation with keyboard shortcuts (F1, Cmd+?)
 - **Offline First**: Works without backend; GitHub features available when authenticated
 - **Databricks Metric Views** (v3.3.0): Standard and materialized metric views with dimensions, measures, filters, joins — analytical tab only
+- **Catalog, Schema & Resource Type** (v3.4.0): Per-table catalog/schema fields with scoped uniqueness; Table/View/Materialized View resource type with canvas badges
 - **Import/Export**: Support for ODCS, DBMV, SQL, AVRO, JSON Schema, and Protobuf formats
 - **Cross-Platform**: Electron desktop app (macOS, Windows, Linux)
 - **Domain-Centric**: Organize data models by business domains with systems, tables, relationships, BPMN processes, and DMN decisions
@@ -192,19 +193,19 @@ frontend/
 
 ## WASM SDK Integration
 
-The application uses a WASM build of the `data-modelling-sdk` (version **2.1.0**) for offline functionality:
+The application uses a WASM build of the `data-modelling-sdk` (version **2.4.0**) for offline functionality:
 
-1. **SDK Version**: Requires `@offenedatenmodellierung/data-modelling-sdk = "^2.1.0"` npm package
+1. **SDK Version**: Requires `@offenedatenmodellierung/data-modelling-sdk = "^2.4.0"` npm package
 2. **Build Process**: The SDK is built using `wasm-pack` and copied to `public/wasm/`
 3. **Automatic Build**: Runs automatically before `npm run build` via `prebuild` script
 4. **Development**: Can be built manually with `npm run build:wasm`
 5. **Fallback**: If WASM SDK is not available, the app uses a JavaScript YAML parser fallback
 
-**Note**: The SDK must be version 2.1.0 or compatible for full sketch support.
+**Note**: The SDK must be version 2.4.0 or compatible for full DBMV and sketch support.
 
-### SDK 2.1.0 Features
+### SDK 2.4.0 Features
 
-The SDK 2.1.0 release includes these capabilities:
+The SDK 2.4.0 release includes these capabilities:
 
 - **Excalidraw Sketches** (NEW in v2.5.0): Freeform diagramming integration
   - Sketch types: architecture, dataflow, entity-relationship, sequence, flowchart, wireframe, concept, infrastructure

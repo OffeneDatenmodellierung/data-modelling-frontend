@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.4.0] - 2026-03-05
+
+### Added
+- **Catalog & Schema Fields**: New dedicated Catalog and Schema fields in the Table Metadata modal, stored as reserved `customProperties` keys
+  - Catalog/schema displayed as subtitle on canvas nodes and system view cards
+  - Table name uniqueness validation scoped by catalog + schema (allows same name in different locations)
+- **Resource Type Dropdown**: New Resource Type selector in Table Metadata modal (Table / View / Materialized View)
+  - Stored as `resource_type` customProperty; default (Table) stores nothing
+  - "View" (blue) and "MV" (purple) badges on canvas nodes and system view table cards
+- **Metric View Import UI**: Dedicated amber action button in Analytical view for creating/importing DBMV metric views
+  - Create mode: name, source table, view type, description
+  - Import mode: paste YAML or upload `.yaml`/`.yml` file
+- **Compound Key Badges**: Columns in compound keys now show 'CK' badge instead of 'PK' in physical view
+  - Primary compound key members use yellow 'CK', non-primary use purple 'CK'
+  - 'PK' reserved for standalone primary keys only — each table shows at most one 'PK'
+
+### New Files
+- `frontend/src/components/views/MetricViewActions.tsx` — Analytical view action button for metric views
+- `frontend/src/components/views/CreateMetricViewDialog.tsx` — Create/Import dialog for DBMV metric views
+
 ## [3.3.0] - 2026-03-05
 
 ### Added

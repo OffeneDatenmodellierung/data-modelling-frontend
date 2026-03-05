@@ -7,7 +7,7 @@ This file provides context for Large Language Models working with this codebase.
 A domain-centric data modelling application built with React, TypeScript, and Electron.
 Creates data architectures, models, and flow diagrams entirely offline with full Git/GitHub integration.
 
-**Version**: 3.3.0
+**Version**: 3.4.0
 **License**: ISC
 
 ## Technology Stack
@@ -43,7 +43,8 @@ Creates data architectures, models, and flow diagrams entirely offline with full
 8. **Help Panel**: Searchable in-app documentation with keyboard shortcuts (F1)
 9. **Import/Export**: ODCS, DBMV, SQL, AVRO, JSON Schema, Protobuf formats
 10. **Databricks Metric Views**: Standard and materialized metric views with dimensions, measures, filters, joins
-11. **Offline First**: Works without backend; GitHub features require authentication
+11. **Catalog, Schema & Resource Type** (v3.4.0): Per-table catalog/schema fields, Table/View/Materialized View with canvas badges
+12. **Offline First**: Works without backend; GitHub features require authentication
 
 ## Project Structure
 
@@ -87,7 +88,7 @@ dm/
 - `tests/unit/components/github/`: PR review component tests (37 tests)
 - `tests/unit/stores/helpStore.test.ts`: Help store tests (23 tests)
 - `tests/unit/types/help.test.ts`: Help utility tests (22 tests)
-- Total test count: ~860 tests
+- Total test count: ~885 tests
 
 ## Development Commands
 
