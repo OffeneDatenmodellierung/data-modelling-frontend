@@ -213,9 +213,10 @@ export interface System {
   description?: string; // Optional description of the system
   system_type?: SystemType; // Type of system infrastructure
 
-  // Table and asset references
+  // Table, asset, and metric view references
   table_ids?: string[]; // Array of table UUIDs that belong to this system
   asset_ids?: string[]; // Array of compute asset (CADS) UUIDs that belong to this system
+  metric_view_ids?: string[]; // Array of metric view (DBMV) UUIDs that belong to this system
 
   // Environment-specific connection details (SDK 2.3.0+)
   environments?: EnvironmentConnection[]; // List of environment connections (production, staging, etc.)
@@ -247,5 +248,6 @@ export interface UpdateSystemRequest {
   position_y?: number;
   table_ids?: string[];
   asset_ids?: string[];
+  metric_view_ids?: string[];
   environments?: EnvironmentConnection[];
 }

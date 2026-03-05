@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.3.0] - 2026-03-05
+
+### Added
+- **Databricks Metric Views (DBMV)**: Full support for Databricks Metric Views as a new entity type
+  - New `MetricView` entity with standard and materialized view types
+  - Dimensions, measures, filters, joins, and materialization configuration
+  - Gold-to-purple gradient canvas nodes (visually distinct from tables and compute assets)
+  - Metric views displayed exclusively in the Analytical view tab
+  - System-bound via `system.metric_view_ids` (same pattern as tables and compute assets)
+  - Import: accepts both full DBMV document (multi-view) and single view YAML
+  - Export from card: single view YAML format
+  - Save: all views grouped by system into `.dbmv.yaml` files
+  - Compact cards in System View showing name, type badge, dimension/measure counts
+- **SDK 2.4.0**: Updated WASM SDK with `parse_dbmv_yaml` and `export_to_dbmv_yaml` bindings
+- **Quality Rules**: Added `mustBeBetween` and `mustNotBeBetween` quality rules with range min/max fields in Column Details modal
+
+### New Files
+- `frontend/src/types/metricView.ts` — MetricView type definitions (dimensions, measures, joins, materialization)
+- `frontend/src/services/sdk/dbmvService.ts` — DBMV parse/export service with SDK, API, and js-yaml fallbacks
+- `frontend/src/components/canvas/MetricViewNode.tsx` — ReactFlow canvas node with gold-purple gradient
+- `frontend/src/components/views/MetricViewCard.tsx` — Compact card for System View
+
 ## [3.2.1] - 2026-02-26
 
 ### Fixed

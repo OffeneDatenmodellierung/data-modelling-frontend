@@ -30,6 +30,7 @@ type ImportFormat =
   | 'protobuf'
   | 'odps'
   | 'cads'
+  | 'dbmv'
   | 'bpmn'
   | 'dmn'
   | 'openapi';
@@ -208,6 +209,27 @@ export const ImportExportDialog: React.FC<ImportExportDialogProps> = ({ isOpen, 
           addToast({
             type: 'success',
             message: `Successfully imported CADS asset: ${cadsAsset.name}`,
+          });
+          onClose();
+          return;
+        }
+        case 'dbmv': {
+          const { dbmvService } = await import('@/services/sdk/dbmvService');
+          const metricViews = await dbmvService.parseYAML(content);
+          // Add each metric view to store
+          const modelState = useModelStore.getState();
+          for (const view of metricViews) {
+            if (!view.domain_id) {
+              const selectedDomainId = modelState.selectedDomainId;
+              if (selectedDomainId) {
+                view.domain_id = selectedDomainId;
+              }
+            }
+            modelState.addMetricView(view);
+          }
+          addToast({
+            type: 'success',
+            message: `Successfully imported ${metricViews.length} metric view(s)`,
           });
           onClose();
           return;
@@ -705,6 +727,7 @@ export const ImportExportDialog: React.FC<ImportExportDialogProps> = ({ isOpen, 
                 <option value="protobuf">Protobuf Schema</option>
                 <option value="odps">ODPS (Data Product)</option>
                 <option value="cads">CADS (Compute Asset)</option>
+                <option value="dbmv">DBMV (Databricks Metric View)</option>
                 <option value="bpmn">BPMN 2.0</option>
                 <option value="dmn">DMN 1.3</option>
                 <option value="openapi">OpenAPI</option>
@@ -781,6 +804,7 @@ export const ImportExportDialog: React.FC<ImportExportDialogProps> = ({ isOpen, 
                 <option value="protobuf">Protobuf Schema</option>
                 <option value="odps">ODPS (Data Product)</option>
                 <option value="cads">CADS (Compute Asset)</option>
+                <option value="dbmv">DBMV (Databricks Metric View)</option>
                 <option value="bpmn">BPMN 2.0</option>
                 <option value="dmn">DMN 1.3</option>
                 <option value="openapi">OpenAPI</option>

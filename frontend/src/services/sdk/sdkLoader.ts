@@ -8,7 +8,7 @@
 import init, * as sdkModule from '@offenedatenmodellierung/data-modelling-sdk';
 
 // Minimum required SDK version
-const MIN_SDK_VERSION = '2.3.0';
+const MIN_SDK_VERSION = '2.4.0';
 
 // Required SDK 2.3.0+ methods - core methods that must be present
 // Other methods (ODPS, CADS, etc.) are optional and checked at runtime
@@ -66,6 +66,10 @@ export interface SDKModule {
   // === CADS Markdown/PDF export ===
   export_cads_to_markdown(asset_json: string): string;
   export_cads_to_pdf(asset_json: string, branding_json?: string | null): string;
+
+  // === DBMV methods (SDK 2.4.0+) ===
+  parse_dbmv_yaml(yaml: string): string;
+  export_to_dbmv_yaml(json: string): string;
 
   // === Domain methods ===
   import_from_domain(yaml: string): string;

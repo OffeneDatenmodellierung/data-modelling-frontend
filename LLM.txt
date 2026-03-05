@@ -7,7 +7,7 @@ This file provides context for Large Language Models working with this codebase.
 A domain-centric data modelling application built with React, TypeScript, and Electron.
 Creates data architectures, models, and flow diagrams entirely offline with full Git/GitHub integration.
 
-**Version**: 3.0.1
+**Version**: 3.3.0
 **License**: ISC
 
 ## Technology Stack
@@ -29,7 +29,7 @@ Creates data architectures, models, and flow diagrams entirely offline with full
 - simple-git for Git operations
 
 ### WASM Modules
-- **data-modelling-sdk 2.3.0**: YAML parsing, validation, ODCS/ODPS/CADS format support, Knowledge Base, Decision Records, Sketches, stable YAML key ordering, workspace relationships, 150+ infrastructure types
+- **data-modelling-sdk 2.4.0**: YAML parsing, validation, ODCS/ODPS/CADS/DBMV format support, Knowledge Base, Decision Records, Sketches, stable YAML key ordering, workspace relationships, 150+ infrastructure types
 
 ## Key Features
 
@@ -41,8 +41,9 @@ Creates data architectures, models, and flow diagrams entirely offline with full
 6. **Decision Logs**: MADR-format Architecture Decision Records
 7. **Knowledge Base**: Documentation articles (Guide, Tutorial, Reference, etc.)
 8. **Help Panel**: Searchable in-app documentation with keyboard shortcuts (F1)
-9. **Import/Export**: ODCS, SQL, AVRO, JSON Schema, Protobuf formats
-10. **Offline First**: Works without backend; GitHub features require authentication
+9. **Import/Export**: ODCS, DBMV, SQL, AVRO, JSON Schema, Protobuf formats
+10. **Databricks Metric Views**: Standard and materialized metric views with dimensions, measures, filters, joins
+11. **Offline First**: Works without backend; GitHub features require authentication
 
 ## Project Structure
 
@@ -86,7 +87,7 @@ dm/
 - `tests/unit/components/github/`: PR review component tests (37 tests)
 - `tests/unit/stores/helpStore.test.ts`: Help store tests (23 tests)
 - `tests/unit/types/help.test.ts`: Help utility tests (22 tests)
-- Total test count: ~780 tests
+- Total test count: ~860 tests
 
 ## Development Commands
 

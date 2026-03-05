@@ -16,7 +16,8 @@ A domain-centric data modelling application built with React and Electron. Creat
 - **Excalidraw Sketches** (v2.5.0+): Freeform diagramming for architecture, dataflow, ER, sequence, flowchart, wireframe, and infrastructure diagrams
 - **Help Panel** (v3.0.0): Searchable in-app documentation with keyboard shortcuts (F1, Cmd+?)
 - **Offline First**: Works without backend; GitHub features available when authenticated
-- **Import/Export**: Support for ODCS, SQL, AVRO, JSON Schema, and Protobuf formats
+- **Databricks Metric Views** (v3.3.0): Standard and materialized metric views with dimensions, measures, filters, joins — analytical tab only
+- **Import/Export**: Support for ODCS, DBMV, SQL, AVRO, JSON Schema, and Protobuf formats
 - **Cross-Platform**: Electron desktop app (macOS, Windows, Linux)
 - **Domain-Centric**: Organize data models by business domains with systems, tables, relationships, BPMN processes, and DMN decisions
 - **Read-Only Viewer** (v3.1.0): Separate Cloudflare Pages deployment for sharing private models via GitHub App proxy

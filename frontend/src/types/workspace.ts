@@ -164,6 +164,7 @@ export interface SystemV2 {
   connection_string?: string; // Connection URL (SDK 2.3.0+)
   table_ids?: string[]; // UUIDs of tables belonging to this system
   asset_ids?: string[]; // UUIDs of compute assets belonging to this system
+  metric_view_ids?: string[]; // UUIDs of metric views belonging to this system
 
   // SDK 2.3.0+ DataFlow metadata fields
   owner?: Owner; // System owner
@@ -202,7 +203,7 @@ export interface ParsedFileName {
   domain?: string;
   system?: string;
   resource?: string;
-  type: 'workspace' | 'odcs' | 'odps' | 'cads' | 'bpmn' | 'dmn';
+  type: 'workspace' | 'odcs' | 'odps' | 'cads' | 'bpmn' | 'dmn' | 'dbmv';
 }
 
 /**
@@ -213,6 +214,7 @@ export interface CategorizedFiles {
   odcs: string[];
   odps: string[];
   cads: string[];
+  dbmv: string[]; // Databricks Metric Views (.dbmv.yaml)
   bpmn: string[];
   dmn: string[];
   kb: string[]; // Knowledge base articles (.kb.yaml)
@@ -227,6 +229,7 @@ export interface DomainFiles {
   odcs: File[];
   odps: File[];
   cads: File[];
+  dbmv: File[]; // Databricks Metric Views (.dbmv.yaml)
   bpmn: File[];
   dmn: File[];
   kb: File[]; // Knowledge base articles (.kb.yaml)

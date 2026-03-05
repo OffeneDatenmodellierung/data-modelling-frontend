@@ -8,8 +8,10 @@ import React from 'react';
 import { Handle, Position } from 'reactflow';
 import { TableCard } from './TableCard';
 import { ComputeAssetCard } from './ComputeAssetCard';
+import { MetricViewCard } from './MetricViewCard';
 import type { Table } from '@/types/table';
 import type { ComputeAsset } from '@/types/cads';
+import type { MetricView } from '@/types/metricView';
 
 import type { SystemType } from '@/types/system';
 
@@ -20,6 +22,7 @@ export interface SystemNodeData {
   description?: string;
   tables?: Table[]; // Tables belonging to this system (for Systems View)
   computeAssets?: ComputeAsset[]; // Compute assets belonging to this system (for Systems View)
+  metricViews?: MetricView[]; // Metric views belonging to this system (for Systems View)
   onTableClick?: (table: Table) => void; // Handler for table card clicks
   onTableEdit?: (tableId: string) => void; // Handler for table edit button clicks
   onTableDelete?: (tableId: string) => void; // Handler for table delete button clicks
@@ -34,6 +37,9 @@ export interface SystemNodeData {
   onAssetExport?: (assetId: string) => void; // Handler for compute asset export
   onAssetBPMNClick?: (assetId: string) => void; // Handler for BPMN icon clicks on assets
   onAssetDMNClick?: (assetId: string) => void; // Handler for DMN icon clicks on assets
+  onMetricViewEdit?: (viewId: string) => void; // Handler for metric view edit
+  onMetricViewDelete?: (viewId: string) => void; // Handler for metric view delete
+  onMetricViewExport?: (viewId: string) => void; // Handler for metric view export
   currentView?: 'systems' | 'etl' | 'operational' | 'analytical' | 'products';
   isShared?: boolean; // True if this is a shared resource from another domain
 }
@@ -51,6 +57,7 @@ export const SystemNode: React.FC<SystemNodeProps> = ({ data, selected }) => {
     description,
     tables = [],
     computeAssets = [],
+    metricViews = [],
     onTableBPMNClick,
     tableHasBPMN,
     onAssetBPMNClick,
@@ -65,6 +72,9 @@ export const SystemNode: React.FC<SystemNodeProps> = ({ data, selected }) => {
     onAssetEdit,
     onAssetDelete,
     onAssetExport,
+    onMetricViewEdit,
+    onMetricViewDelete,
+    onMetricViewExport,
     currentView,
     isShared = false,
   } = data;
@@ -458,58 +468,83 @@ export const SystemNode: React.FC<SystemNodeProps> = ({ data, selected }) => {
       </div>
 
       {/* Table Cards and Compute Asset Cards (only in Systems View) */}
-      {isSystemsView && (tables.length > 0 || computeAssets.length > 0) && (
-        <div className="p-3 space-y-2 max-h-[400px] overflow-y-auto">
-          {/* Tables Section */}
-          {tables.length > 0 && (
-            <>
-              <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-                Tables
-              </div>
-              {tables.map((table) => (
-                <TableCard
-                  key={table.id}
-                  table={table}
-                  onClick={() => onTableClick?.(table)}
-                  onEdit={onTableEdit}
-                  onDelete={onTableDelete}
-                  onExport={onTableExport}
-                  onBPMNClick={onTableBPMNClick}
-                  hasBPMNLink={tableHasBPMN?.(table.id) || false}
-                />
-              ))}
-            </>
-          )}
+      {isSystemsView &&
+        (tables.length > 0 || computeAssets.length > 0 || metricViews.length > 0) && (
+          <div className="p-3 space-y-2 max-h-[400px] overflow-y-auto">
+            {/* Tables Section */}
+            {tables.length > 0 && (
+              <>
+                <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+                  Tables
+                </div>
+                {tables.map((table) => (
+                  <TableCard
+                    key={table.id}
+                    table={table}
+                    onClick={() => onTableClick?.(table)}
+                    onEdit={onTableEdit}
+                    onDelete={onTableDelete}
+                    onExport={onTableExport}
+                    onBPMNClick={onTableBPMNClick}
+                    hasBPMNLink={tableHasBPMN?.(table.id) || false}
+                  />
+                ))}
+              </>
+            )}
 
-          {/* Compute Assets Section */}
-          {computeAssets.length > 0 && (
-            <>
-              {tables.length > 0 && <div className="pt-2 border-t border-gray-200 mt-2" />}
-              <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-                Assets
-              </div>
-              {computeAssets.map((asset) => (
-                <ComputeAssetCard
-                  key={asset.id}
-                  asset={asset}
-                  onEdit={onAssetEdit}
-                  onDelete={onAssetDelete}
-                  onExport={onAssetExport}
-                  onBPMNClick={onAssetBPMNClick}
-                  onDMNClick={onAssetDMNClick}
-                />
-              ))}
-            </>
-          )}
-        </div>
-      )}
+            {/* Compute Assets Section */}
+            {computeAssets.length > 0 && (
+              <>
+                {tables.length > 0 && <div className="pt-2 border-t border-gray-200 mt-2" />}
+                <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+                  Assets
+                </div>
+                {computeAssets.map((asset) => (
+                  <ComputeAssetCard
+                    key={asset.id}
+                    asset={asset}
+                    onEdit={onAssetEdit}
+                    onDelete={onAssetDelete}
+                    onExport={onAssetExport}
+                    onBPMNClick={onAssetBPMNClick}
+                    onDMNClick={onAssetDMNClick}
+                  />
+                ))}
+              </>
+            )}
+
+            {/* Metric Views Section */}
+            {metricViews.length > 0 && (
+              <>
+                {(tables.length > 0 || computeAssets.length > 0) && (
+                  <div className="pt-2 border-t border-gray-200 mt-2" />
+                )}
+                <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+                  Metric Views
+                </div>
+                {metricViews.map((view) => (
+                  <MetricViewCard
+                    key={view.id}
+                    metricView={view}
+                    onEdit={onMetricViewEdit}
+                    onDelete={onMetricViewDelete}
+                    onExport={onMetricViewExport}
+                  />
+                ))}
+              </>
+            )}
+          </div>
+        )}
 
       {/* Empty state for Systems View */}
-      {isSystemsView && tables.length === 0 && computeAssets.length === 0 && (
-        <div className="p-3 text-sm text-gray-400 text-center italic">
-          No tables or assets in this system
-        </div>
-      )}
+      {isSystemsView &&
+        tables.length === 0 &&
+        computeAssets.length === 0 &&
+        metricViews.length === 0 && (
+          <div className="p-3 text-sm text-gray-400 text-center italic">
+            No tables, assets, or metric views in this system
+          </div>
+        )}
     </div>
   );
 };
