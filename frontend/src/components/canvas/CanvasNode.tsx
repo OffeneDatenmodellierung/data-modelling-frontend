@@ -8,7 +8,7 @@ import { Handle, Position, NodeProps } from 'reactflow';
 import { useModelStore } from '@/stores/modelStore';
 import type { Table, QualityTier } from '@/types/table';
 import { getTableAriaLabel } from '@/utils/accessibility';
-import { getSourceTopic } from '@/utils/customProperties';
+import { getSourceTopic, getCatalogSchema, getResourceType } from '@/utils/customProperties';
 
 export interface TableNodeData {
   table: Table;
@@ -50,6 +50,21 @@ export const CanvasNode: React.FC<NodeProps<TableNodeData>> = memo(({ data, sele
   const showDataTypes = modelType === 'physical'; // Physical view: show data types
   const showConstraints = modelType === 'physical'; // Physical view: show constraints
 
+  // Set of column IDs that belong to any compound key (for badge display)
+  const compoundKeyColumnIds = useMemo(
+    () => new Set((table.compoundKeys || []).flatMap((ck) => ck.column_ids)),
+    [table.compoundKeys]
+  );
+
+  // Set of column IDs that belong to a primary compound key
+  const primaryCompoundKeyColumnIds = useMemo(
+    () =>
+      new Set(
+        (table.compoundKeys || []).filter((ck) => ck.is_primary).flatMap((ck) => ck.column_ids)
+      ),
+    [table.compoundKeys]
+  );
+
   // Filter columns based on view type and sort by order
   const visibleColumns = useMemo(() => {
     if (!showColumns) return [];
@@ -61,9 +76,6 @@ export const CanvasNode: React.FC<NodeProps<TableNodeData>> = memo(({ data, sele
     if (modelType === 'logical') {
       // Logical view: show only keys (primary keys, foreign keys, and unique indexes)
       // Exclude columns that are part of compound keys (they'll be shown separately)
-      const compoundKeyColumnIds = new Set(
-        (table.compoundKeys || []).flatMap((ck) => ck.column_ids)
-      );
       cols = rootColumns.filter(
         (col) =>
           (col.is_primary_key || col.is_foreign_key || col.is_unique) &&
@@ -76,7 +88,7 @@ export const CanvasNode: React.FC<NodeProps<TableNodeData>> = memo(({ data, sele
 
     // Sort by order
     return [...cols].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-  }, [table.columns, table.compoundKeys, modelType, showColumns]);
+  }, [table.columns, compoundKeyColumnIds, modelType, showColumns]);
 
   // Get compound keys for display in logical view
   const compoundKeys = useMemo(() => {
@@ -183,6 +195,8 @@ export const CanvasNode: React.FC<NodeProps<TableNodeData>> = memo(({ data, sele
   const qualityTier: QualityTier =
     (table.metadata?.quality_tier as QualityTier) || table.data_level || 'operational';
   const sourceTopic = getSourceTopic(table.customProperties);
+  const catalogSchema = getCatalogSchema(table.customProperties);
+  const resourceType = getResourceType(table.customProperties);
   const titleBarColor = useMemo(() => {
     // Cross-domain tables use pastel shades
     if (isCrossDomain) {
@@ -416,6 +430,14 @@ export const CanvasNode: React.FC<NodeProps<TableNodeData>> = memo(({ data, sele
               {sourceTopic}
             </span>
           )}
+          {catalogSchema && (
+            <span
+              className="text-xs font-normal text-white text-opacity-70 truncate"
+              title={`Location: ${catalogSchema}`}
+            >
+              {catalogSchema}
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
           {qualityTier !== 'operational' && (
@@ -440,6 +462,19 @@ export const CanvasNode: React.FC<NodeProps<TableNodeData>> = memo(({ data, sele
                 />
               </svg>
               BPMN
+            </span>
+          )}
+          {resourceType === 'view' && (
+            <span className="text-xs bg-blue-500 bg-opacity-80 px-2 py-0.5 rounded" title="View">
+              View
+            </span>
+          )}
+          {resourceType === 'materialized_view' && (
+            <span
+              className="text-xs bg-purple-500 bg-opacity-80 px-2 py-0.5 rounded"
+              title="Materialized View"
+            >
+              MV
             </span>
           )}
           {isReadOnly && (
@@ -506,22 +541,39 @@ export const CanvasNode: React.FC<NodeProps<TableNodeData>> = memo(({ data, sele
                     className="flex items-center gap-2 text-sm py-1 px-2 hover:bg-gray-50 rounded"
                   >
                     <span className="flex-1 truncate">
-                      {column.is_primary_key && (
+                      {/* Show CK for compound key members, PK only for standalone primary keys */}
+                      {compoundKeyColumnIds.has(column.id) ? (
+                        <span
+                          className={`font-bold mr-1 ${primaryCompoundKeyColumnIds.has(column.id) ? 'text-yellow-600' : 'text-purple-600'}`}
+                          aria-label={
+                            primaryCompoundKeyColumnIds.has(column.id)
+                              ? 'Primary compound key member'
+                              : 'Compound key member'
+                          }
+                        >
+                          CK
+                        </span>
+                      ) : column.is_primary_key ? (
                         <span className="text-yellow-600 font-bold mr-1" aria-label="Primary key">
                           PK
                         </span>
-                      )}
+                      ) : null}
                       {column.is_foreign_key && (
                         <span className="text-green-600 font-bold mr-1" aria-label="Foreign key">
                           FK
                         </span>
                       )}
-                      {/* Show IX only if unique AND not a primary key */}
-                      {column.is_unique && !column.is_primary_key && (
-                        <span className="text-purple-600 font-bold mr-1" aria-label="Unique index">
-                          IX
-                        </span>
-                      )}
+                      {/* Show IX only if unique AND not a primary key AND not in compound key */}
+                      {column.is_unique &&
+                        !column.is_primary_key &&
+                        !compoundKeyColumnIds.has(column.id) && (
+                          <span
+                            className="text-purple-600 font-bold mr-1"
+                            aria-label="Unique index"
+                          >
+                            IX
+                          </span>
+                        )}
                       <span className={column.nullable ? 'text-gray-600' : 'font-medium'}>
                         {column.name}
                       </span>

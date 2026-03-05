@@ -5,6 +5,48 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.4.0] - 2026-03-05
+
+### Added
+- **Catalog & Schema Fields**: New dedicated Catalog and Schema fields in the Table Metadata modal, stored as reserved `customProperties` keys
+  - Catalog/schema displayed as subtitle on canvas nodes and system view cards
+  - Table name uniqueness validation scoped by catalog + schema (allows same name in different locations)
+- **Resource Type Dropdown**: New Resource Type selector in Table Metadata modal (Table / View / Materialized View)
+  - Stored as `resource_type` customProperty; default (Table) stores nothing
+  - "View" (blue) and "MV" (purple) badges on canvas nodes and system view table cards
+- **Metric View Import UI**: Dedicated amber action button in Analytical view for creating/importing DBMV metric views
+  - Create mode: name, source table, view type, description
+  - Import mode: paste YAML or upload `.yaml`/`.yml` file
+- **Compound Key Badges**: Columns in compound keys now show 'CK' badge instead of 'PK' in physical view
+  - Primary compound key members use yellow 'CK', non-primary use purple 'CK'
+  - 'PK' reserved for standalone primary keys only — each table shows at most one 'PK'
+
+### New Files
+- `frontend/src/components/views/MetricViewActions.tsx` — Analytical view action button for metric views
+- `frontend/src/components/views/CreateMetricViewDialog.tsx` — Create/Import dialog for DBMV metric views
+
+## [3.3.0] - 2026-03-05
+
+### Added
+- **Databricks Metric Views (DBMV)**: Full support for Databricks Metric Views as a new entity type
+  - New `MetricView` entity with standard and materialized view types
+  - Dimensions, measures, filters, joins, and materialization configuration
+  - Gold-to-purple gradient canvas nodes (visually distinct from tables and compute assets)
+  - Metric views displayed exclusively in the Analytical view tab
+  - System-bound via `system.metric_view_ids` (same pattern as tables and compute assets)
+  - Import: accepts both full DBMV document (multi-view) and single view YAML
+  - Export from card: single view YAML format
+  - Save: all views grouped by system into `.dbmv.yaml` files
+  - Compact cards in System View showing name, type badge, dimension/measure counts
+- **SDK 2.4.0**: Updated WASM SDK with `parse_dbmv_yaml` and `export_to_dbmv_yaml` bindings
+- **Quality Rules**: Added `mustBeBetween` and `mustNotBeBetween` quality rules with range min/max fields in Column Details modal
+
+### New Files
+- `frontend/src/types/metricView.ts` — MetricView type definitions (dimensions, measures, joins, materialization)
+- `frontend/src/services/sdk/dbmvService.ts` — DBMV parse/export service with SDK, API, and js-yaml fallbacks
+- `frontend/src/components/canvas/MetricViewNode.tsx` — ReactFlow canvas node with gold-purple gradient
+- `frontend/src/components/views/MetricViewCard.tsx` — Compact card for System View
+
 ## [3.2.1] - 2026-02-26
 
 ### Fixed

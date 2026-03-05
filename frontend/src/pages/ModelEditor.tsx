@@ -1046,9 +1046,33 @@ const ModelEditor: React.FC = () => {
   if (error) {
     return (
       <div className="flex items-center justify-center h-screen">
-        <div className="text-center">
+        <div className="text-center max-w-md">
           <h2 className="text-xl font-semibold text-red-600 mb-2">Error</h2>
-          <p className="text-gray-600">{error}</p>
+          <p className="text-gray-600 mb-4">{error}</p>
+          <div className="flex gap-3 justify-center">
+            <button
+              onClick={() => window.location.reload()}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            >
+              Retry
+            </button>
+            {isViewerMode() && (
+              <button
+                onClick={async () => {
+                  try {
+                    const { resetApplicationState } = await import('@/utils/resetApplicationState');
+                    await resetApplicationState();
+                  } catch (e) {
+                    console.warn('[ModelEditor] Reset failed:', e);
+                  }
+                  window.location.href = '/';
+                }}
+                className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700"
+              >
+                Reset &amp; Retry
+              </button>
+            )}
+          </div>
         </div>
       </div>
     );

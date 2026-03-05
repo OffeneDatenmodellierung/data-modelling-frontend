@@ -26,7 +26,9 @@ export interface QualityRule {
     | 'string_constraints'
     | 'numeric_constraints'
     | 'pattern'
-    | 'format';
+    | 'format'
+    | 'must_be_between'
+    | 'must_not_be_between';
   enabled: boolean;
   value?: string | number | string[];
   minLength?: number;
@@ -36,6 +38,8 @@ export interface QualityRule {
   minimum?: number;
   maximum?: number;
   validValues?: string[];
+  rangeMin?: number;
+  rangeMax?: number;
 }
 
 // Tooltip component for field descriptions
@@ -518,6 +522,26 @@ export const ColumnDetailsModal: React.FC<ColumnDetailsModalProps> = ({
         }
       }
 
+      if (allConstraints.mustBeBetween) {
+        const range = allConstraints.mustBeBetween as [number, number];
+        rules.push({
+          type: 'must_be_between',
+          enabled: true,
+          rangeMin: range[0],
+          rangeMax: range[1],
+        });
+      }
+
+      if (allConstraints.mustNotBeBetween) {
+        const range = allConstraints.mustNotBeBetween as [number, number];
+        rules.push({
+          type: 'must_not_be_between',
+          enabled: true,
+          rangeMin: range[0],
+          rangeMax: range[1],
+        });
+      }
+
       setQualityRules(rules);
     }
 
@@ -639,6 +663,16 @@ export const ColumnDetailsModal: React.FC<ColumnDetailsModalProps> = ({
           case 'valid_values':
             if (rule.validValues && rule.validValues.length > 0) {
               constraints.validValues = rule.validValues;
+            }
+            break;
+          case 'must_be_between':
+            if (rule.rangeMin !== undefined && rule.rangeMax !== undefined) {
+              constraints.mustBeBetween = [rule.rangeMin, rule.rangeMax];
+            }
+            break;
+          case 'must_not_be_between':
+            if (rule.rangeMin !== undefined && rule.rangeMax !== undefined) {
+              constraints.mustNotBeBetween = [rule.rangeMin, rule.rangeMax];
             }
             break;
         }
@@ -1212,6 +1246,8 @@ export const ColumnDetailsModal: React.FC<ColumnDetailsModalProps> = ({
                   <option value="numeric_constraints">Numeric Constraints (min/max value)</option>
                   <option value="pattern">Pattern (regex validation)</option>
                   <option value="format">Format (email, UUID, date, etc.)</option>
+                  <option value="must_be_between">Must Be Between (inclusive range)</option>
+                  <option value="must_not_be_between">Must Not Be Between (excluded range)</option>
                   <option value="valid_values">Valid Values (enumeration)</option>
                 </select>
               </div>
@@ -1322,6 +1358,53 @@ export const ColumnDetailsModal: React.FC<ColumnDetailsModalProps> = ({
                               onChange={(e) =>
                                 handleUpdateQualityRule(index, {
                                   maximum: e.target.value ? parseFloat(e.target.value) : undefined,
+                                })
+                              }
+                              className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
+                              placeholder="100"
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      {(rule.type === 'must_be_between' || rule.type === 'must_not_be_between') && (
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <LabelWithTooltip
+                              label="Range Min"
+                              tooltip={
+                                rule.type === 'must_be_between'
+                                  ? 'Value must be >= this'
+                                  : 'Value must not be >= this'
+                              }
+                            />
+                            <input
+                              type="number"
+                              value={rule.rangeMin ?? ''}
+                              onChange={(e) =>
+                                handleUpdateQualityRule(index, {
+                                  rangeMin: e.target.value ? parseFloat(e.target.value) : undefined,
+                                })
+                              }
+                              className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
+                              placeholder="0"
+                            />
+                          </div>
+                          <div>
+                            <LabelWithTooltip
+                              label="Range Max"
+                              tooltip={
+                                rule.type === 'must_be_between'
+                                  ? 'Value must be <= this'
+                                  : 'Value must not be <= this'
+                              }
+                            />
+                            <input
+                              type="number"
+                              value={rule.rangeMax ?? ''}
+                              onChange={(e) =>
+                                handleUpdateQualityRule(index, {
+                                  rangeMax: e.target.value ? parseFloat(e.target.value) : undefined,
                                 })
                               }
                               className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
