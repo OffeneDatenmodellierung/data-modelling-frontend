@@ -281,7 +281,6 @@ const PHYSICAL_TYPE_OPTIONS = [
   { value: 'FLOAT', label: 'FLOAT' },
   { value: 'DOUBLE', label: 'DOUBLE' },
   { value: 'DECIMAL', label: 'DECIMAL' },
-  { value: 'DECIMAL(10,2)', label: 'DECIMAL(10,2)' },
   { value: 'NUMERIC', label: 'NUMERIC' },
   { value: 'REAL', label: 'REAL' },
   // Date/Time types
@@ -355,6 +354,8 @@ export const ColumnDetailsModal: React.FC<ColumnDetailsModalProps> = ({
   const [physicalName, setPhysicalName] = useState<string>('');
   const [physicalType, setPhysicalType] = useState<string>('');
   const [logicalType, setLogicalType] = useState<string>('');
+  const [decimalPrecision, setDecimalPrecision] = useState<string>('');
+  const [decimalScale, setDecimalScale] = useState<string>('');
 
   // Data Governance
   const [classification, setClassification] = useState<string>('');
@@ -398,7 +399,27 @@ export const ColumnDetailsModal: React.FC<ColumnDetailsModalProps> = ({
     // ODCS Naming
     setBusinessName(column.businessName || '');
     setPhysicalName(column.physicalName || '');
-    setPhysicalType(column.physicalType || '');
+    // Parse DECIMAL/NUMERIC precision and scale from physicalType string like "DECIMAL(10,2)"
+    const rawPhysicalType = column.physicalType || '';
+    const decimalMatch = rawPhysicalType.match(/^(DECIMAL|NUMERIC)\((\d+),\s*(\d+)\)$/i);
+    if (decimalMatch && decimalMatch[1] && decimalMatch[2] && decimalMatch[3]) {
+      setPhysicalType(decimalMatch[1].toUpperCase());
+      setDecimalPrecision(decimalMatch[2]);
+      setDecimalScale(decimalMatch[3]);
+    } else {
+      setPhysicalType(rawPhysicalType);
+      // Fall back to logicalTypeOptions if available
+      setDecimalPrecision(
+        column.logicalTypeOptions?.precision !== undefined
+          ? String(column.logicalTypeOptions.precision)
+          : ''
+      );
+      setDecimalScale(
+        column.logicalTypeOptions?.scale !== undefined
+          ? String(column.logicalTypeOptions.scale)
+          : ''
+      );
+    }
     setLogicalType(column.logicalType || '');
 
     // Data Governance
@@ -633,6 +654,17 @@ export const ColumnDetailsModal: React.FC<ColumnDetailsModalProps> = ({
   };
 
   const handleSave = async () => {
+    // Validate DECIMAL/NUMERIC precision and scale
+    const baseType = physicalType?.toUpperCase();
+    if (baseType === 'DECIMAL' || baseType === 'NUMERIC') {
+      const p = decimalPrecision ? parseInt(decimalPrecision, 10) : 0;
+      const s = decimalScale ? parseInt(decimalScale, 10) : 0;
+      if (p > 0 && s >= p) {
+        addToast({ type: 'error', message: 'Scale must be less than precision' });
+        return;
+      }
+    }
+
     setIsSaving(true);
     try {
       // Build constraints object from quality rules
@@ -692,8 +724,26 @@ export const ColumnDetailsModal: React.FC<ColumnDetailsModalProps> = ({
         // ODCS Naming
         businessName: businessName || undefined,
         physicalName: physicalName || undefined,
-        physicalType: physicalType || undefined,
+        physicalType: (() => {
+          const baseType = physicalType?.toUpperCase();
+          if ((baseType === 'DECIMAL' || baseType === 'NUMERIC') && decimalPrecision) {
+            return `${baseType}(${decimalPrecision},${decimalScale || '0'})`;
+          }
+          return physicalType || undefined;
+        })(),
         logicalType: logicalType || undefined,
+        logicalTypeOptions: (() => {
+          const opts = column.logicalTypeOptions ? { ...column.logicalTypeOptions } : {};
+          const baseType = physicalType?.toUpperCase();
+          if ((baseType === 'DECIMAL' || baseType === 'NUMERIC') && decimalPrecision) {
+            opts.precision = parseInt(decimalPrecision, 10);
+            opts.scale = parseInt(decimalScale || '0', 10);
+          } else {
+            delete opts.precision;
+            delete opts.scale;
+          }
+          return Object.keys(opts).length > 0 ? opts : undefined;
+        })(),
 
         // Data Governance
         classification: classification || undefined,
@@ -1048,6 +1098,41 @@ export const ColumnDetailsModal: React.FC<ColumnDetailsModalProps> = ({
                       </option>
                     ))}
                   </select>
+                  {(physicalType.toUpperCase() === 'DECIMAL' ||
+                    physicalType.toUpperCase() === 'NUMERIC') && (
+                    <div className="flex gap-2 mt-2">
+                      <div className="flex-1">
+                        <label className="text-xs text-gray-600 mb-0.5 block">
+                          Precision (total digits)
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          max="38"
+                          value={decimalPrecision}
+                          onChange={(e) => setDecimalPrecision(e.target.value)}
+                          placeholder="10"
+                          className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          disabled={readOnly}
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <label className="text-xs text-gray-600 mb-0.5 block">
+                          Scale (decimal places)
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          max="38"
+                          value={decimalScale}
+                          onChange={(e) => setDecimalScale(e.target.value)}
+                          placeholder="2"
+                          className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          disabled={readOnly}
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
                 <div>
                   <LabelWithTooltip
