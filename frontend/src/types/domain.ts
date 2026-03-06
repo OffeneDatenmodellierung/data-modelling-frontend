@@ -45,6 +45,7 @@ export interface Domain {
   tables?: string[]; // Array of table IDs (ODCS)
   products?: string[]; // Array of product IDs (ODPS)
   assets?: string[]; // Array of compute asset IDs (CADS)
+  metric_views?: string[]; // Array of metric view IDs (DBMV)
   processes?: string[]; // Array of BPMN process IDs
   decisions?: string[]; // Array of DMN decision IDs
 

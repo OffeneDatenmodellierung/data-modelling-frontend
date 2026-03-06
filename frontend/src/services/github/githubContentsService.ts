@@ -6,7 +6,7 @@
  */
 
 import { githubApi } from './githubApi';
-import { isViewerMode } from '@/services/viewerMode';
+import { isViewerMode, viewerAutoRecover } from '@/services/viewerMode';
 import type {
   GitHubFileContent,
   GitHubDirectoryEntry,
@@ -122,6 +122,9 @@ export async function getTree(
   });
 
   if (!response.ok) {
+    if (isViewerMode() && (response.status === 502 || response.status === 503)) {
+      await viewerAutoRecover();
+    }
     throw new Error(`Failed to get tree: ${response.status}`);
   }
 

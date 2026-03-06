@@ -7,6 +7,7 @@ import { browserFileService } from '@/services/platform/browser';
 import { odcsService } from '@/services/sdk/odcsService';
 import { odpsService } from '@/services/sdk/odpsService';
 import { cadsService } from '@/services/sdk/cadsService';
+import { dbmvService } from '@/services/sdk/dbmvService';
 import { bpmnService } from '@/services/sdk/bpmnService';
 import { dmnService } from '@/services/sdk/dmnService';
 import { knowledgeService } from '@/services/sdk/knowledgeService';
@@ -34,6 +35,7 @@ import type { Table } from '@/types/table';
 import type { Relationship } from '@/types/relationship';
 import type { DataProduct } from '@/types/odps';
 import type { ComputeAsset } from '@/types/cads';
+import type { MetricView } from '@/types/metricView';
 import type { BPMNProcess } from '@/types/bpmn';
 import type { DMNDecision } from '@/types/dmn';
 import type { KnowledgeArticle } from '@/types/knowledge';
@@ -48,6 +50,7 @@ interface DomainLoadResult {
   tables: Table[];
   products: DataProduct[];
   assets: ComputeAsset[];
+  metricViews: MetricView[];
   processes: BPMNProcess[];
   decisions: DMNDecision[];
   systems: System[];
@@ -111,6 +114,7 @@ export class WorkspaceV2Loader {
       odcs: categorized.odcs.length,
       odps: categorized.odps.length,
       cads: categorized.cads.length,
+      dbmv: categorized.dbmv.length,
       bpmn: categorized.bpmn.length,
       dmn: categorized.dmn.length,
       kb: categorized.kb.length,
@@ -137,6 +141,7 @@ export class WorkspaceV2Loader {
     const allTables: Table[] = [];
     const allProducts: DataProduct[] = [];
     const allAssets: ComputeAsset[] = [];
+    const allMetricViews: MetricView[] = [];
     const allProcesses: BPMNProcess[] = [];
     const allDecisions: DMNDecision[] = [];
     const allSystems: System[] = [];
@@ -150,6 +155,7 @@ export class WorkspaceV2Loader {
       allTables.push(...result.tables);
       allProducts.push(...result.products);
       allAssets.push(...result.assets);
+      allMetricViews.push(...result.metricViews);
       allProcesses.push(...result.processes);
       allDecisions.push(...result.decisions);
       allSystems.push(...result.systems);
@@ -265,6 +271,7 @@ export class WorkspaceV2Loader {
       systems?: System[];
       products?: DataProduct[];
       assets?: ComputeAsset[];
+      metricViews?: MetricView[];
       bpmnProcesses?: BPMNProcess[];
       dmnDecisions?: DMNDecision[];
       knowledgeArticles?: KnowledgeArticle[];
@@ -303,6 +310,10 @@ export class WorkspaceV2Loader {
     if (allAssets.length > 0) {
       workspace.assets = allAssets;
       console.log(`[WorkspaceV2Loader] Added ${allAssets.length} asset(s) to workspace`);
+    }
+    if (allMetricViews.length > 0) {
+      workspace.metricViews = allMetricViews;
+      console.log(`[WorkspaceV2Loader] Added ${allMetricViews.length} metric view(s) to workspace`);
     }
     if (allProcesses.length > 0) {
       workspace.bpmnProcesses = allProcesses;
@@ -346,6 +357,7 @@ export class WorkspaceV2Loader {
       systems: allSystems.length,
       products: allProducts.length,
       assets: allAssets.length,
+      metricViews: allMetricViews.length,
       bpmnProcesses: allProcesses.length,
       dmnDecisions: allDecisions.length,
       knowledgeArticles: allKnowledgeArticles.length,
@@ -384,6 +396,7 @@ export class WorkspaceV2Loader {
       odcs: categorized.odcs.length,
       odps: categorized.odps.length,
       cads: categorized.cads.length,
+      dbmv: categorized.dbmv.length,
       bpmn: categorized.bpmn.length,
       dmn: categorized.dmn.length,
       kb: categorized.kb.length,
@@ -410,6 +423,7 @@ export class WorkspaceV2Loader {
     const allTables: Table[] = [];
     const allProducts: DataProduct[] = [];
     const allAssets: ComputeAsset[] = [];
+    const allMetricViews: MetricView[] = [];
     const allProcesses: BPMNProcess[] = [];
     const allDecisions: DMNDecision[] = [];
     const allSystems: System[] = [];
@@ -423,6 +437,7 @@ export class WorkspaceV2Loader {
       allTables.push(...result.tables);
       allProducts.push(...result.products);
       allAssets.push(...result.assets);
+      allMetricViews.push(...result.metricViews);
       allProcesses.push(...result.processes);
       allDecisions.push(...result.decisions);
       allSystems.push(...result.systems);
@@ -506,6 +521,7 @@ export class WorkspaceV2Loader {
       systems?: System[];
       products?: DataProduct[];
       assets?: ComputeAsset[];
+      metricViews?: MetricView[];
       bpmnProcesses?: BPMNProcess[];
       dmnDecisions?: DMNDecision[];
       knowledgeArticles?: KnowledgeArticle[];
@@ -528,6 +544,7 @@ export class WorkspaceV2Loader {
     if (allSystems.length > 0) workspace.systems = allSystems;
     if (allProducts.length > 0) workspace.products = allProducts;
     if (allAssets.length > 0) workspace.assets = allAssets;
+    if (allMetricViews.length > 0) workspace.metricViews = allMetricViews;
     if (allProcesses.length > 0) workspace.bpmnProcesses = allProcesses;
     if (allDecisions.length > 0) workspace.dmnDecisions = allDecisions;
     if (allKnowledgeArticles.length > 0) workspace.knowledgeArticles = allKnowledgeArticles;
@@ -575,6 +592,7 @@ export class WorkspaceV2Loader {
       odcs: domainFiles.odcs.length,
       odps: domainFiles.odps.length,
       cads: domainFiles.cads.length,
+      dbmv: domainFiles.dbmv.length,
       bpmn: domainFiles.bpmn.length,
       dmn: domainFiles.dmn.length,
       kb: domainFiles.kb.length,
@@ -594,6 +612,14 @@ export class WorkspaceV2Loader {
 
     // Load assets
     const assets = await this.loadAssets(domainFiles.cads, domainSpec);
+
+    // Load metric views
+    const { views: metricViews, viewSystemNameMap } = await this.loadMetricViews(
+      domainFiles.dbmv,
+      domainSpec,
+      workspaceName,
+      domainSpec.name
+    );
 
     // Load processes
     const processes = await this.loadProcesses(domainFiles.bpmn, domainSpec);
@@ -617,6 +643,10 @@ export class WorkspaceV2Loader {
       failedOdcsFiles
     );
 
+    // Auto-assign metric views to systems based on DBMV filename
+    // DBMV files are named {workspace}_{domain}_{system}.dbmv.yaml
+    this.assignMetricViewsToSystems(systems, metricViews, viewSystemNameMap);
+
     // Construct Domain object (SDK schema has simpler DomainV2 structure)
     const domain: Domain = {
       id: domainSpec.id,
@@ -631,6 +661,7 @@ export class WorkspaceV2Loader {
       tables: tables.map((t) => t.id),
       products: products.map((p) => p.id),
       assets: assets.map((a) => a.id),
+      metric_views: metricViews.map((mv) => mv.id),
       processes: processes.map((p) => p.id),
       decisions: decisions.map((d) => d.id),
       // Load view-specific positions for canvas nodes (tables, systems, assets)
@@ -644,6 +675,7 @@ export class WorkspaceV2Loader {
       tables,
       products,
       assets,
+      metricViews,
       processes,
       decisions,
       systems,
@@ -676,6 +708,7 @@ export class WorkspaceV2Loader {
       odcs: domainFiles.odcs.length,
       odps: domainFiles.odps.length,
       cads: domainFiles.cads.length,
+      dbmv: domainFiles.dbmv.length,
       bpmn: domainFiles.bpmn.length,
       dmn: domainFiles.dmn.length,
       kb: domainFiles.kb.length,
@@ -695,6 +728,14 @@ export class WorkspaceV2Loader {
 
     // Load assets
     const assets = await this.loadAssetsFromStrings(domainFiles.cads, domainSpec);
+
+    // Load metric views
+    const { views: metricViews, viewSystemNameMap } = await this.loadMetricViewsFromStrings(
+      domainFiles.dbmv,
+      domainSpec,
+      workspaceName,
+      domainSpec.name
+    );
 
     // Load processes
     const processes = await this.loadProcessesFromStrings(domainFiles.bpmn, domainSpec);
@@ -718,6 +759,9 @@ export class WorkspaceV2Loader {
       failedOdcsFiles
     );
 
+    // Auto-assign metric views to systems based on DBMV filename
+    this.assignMetricViewsToSystems(systems, metricViews, viewSystemNameMap);
+
     // Construct Domain object
     const domain: Domain = {
       id: domainSpec.id,
@@ -732,6 +776,7 @@ export class WorkspaceV2Loader {
       tables: tables.map((t) => t.id),
       products: products.map((p) => p.id),
       assets: assets.map((a) => a.id),
+      metric_views: metricViews.map((mv) => mv.id),
       processes: processes.map((p) => p.id),
       decisions: decisions.map((d) => d.id),
       // Load view-specific positions for canvas nodes (tables, systems, assets)
@@ -745,6 +790,7 @@ export class WorkspaceV2Loader {
       tables,
       products,
       assets,
+      metricViews,
       processes,
       decisions,
       systems,
@@ -767,6 +813,7 @@ export class WorkspaceV2Loader {
     odcs: Array<{ name: string; content: string }>;
     odps: Array<{ name: string; content: string }>;
     cads: Array<{ name: string; content: string }>;
+    dbmv: Array<{ name: string; content: string }>;
     bpmn: Array<{ name: string; content: string }>;
     dmn: Array<{ name: string; content: string }>;
     kb: Array<{ name: string; content: string }>;
@@ -804,6 +851,7 @@ export class WorkspaceV2Loader {
       odcs: filterByPrefix(categorized.odcs),
       odps: filterByPrefix(categorized.odps),
       cads: filterByPrefix(categorized.cads),
+      dbmv: filterByPrefix(categorized.dbmv),
       bpmn: filterByPrefix(categorized.bpmn),
       dmn: filterByPrefix(categorized.dmn),
       kb: filterByPrefix(categorized.kb),
@@ -934,6 +982,55 @@ export class WorkspaceV2Loader {
     }
 
     return assets;
+  }
+
+  /**
+   * Load DBMV metric views from string content
+   */
+  private static async loadMetricViewsFromStrings(
+    files: Array<{ name: string; content: string }>,
+    domainSpec: DomainV2,
+    workspaceName: string,
+    domainName: string
+  ): Promise<{ views: MetricView[]; viewSystemNameMap: Map<string, string> }> {
+    const views: MetricView[] = [];
+    const viewSystemNameMap = new Map<string, string>();
+
+    // Build prefix to extract system name from filename
+    // Pattern: {workspace}_{domain}_{system}.dbmv.yaml
+    const prefix = `${workspaceName}_${domainName}_`.toLowerCase();
+
+    for (const file of files) {
+      try {
+        const parsed = await dbmvService.parseYAML(file.content);
+
+        // Extract system name from filename
+        const fileName = file.name.split('/').pop() || file.name;
+        let systemName: string | undefined;
+        const fileNameLower = fileName.toLowerCase();
+        if (fileNameLower.startsWith(prefix)) {
+          systemName = fileName.substring(prefix.length).replace(/\.dbmv\.yaml$/i, '');
+        }
+
+        for (const view of parsed) {
+          view.domain_id = domainSpec.id;
+          views.push(view);
+          if (systemName) {
+            viewSystemNameMap.set(view.id, systemName);
+          }
+        }
+
+        if (parsed.length > 0) {
+          console.log(
+            `[WorkspaceV2Loader] Loaded ${parsed.length} metric view(s) from ${file.name}${systemName ? ` (system: ${systemName})` : ''}`
+          );
+        }
+      } catch (error) {
+        console.error(`[WorkspaceV2Loader] Failed to load metric view from ${file.name}:`, error);
+      }
+    }
+
+    return { views, viewSystemNameMap };
   }
 
   /**
@@ -1148,8 +1245,9 @@ export class WorkspaceV2Loader {
         }
       }
 
-      // Get asset_ids from workspace.yaml if present
+      // Get asset_ids and metric_view_ids from workspace.yaml if present
       const assetIds = spec.asset_ids || [];
+      const metricViewIds = spec.metric_view_ids || [];
 
       const system: System = {
         id: spec.id,
@@ -1162,6 +1260,7 @@ export class WorkspaceV2Loader {
         connection_string: spec.connection_string,
         table_ids: tableIds,
         asset_ids: assetIds,
+        metric_view_ids: metricViewIds,
         created_at: new Date().toISOString(),
         last_modified_at: new Date().toISOString(),
       };
@@ -1176,11 +1275,44 @@ export class WorkspaceV2Loader {
 
       systems.push(system);
       console.log(
-        `[WorkspaceV2Loader] Loaded system "${spec.name}" with ${tableIds.length} table(s), ${assetIds.length} asset(s)`
+        `[WorkspaceV2Loader] Loaded system "${spec.name}" with ${tableIds.length} table(s), ${assetIds.length} asset(s), ${metricViewIds.length} metric view(s)`
       );
     }
 
     return systems;
+  }
+
+  /**
+   * Auto-assign metric views to systems based on DBMV filename system name extraction.
+   * Only assigns if the system doesn't already have metric_view_ids from workspace.yaml.
+   */
+  private static assignMetricViewsToSystems(
+    systems: System[],
+    metricViews: MetricView[],
+    viewSystemNameMap: Map<string, string>
+  ): void {
+    if (metricViews.length === 0 || viewSystemNameMap.size === 0) return;
+
+    for (const system of systems) {
+      // Skip if system already has metric_view_ids from workspace.yaml
+      if (system.metric_view_ids && system.metric_view_ids.length > 0) continue;
+
+      // Find metric views whose DBMV filename matches this system name (case-insensitive)
+      const systemNameLower = system.name.toLowerCase();
+      const matchedViewIds = metricViews
+        .filter((v) => {
+          const viewSystemName = viewSystemNameMap.get(v.id);
+          return viewSystemName && viewSystemName.toLowerCase() === systemNameLower;
+        })
+        .map((v) => v.id);
+
+      if (matchedViewIds.length > 0) {
+        system.metric_view_ids = matchedViewIds;
+        console.log(
+          `[WorkspaceV2Loader] Auto-assigned ${matchedViewIds.length} metric view(s) to system "${system.name}" from DBMV filename`
+        );
+      }
+    }
   }
 
   /**
@@ -1302,6 +1434,7 @@ export class WorkspaceV2Loader {
       odcs: filterByPrefix(categorized.odcs),
       odps: filterByPrefix(categorized.odps),
       cads: filterByPrefix(categorized.cads),
+      dbmv: filterByPrefix(categorized.dbmv),
       bpmn: filterByPrefix(categorized.bpmn),
       dmn: filterByPrefix(categorized.dmn),
       kb: filterByPrefix(categorized.kb),
@@ -1405,6 +1538,56 @@ export class WorkspaceV2Loader {
     }
 
     return assets;
+  }
+
+  /**
+   * Load DBMV metric views from files
+   */
+  private static async loadMetricViews(
+    files: File[],
+    domainSpec: DomainV2,
+    workspaceName: string,
+    domainName: string
+  ): Promise<{ views: MetricView[]; viewSystemNameMap: Map<string, string> }> {
+    const views: MetricView[] = [];
+    const viewSystemNameMap = new Map<string, string>();
+
+    // Build prefix to extract system name from filename
+    // Pattern: {workspace}_{domain}_{system}.dbmv.yaml
+    const prefix = `${workspaceName}_${domainName}_`.toLowerCase();
+
+    for (const file of files) {
+      try {
+        const content = await browserFileService.readFile(file);
+        const parsed = await dbmvService.parseYAML(content);
+
+        // Extract system name from filename
+        const fileName = file.name.split('/').pop() || file.name;
+        let systemName: string | undefined;
+        const fileNameLower = fileName.toLowerCase();
+        if (fileNameLower.startsWith(prefix)) {
+          systemName = fileName.substring(prefix.length).replace(/\.dbmv\.yaml$/i, '');
+        }
+
+        for (const view of parsed) {
+          view.domain_id = domainSpec.id;
+          views.push(view);
+          if (systemName) {
+            viewSystemNameMap.set(view.id, systemName);
+          }
+        }
+
+        if (parsed.length > 0) {
+          console.log(
+            `[WorkspaceV2Loader] Loaded ${parsed.length} metric view(s) from ${file.name}${systemName ? ` (system: ${systemName})` : ''}`
+          );
+        }
+      } catch (error) {
+        console.error(`[WorkspaceV2Loader] Failed to load metric view from ${file.name}:`, error);
+      }
+    }
+
+    return { views, viewSystemNameMap };
   }
 
   /**
@@ -1557,6 +1740,7 @@ export class WorkspaceV2Loader {
     const odcsPattern = /\.odcs\.yaml$/;
     const odpsPattern = /\.odps\.yaml$/;
     const cadsPattern = /\.cads\.yaml$/;
+    const dbmvPattern = /\.dbmv\.yaml$/;
     const bpmnPattern = /\.bpmn$/;
     const dmnPattern = /\.dmn$/;
     const kbPattern = /\.kb\.yaml$/;
@@ -1574,6 +1758,7 @@ export class WorkspaceV2Loader {
       odcs: filePaths.filter((f) => odcsPattern.test(getFileName(f))),
       odps: filePaths.filter((f) => odpsPattern.test(getFileName(f))),
       cads: filePaths.filter((f) => cadsPattern.test(getFileName(f))),
+      dbmv: filePaths.filter((f) => dbmvPattern.test(getFileName(f))),
       bpmn: filePaths.filter((f) => bpmnPattern.test(getFileName(f))),
       dmn: filePaths.filter((f) => dmnPattern.test(getFileName(f))),
       kb: filePaths.filter((f) => kbPattern.test(getFileName(f))),

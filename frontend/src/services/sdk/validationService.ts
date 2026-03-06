@@ -11,6 +11,7 @@ import type { KnowledgeArticle } from '@/types/knowledge';
 import type { Decision } from '@/types/decision';
 import type { ResourceType, ValidationSeverity } from '@/stores/validationStore';
 import { isValidTableName, isValidColumnName } from '@/utils/validation';
+import { getCatalog, getSchema } from '@/utils/customProperties';
 
 export interface ValidationError {
   field: string;
@@ -215,16 +216,20 @@ class ValidationService {
       }
     }
 
-    // Check for duplicate table names
+    // Check for duplicate table names (scoped by catalog + schema)
     const tableNames = new Map<string, string>();
     for (const table of tables) {
-      if (tableNames.has(table.name)) {
+      const cat = getCatalog(table.customProperties) ?? '';
+      const sch = getSchema(table.customProperties) ?? '';
+      const nameKey = `${cat}::${sch}::${table.name}`;
+      if (tableNames.has(nameKey)) {
         duplicateNames.push(table.name);
+        const location = cat || sch ? ` in ${[cat, sch].filter(Boolean).join('.')}` : '';
         errors.push(
-          `Duplicate table name: ${table.name} (tables ${tableNames.get(table.name)} and ${table.id})`
+          `Duplicate table name: ${table.name}${location} (tables ${tableNames.get(nameKey)} and ${table.id})`
         );
       } else {
-        tableNames.set(table.name, table.id);
+        tableNames.set(nameKey, table.id);
       }
     }
 
@@ -553,20 +558,26 @@ class ValidationService {
       }
     }
 
-    // Check for duplicate table names
+    // Check for duplicate table names (scoped by catalog + schema)
     const tableNames = new Map<string, string>();
     for (const table of tables) {
-      if (table.name && tableNames.has(table.name.toLowerCase())) {
-        issues.push({
-          resourceType: 'table',
-          resourceId: table.id,
-          resourceName: table.name,
-          severity: 'error',
-          field: 'name',
-          message: `Duplicate table name "${table.name}"`,
-        });
-      } else if (table.name) {
-        tableNames.set(table.name.toLowerCase(), table.id);
+      if (table.name) {
+        const cat = getCatalog(table.customProperties) ?? '';
+        const sch = getSchema(table.customProperties) ?? '';
+        const nameKey = `${cat}::${sch}::${table.name.toLowerCase()}`;
+        if (tableNames.has(nameKey)) {
+          const location = cat || sch ? ` in ${[cat, sch].filter(Boolean).join('.')}` : '';
+          issues.push({
+            resourceType: 'table',
+            resourceId: table.id,
+            resourceName: table.name,
+            severity: 'error',
+            field: 'name',
+            message: `Duplicate table name "${table.name}"${location}`,
+          });
+        } else {
+          tableNames.set(nameKey, table.id);
+        }
       }
     }
 

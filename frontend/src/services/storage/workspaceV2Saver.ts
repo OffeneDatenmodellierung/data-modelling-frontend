@@ -6,6 +6,7 @@
 import { odcsService } from '@/services/sdk/odcsService';
 import { odpsService } from '@/services/sdk/odpsService';
 import { cadsService } from '@/services/sdk/cadsService';
+import { dbmvService } from '@/services/sdk/dbmvService';
 import { bpmnService } from '@/services/sdk/bpmnService';
 import { dmnService } from '@/services/sdk/dmnService';
 import { knowledgeService } from '@/services/sdk/knowledgeService';
@@ -21,6 +22,7 @@ import type { System } from '@/types/system';
 import type { Relationship } from '@/types/relationship';
 import type { DataProduct } from '@/types/odps';
 import type { ComputeAsset } from '@/types/cads';
+import type { MetricView } from '@/types/metricView';
 import type { BPMNProcess } from '@/types/bpmn';
 import type { DMNDecision } from '@/types/dmn';
 import type { KnowledgeArticle } from '@/types/knowledge';
@@ -45,6 +47,7 @@ export class WorkspaceV2Saver {
     allRelationships: Relationship[],
     allProducts: DataProduct[],
     allAssets: ComputeAsset[],
+    allMetricViews: MetricView[],
     allBpmnProcesses: BPMNProcess[],
     allDmnDecisions: DMNDecision[],
     allKnowledgeArticles: KnowledgeArticle[] = [],
@@ -137,6 +140,7 @@ export class WorkspaceV2Saver {
       const domainTables = allTables.filter((t) => t.primary_domain_id === domain.id);
       const domainProducts = allProducts.filter((p) => (p as any).domain_id === domain.id);
       const domainAssets = allAssets.filter((a) => (a as any).domain_id === domain.id);
+      const domainMetricViews = allMetricViews.filter((mv) => mv.domain_id === domain.id);
       const domainProcesses = allBpmnProcesses.filter((p) => (p as any).domain_id === domain.id);
       const domainDecisions = allDmnDecisions.filter((d) => (d as any).domain_id === domain.id);
       const domainSystems = allSystems.filter((s) => (s as any).domain_id === domain.id);
@@ -315,6 +319,77 @@ export class WorkspaceV2Saver {
           files.push({ name: fileName, content, directory: 'cads' });
         } catch (error) {
           console.error(`[WorkspaceV2Saver] Failed to export asset ${asset.name}:`, error);
+        }
+      }
+
+      // Generate DBMV metric view files grouped by system in dbmv/ directory
+      if (domainMetricViews.length > 0) {
+        // Build metric view to system mapping
+        const metricViewsBySystem = new Map<string, MetricView[]>();
+        const viewsWithoutSystem: MetricView[] = [];
+
+        const metricViewToSystemMap = new Map<string, string>();
+        for (const system of domainSystems) {
+          if (system.metric_view_ids && system.metric_view_ids.length > 0) {
+            for (const viewId of system.metric_view_ids) {
+              metricViewToSystemMap.set(viewId, system.id);
+            }
+          }
+        }
+
+        for (const view of domainMetricViews) {
+          const systemId = metricViewToSystemMap.get(view.id);
+          if (systemId) {
+            const existing = metricViewsBySystem.get(systemId) || [];
+            existing.push(view);
+            metricViewsBySystem.set(systemId, existing);
+          } else {
+            viewsWithoutSystem.push(view);
+          }
+        }
+
+        // One .dbmv.yaml per system
+        for (const [systemId, systemViews] of metricViewsBySystem) {
+          const system = domainSystems.find((s) => s.id === systemId);
+          const systemName = system?.name || systemId;
+          const fileName = FileMigration.generateFileName(
+            workspaceName,
+            domainName,
+            systemName,
+            undefined,
+            'dbmv.yaml'
+          );
+
+          try {
+            const content = await dbmvService.toYAML(systemViews);
+            files.push({ name: fileName, content, directory: 'dbmv' });
+            console.log(
+              `[WorkspaceV2Saver] Generated DBMV file for system "${systemName}" with ${systemViews.length} metric view(s)`
+            );
+          } catch (error) {
+            console.error(
+              `[WorkspaceV2Saver] Failed to export metric views for system ${systemName}:`,
+              error
+            );
+          }
+        }
+
+        // Individual .dbmv.yaml files for views without a system
+        for (const view of viewsWithoutSystem) {
+          const fileName = FileMigration.generateFileName(
+            workspaceName,
+            domainName,
+            view.name,
+            undefined,
+            'dbmv.yaml'
+          );
+
+          try {
+            const content = await dbmvService.toYAML([view]);
+            files.push({ name: fileName, content, directory: 'dbmv' });
+          } catch (error) {
+            console.error(`[WorkspaceV2Saver] Failed to export metric view ${view.name}:`, error);
+          }
         }
       }
 
@@ -548,6 +623,8 @@ export class WorkspaceV2Saver {
             // Include table and asset IDs for system-resource linkage
             ...(s.table_ids && s.table_ids.length > 0 && { table_ids: s.table_ids }),
             ...(s.asset_ids && s.asset_ids.length > 0 && { asset_ids: s.asset_ids }),
+            ...(s.metric_view_ids &&
+              s.metric_view_ids.length > 0 && { metric_view_ids: s.metric_view_ids }),
             // SDK 2.3.0+ DataFlow metadata fields
             ...((s as any).owner && { owner: (s as any).owner }),
             ...((s as any).sla && (s as any).sla.length > 0 && { sla: (s as any).sla }),
@@ -666,6 +743,7 @@ This workspace was created with the Data Modelling tool.
 ├── odcs/                        # Data contracts (ODCS)
 ├── odps/                        # Data products (ODPS)
 ├── cads/                        # Compute assets (CADS)
+├── dbmv/                        # Metric views (DBMV)
 ├── bpmn/                        # Business processes (BPMN)
 ├── dmn/                         # Decision models (DMN)
 ├── kb/                          # Knowledge base articles
@@ -726,13 +804,24 @@ will be synchronized with the workspace settings.
     );
 
     // Subdirectories we manage
-    const managedDirectories = ['odcs', 'odps', 'cads', 'bpmn', 'dmn', 'kb', 'adr', 'sketches'];
+    const managedDirectories = [
+      'odcs',
+      'odps',
+      'cads',
+      'dbmv',
+      'bpmn',
+      'dmn',
+      'kb',
+      'adr',
+      'sketches',
+    ];
 
     // Workspace-related file extensions
     const workspaceFileExtensions = [
       '.odcs.yaml',
       '.cads.yaml',
       '.odps.yaml',
+      '.dbmv.yaml',
       '.bpmn',
       '.dmn',
       '.kb.yaml',

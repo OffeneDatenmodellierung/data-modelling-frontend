@@ -4,7 +4,7 @@
  */
 
 import { githubAuth } from './githubAuth';
-import { isViewerMode } from '@/services/viewerMode';
+import { isViewerMode, viewerAutoRecover } from '@/services/viewerMode';
 import type {
   GitHubApiError,
   GitHubApiResponse,
@@ -152,6 +152,17 @@ async function apiRequest<T>(
   updateRateLimit(response.headers);
 
   if (!response.ok) {
+    // In viewer mode, 502/503 from the Cloudflare proxy likely means
+    // the GitHub App auth is temporarily unavailable. If browser state is
+    // corrupt the app can get stuck, so auto-flush and reload.
+    if (isViewerMode() && (response.status === 502 || response.status === 503)) {
+      console.error(
+        `[githubApi] Viewer mode proxy returned ${response.status} — flushing state and reloading`
+      );
+      await viewerAutoRecover();
+      // viewerModeAutoRecover reloads the page, so this line should not be reached
+    }
+
     const error = await parseError(response);
     throw new Error(error.message);
   }

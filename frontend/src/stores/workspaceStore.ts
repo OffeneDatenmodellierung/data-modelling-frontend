@@ -492,6 +492,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                 domains,
                 products,
                 computeAssets,
+                metricViews,
                 bpmnProcesses,
                 dmnDecisions,
                 systems,
@@ -561,6 +562,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                       relationships,
                       products,
                       computeAssets,
+                      metricViews,
                       bpmnProcesses,
                       dmnDecisions,
                       articles,
@@ -659,6 +661,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                           relationships,
                           products,
                           computeAssets,
+                          metricViews,
                           bpmnProcesses,
                           dmnDecisions,
                           articles,
@@ -800,6 +803,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                 domains,
                 products,
                 computeAssets,
+                metricViews,
                 bpmnProcesses,
                 dmnDecisions,
                 systems,
@@ -820,6 +824,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                 relationships,
                 products,
                 computeAssets,
+                metricViews,
                 bpmnProcesses,
                 dmnDecisions,
                 articles,
@@ -1029,6 +1034,9 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             }
             if ((workspace as any).assets) {
               modelStore.setComputeAssets((workspace as any).assets);
+            }
+            if ((workspace as any).metricViews) {
+              modelStore.setMetricViews((workspace as any).metricViews);
             }
             if ((workspace as any).bpmnProcesses) {
               modelStore.setBPMNProcesses((workspace as any).bpmnProcesses);

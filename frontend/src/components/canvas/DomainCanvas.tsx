@@ -25,15 +25,18 @@ import { TransformationEdge } from './TransformationEdge';
 import { SimpleEdge } from './SimpleEdge';
 import { SystemNode } from '@/components/views/SystemNode';
 import { ComputeAssetNode } from './ComputeAssetNode';
+import { MetricViewNode } from './MetricViewNode';
 import { DataProductView } from '@/components/views/DataProductView';
 import { SystemsViewActions } from '@/components/views/SystemsViewActions';
 import { TableViewActions } from '@/components/views/TableViewActions';
 import { NodeViewActions } from '@/components/views/NodeViewActions';
+import { MetricViewActions } from '@/components/views/MetricViewActions';
 import { TableMetadataModal } from '@/components/table/TableMetadataModal';
 import { CreateSystemDialog } from '@/components/system/CreateSystemDialog';
 import { UnlinkedTablesDialog } from '@/components/system/UnlinkedTablesDialog';
 import { SystemExportDialog } from '@/components/system/SystemExportDialog';
 import { ComputeAssetEditor } from '@/components/asset/ComputeAssetEditor';
+import { MetricViewEditor } from '@/components/asset/MetricViewEditor';
 import { RelationshipEditor } from '@/components/relationship/RelationshipEditor';
 import { EditorModal } from '@/components/editors/EditorModal';
 import { CanvasExport } from './CanvasExport';
@@ -52,6 +55,7 @@ const nodeTypes: NodeTypes = {
   table: CanvasNode,
   system: SystemNode,
   'compute-asset': ComputeAssetNode,
+  'metric-view': MetricViewNode,
 };
 
 const edgeTypes: EdgeTypes = {
@@ -68,6 +72,7 @@ export const DomainCanvas: React.FC<DomainCanvasProps> = ({ workspaceId, domainI
     systems,
     tables,
     computeAssets,
+    metricViews,
     domains,
     selectedTableId,
     selectedRelationshipId,
@@ -80,6 +85,7 @@ export const DomainCanvas: React.FC<DomainCanvasProps> = ({ workspaceId, domainI
     updateSystem,
     removeSystem,
     removeComputeAsset,
+    removeMetricView,
     removeTable,
     updateBPMNProcess,
     updateDMNDecision,
@@ -107,6 +113,10 @@ export const DomainCanvas: React.FC<DomainCanvasProps> = ({ workspaceId, domainI
   // State for compute asset edit dialog
   const [editingAssetId, setEditingAssetId] = React.useState<string | null>(null);
   const [showAssetEditDialog, setShowAssetEditDialog] = React.useState(false);
+
+  // State for metric view editor
+  const [editingMetricViewId, setEditingMetricViewId] = React.useState<string | null>(null);
+  const [showMetricViewEditor, setShowMetricViewEditor] = React.useState(false);
 
   // State for unlinked tables dialog
   const [showUnlinkedTablesDialog, setShowUnlinkedTablesDialog] = React.useState(false);
@@ -301,6 +311,53 @@ export const DomainCanvas: React.FC<DomainCanvasProps> = ({ workspaceId, domainI
       }
     },
     [computeAssets, systems]
+  );
+
+  // Handle metric view edit
+  const handleMetricViewEdit = React.useCallback((viewId: string) => {
+    setEditingMetricViewId(viewId);
+    setShowMetricViewEditor(true);
+  }, []);
+
+  // Handle metric view delete
+  const handleMetricViewDelete = React.useCallback(
+    (viewId: string) => {
+      const view = metricViews.find((v) => v.id === viewId);
+      if (!view) return;
+
+      if (confirm(`Are you sure you want to delete the metric view "${view.name}"?`)) {
+        removeMetricView(viewId);
+      }
+    },
+    [metricViews, removeMetricView]
+  );
+
+  // Handle metric view export (single view YAML)
+  const handleMetricViewExport = React.useCallback(
+    async (viewId: string) => {
+      const view = metricViews.find((v) => v.id === viewId);
+      if (!view) return;
+
+      try {
+        const { dbmvService } = await import('@/services/sdk/dbmvService');
+        const { browserFileService } = await import('@/services/platform/browser');
+
+        const yamlContent = await dbmvService.toSingleViewYAML(view);
+        const fileName = `${view.name.replace(/\s+/g, '_')}.dbmv.yaml`;
+        browserFileService.downloadFile(fileName, yamlContent, 'text/yaml');
+
+        useUIStore.getState().addToast({
+          type: 'success',
+          message: `Exported ${view.name} as DBMV YAML`,
+        });
+      } catch (error) {
+        useUIStore.getState().addToast({
+          type: 'error',
+          message: `Failed to export metric view: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        });
+      }
+    },
+    [metricViews]
   );
 
   // Handle BPMN click on table (open BPMN process linked via transformation_links)
@@ -589,6 +646,23 @@ export const DomainCanvas: React.FC<DomainCanvasProps> = ({ workspaceId, domainI
     return assets;
   }, [computeAssets, domainId, selectedSystemId, currentView, systems, sharedResources]);
 
+  // Filter metric views for current domain and system
+  const domainMetricViews = useMemo(() => {
+    let views = metricViews.filter((v) => v.domain_id === domainId);
+
+    // If a system is selected, filter metric views by system
+    if (selectedSystemId && currentView === 'analytical') {
+      const selectedSystem = systems.find((s) => s.id === selectedSystemId);
+      if (selectedSystem && selectedSystem.metric_view_ids) {
+        views = metricViews.filter(
+          (v) => v.domain_id === domainId && selectedSystem.metric_view_ids?.includes(v.id)
+        );
+      }
+    }
+
+    return views;
+  }, [metricViews, domainId, selectedSystemId, currentView, systems]);
+
   // Filter relationships for current domain
   const domainRelationships = useMemo(() => {
     return relationships.filter((rel) => rel.domain_id === domainId);
@@ -731,6 +805,7 @@ export const DomainCanvas: React.FC<DomainCanvasProps> = ({ workspaceId, domainI
             description: system.description,
             tables: systemTables,
             computeAssets: systemAssets,
+            metricViews: metricViews.filter((v) => system.metric_view_ids?.includes(v.id)),
             isShared, // Mark if this is a shared resource from another domain
             onTableClick: handleTableCardClick,
             onTableBPMNClick: handleTableBPMNClick,
@@ -745,6 +820,10 @@ export const DomainCanvas: React.FC<DomainCanvasProps> = ({ workspaceId, domainI
             onAssetExport: handleAssetExport,
             onAssetBPMNClick: handleAssetBPMNClick,
             onAssetDMNClick: handleAssetDMNClick,
+            onMetricViewEdit: isViewerMode() ? undefined : handleMetricViewEdit,
+            onMetricViewDelete: isViewerMode() ? undefined : handleMetricViewDelete,
+            onMetricViewExport: handleMetricViewExport,
+            onMetricViewView: handleMetricViewEdit,
             currentView: currentView,
           },
           selected: selectedSystemId === system.id,
@@ -832,11 +911,41 @@ export const DomainCanvas: React.FC<DomainCanvasProps> = ({ workspaceId, domainI
           })
         : [];
 
-    return [...nodes, ...tableNodes, ...computeAssetNodes];
+    // Add metric view nodes (only in Analytical View)
+    const metricViewNodes =
+      currentView === 'analytical'
+        ? domainMetricViews.map((view) => {
+            const centerX = window.innerWidth / 2 - 200;
+            const centerY = window.innerHeight / 2 - 150;
+            const viewPos = viewPositions[view.id];
+            const positionX = viewPos?.x ?? view.position_x ?? centerX;
+            const positionY = viewPos?.y ?? view.position_y ?? centerY;
+
+            return {
+              id: view.id,
+              type: 'metric-view',
+              position: { x: positionX, y: positionY },
+              draggable: true,
+              data: {
+                metricView: view,
+                nodeType: 'metric-view' as const,
+                isShared: false,
+                onEdit: isViewerMode() ? undefined : handleMetricViewEdit,
+                onDelete: isViewerMode() ? undefined : handleMetricViewDelete,
+                onExport: handleMetricViewExport,
+                onView: handleMetricViewEdit,
+              },
+              selected: false,
+            };
+          })
+        : [];
+
+    return [...nodes, ...tableNodes, ...computeAssetNodes, ...metricViewNodes];
   }, [
     domainSystems,
     visibleTables,
     domainComputeAssets,
+    domainMetricViews,
     sharedResources,
     selectedTableId,
     selectedSystemId,
@@ -855,6 +964,9 @@ export const DomainCanvas: React.FC<DomainCanvasProps> = ({ workspaceId, domainI
     handleAssetExport,
     handleAssetBPMNClick,
     handleAssetDMNClick,
+    handleMetricViewEdit,
+    handleMetricViewDelete,
+    handleMetricViewExport,
     handleTableBPMNClick,
     tableHasBPMN,
   ]);
@@ -1003,6 +1115,7 @@ export const DomainCanvas: React.FC<DomainCanvasProps> = ({ workspaceId, domainI
     tableIds: string[];
     assetIds: string[];
     systemIds: string[];
+    metricViewIds: string[];
     currentView: ViewMode;
     tableDataHash?: string;
   }
@@ -1011,6 +1124,7 @@ export const DomainCanvas: React.FC<DomainCanvasProps> = ({ workspaceId, domainI
     tableIds: [],
     assetIds: [],
     systemIds: [],
+    metricViewIds: [],
     currentView: 'systems',
   });
 
@@ -1019,6 +1133,7 @@ export const DomainCanvas: React.FC<DomainCanvasProps> = ({ workspaceId, domainI
     const currentTableIds = visibleTables.map((t) => t.id).sort();
     const currentAssetIds = domainComputeAssets.map((a) => a.id).sort();
     const currentSystemIds = domainSystems.map((s) => s.id).sort();
+    const currentMetricViewIds = domainMetricViews.map((v) => v.id).sort();
 
     // Create a hash of table data to detect changes (not just IDs)
     // Include compoundKeys, metadata.indexes, and tags in the hash to detect changes
@@ -1032,6 +1147,7 @@ export const DomainCanvas: React.FC<DomainCanvasProps> = ({ workspaceId, domainI
     const prevTableIds = prevDataRef.current.tableIds;
     const prevAssetIds = prevDataRef.current.assetIds;
     const prevSystemIds = prevDataRef.current.systemIds;
+    const prevMetricViewIds = prevDataRef.current.metricViewIds;
     const prevView = prevDataRef.current.currentView;
     const prevTableDataHash = prevDataRef.current.tableDataHash || '';
 
@@ -1045,10 +1161,20 @@ export const DomainCanvas: React.FC<DomainCanvasProps> = ({ workspaceId, domainI
     const systemsChanged =
       currentSystemIds.length !== prevSystemIds.length ||
       currentSystemIds.some((id, idx) => id !== prevSystemIds[idx]);
+    const metricViewsChanged =
+      currentMetricViewIds.length !== prevMetricViewIds.length ||
+      currentMetricViewIds.some((id, idx) => id !== prevMetricViewIds[idx]);
     const viewChanged = currentView !== prevView;
     const tableDataChanged = currentTableDataHash !== prevTableDataHash;
 
-    if (tablesChanged || assetsChanged || systemsChanged || viewChanged || tableDataChanged) {
+    if (
+      tablesChanged ||
+      assetsChanged ||
+      systemsChanged ||
+      metricViewsChanged ||
+      viewChanged ||
+      tableDataChanged
+    ) {
       setNodes((currentNodes) => {
         // When VIEW changes, use initialNodes positions directly (from viewPositions[currentView])
         // This ensures each view loads its own saved positions, not the previous view's positions
@@ -1073,6 +1199,7 @@ export const DomainCanvas: React.FC<DomainCanvasProps> = ({ workspaceId, domainI
         tableIds: currentTableIds,
         assetIds: currentAssetIds,
         systemIds: currentSystemIds,
+        metricViewIds: currentMetricViewIds,
         currentView,
         tableDataHash: currentTableDataHash,
       };
@@ -1080,7 +1207,15 @@ export const DomainCanvas: React.FC<DomainCanvasProps> = ({ workspaceId, domainI
     // Note: We don't update positions from store when data hasn't changed
     // ReactFlow manages positions during drag, and positions are saved via onNodeDragStop
     // This prevents overriding user drags
-  }, [visibleTables, domainComputeAssets, domainSystems, currentView, initialNodes, setNodes]);
+  }, [
+    visibleTables,
+    domainComputeAssets,
+    domainMetricViews,
+    domainSystems,
+    currentView,
+    initialNodes,
+    setNodes,
+  ]);
 
   useEffect(() => {
     console.log('[DomainCanvas] Updating edges:', {
@@ -1167,6 +1302,7 @@ export const DomainCanvas: React.FC<DomainCanvasProps> = ({ workspaceId, domainI
           <>
             <TableViewActions workspaceId={workspaceId} domainId={domainId} />
             {currentView === 'process' && <NodeViewActions domainId={domainId} />}
+            {currentView === 'analytical' && <MetricViewActions domainId={domainId} />}
           </>
         )}
 
@@ -1206,6 +1342,19 @@ export const DomainCanvas: React.FC<DomainCanvasProps> = ({ workspaceId, domainI
           onClose={() => {
             setShowAssetEditDialog(false);
             setEditingAssetId(null);
+          }}
+        />
+      )}
+
+      {/* Metric View Editor (renders in both normal and viewer mode) */}
+      {editingMetricViewId && (
+        <MetricViewEditor
+          metricView={metricViews.find((v) => v.id === editingMetricViewId)}
+          domainId={domainId}
+          isOpen={showMetricViewEditor}
+          onClose={() => {
+            setShowMetricViewEditor(false);
+            setEditingMetricViewId(null);
           }}
         />
       )}

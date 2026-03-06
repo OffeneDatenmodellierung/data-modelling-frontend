@@ -125,6 +125,9 @@ export class FileMigration {
     } else if (fileName.endsWith('.cads.yaml')) {
       baseName = fileName.replace('.cads.yaml', '');
       type = 'cads';
+    } else if (fileName.endsWith('.dbmv.yaml')) {
+      baseName = fileName.replace('.dbmv.yaml', '');
+      type = 'dbmv';
     } else if (fileName.endsWith('.bpmn')) {
       baseName = fileName.replace('.bpmn', '');
       type = 'bpmn';
@@ -166,6 +169,7 @@ export class FileMigration {
     const odcsPattern = /_.*\.odcs\.yaml$/;
     const odpsPattern = /_.*\.odps\.yaml$/;
     const cadsPattern = /_.*\.cads\.yaml$/;
+    const dbmvPattern = /_.*\.dbmv\.yaml$/;
     const bpmnPattern = /\.bpmn$/;
     const dmnPattern = /\.dmn$/;
     const kbPattern = /_.*\.kb\.yaml$/;
@@ -177,6 +181,7 @@ export class FileMigration {
       odcs: fileNames.filter((f) => odcsPattern.test(f)),
       odps: fileNames.filter((f) => odpsPattern.test(f)),
       cads: fileNames.filter((f) => cadsPattern.test(f)),
+      dbmv: fileNames.filter((f) => dbmvPattern.test(f)),
       bpmn: fileNames.filter((f) => bpmnPattern.test(f)),
       dmn: fileNames.filter((f) => dmnPattern.test(f)),
       kb: fileNames.filter((f) => kbPattern.test(f)),
@@ -203,6 +208,7 @@ export class FileMigration {
       odcs: filterByPrefix(categorized.odcs),
       odps: filterByPrefix(categorized.odps),
       cads: filterByPrefix(categorized.cads),
+      dbmv: filterByPrefix(categorized.dbmv),
       bpmn: filterByPrefix(categorized.bpmn),
       dmn: filterByPrefix(categorized.dmn),
       kb: filterByPrefix(categorized.kb),

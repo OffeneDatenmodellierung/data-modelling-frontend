@@ -16,6 +16,7 @@ import type { DataProduct } from '@/types/odps';
 import type { ComputeAsset } from '@/types/cads';
 import type { BPMNProcess } from '@/types/bpmn';
 import type { DMNDecision } from '@/types/dmn';
+import type { MetricView } from '@/types/metricView';
 import type { System } from '@/types/system';
 import type { CreateTableRequest, CreateRelationshipRequest } from '@/types/api';
 
@@ -40,6 +41,7 @@ interface ModelState {
   systems: System[];
   products: DataProduct[];
   computeAssets: ComputeAsset[];
+  metricViews: MetricView[];
   bpmnProcesses: BPMNProcess[];
   dmnDecisions: DMNDecision[];
   selectedTableId: string | null;
@@ -72,6 +74,7 @@ interface ModelState {
   setSystems: (systems: System[]) => void;
   setProducts: (products: DataProduct[]) => void;
   setComputeAssets: (assets: ComputeAsset[]) => void;
+  setMetricViews: (views: MetricView[]) => void;
   setBPMNProcesses: (processes: BPMNProcess[]) => void;
   setDMNDecisions: (decisions: DMNDecision[]) => void;
   addDomain: (domain: Domain) => void;
@@ -93,6 +96,9 @@ interface ModelState {
   addComputeAsset: (asset: ComputeAsset) => void;
   updateComputeAsset: (assetId: string, updates: Partial<ComputeAsset>) => void;
   removeComputeAsset: (assetId: string) => void;
+  addMetricView: (view: MetricView) => void;
+  updateMetricView: (viewId: string, updates: Partial<MetricView>) => void;
+  removeMetricView: (viewId: string) => void;
   addBPMNProcess: (process: BPMNProcess) => void;
   updateBPMNProcess: (processId: string, updates: Partial<BPMNProcess>) => void;
   removeBPMNProcess: (processId: string) => void;
@@ -242,6 +248,7 @@ export const useModelStore = create<ModelState>((set, get) => ({
   systems: [],
   products: [],
   computeAssets: [],
+  metricViews: [],
   bpmnProcesses: [],
   dmnDecisions: [],
   selectedTableId: null,
@@ -267,6 +274,7 @@ export const useModelStore = create<ModelState>((set, get) => ({
   setSystems: (systems) => set({ systems }),
   setProducts: (products) => set({ products }),
   setComputeAssets: (assets) => set({ computeAssets: assets }),
+  setMetricViews: (views) => set({ metricViews: views }),
   setBPMNProcesses: (processes) => set({ bpmnProcesses: processes }),
   setDMNDecisions: (decisions) => set({ dmnDecisions: decisions }),
   addDomain: (domain) => {
@@ -482,6 +490,24 @@ export const useModelStore = create<ModelState>((set, get) => ({
   removeComputeAsset: (assetId) => {
     set((state) => ({
       computeAssets: state.computeAssets.filter((a) => a.id !== assetId),
+    }));
+    useWorkspaceStore.getState().setPendingChanges(true);
+  },
+  addMetricView: (view) => {
+    set((state) => ({
+      metricViews: [...state.metricViews, view],
+    }));
+    useWorkspaceStore.getState().setPendingChanges(true);
+  },
+  updateMetricView: (viewId, updates) => {
+    set((state) => ({
+      metricViews: state.metricViews.map((v) => (v.id === viewId ? { ...v, ...updates } : v)),
+    }));
+    useWorkspaceStore.getState().setPendingChanges(true);
+  },
+  removeMetricView: (viewId) => {
+    set((state) => ({
+      metricViews: state.metricViews.filter((v) => v.id !== viewId),
     }));
     useWorkspaceStore.getState().setPendingChanges(true);
   },
