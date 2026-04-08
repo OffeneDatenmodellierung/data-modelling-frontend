@@ -331,16 +331,20 @@ export const TableMetadataModal: React.FC<TableMetadataModalProps> = ({
             severity: 'error',
             implementation: { expectation: 'expect_column_to_exist' },
           });
-          // Nullable columns get a null ratio check
+          // Nullable columns get a null ratio check — preserve any existing per-column threshold
           if (col.nullable) {
+            const existingNullRule = existingRules.find(
+              (r: any) => r.type === 'library' && r.metric === 'nullValues'
+            ) as any;
+            const threshold = existingNullRule?.mustBeLessThan ?? 0.1;
             managedColRules.push({
               type: 'library',
               name: `${col.name}_null_ratio`,
-              description: `${col.name} column should not be more than 10% null`,
+              description: `${col.name} column should not be more than ${Math.round(threshold * 100)}% null`,
               dimension: 'completeness',
               metric: 'nullValues',
               arguments: { column: col.name },
-              mustBeLessThan: 0.1,
+              mustBeLessThan: threshold,
               severity: 'warning',
             });
           }
