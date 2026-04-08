@@ -55,18 +55,11 @@ export const TableMetadataModal: React.FC<TableMetadataModalProps> = ({
   const [catalog, setCatalog] = useState<string>('');
   const [schema, setSchema] = useState<string>('');
   const [resourceType, setResourceType] = useState<ResourceType | undefined>(undefined);
-  // Managed DQ check state
+  // Managed DQ check state — table-level
   const [freshnessEnabled, setFreshnessEnabled] = useState(false);
   const [freshnessColumn, setFreshnessColumn] = useState<string>('');
   const [freshnessThreshold, setFreshnessThreshold] = useState<number>(60);
   const [rowCountEnabled, setRowCountEnabled] = useState(true);
-  const [noDuplicatesEnabled, setNoDuplicatesEnabled] = useState(true);
-  const [noDuplicatesColumns, setNoDuplicatesColumns] = useState<string[]>([]);
-  const [columnExistsEnabled, setColumnExistsEnabled] = useState(true);
-  const [columnExistsColumn, setColumnExistsColumn] = useState<string>('jurisdiction');
-  const [nullRatioEnabled, setNullRatioEnabled] = useState(true);
-  const [nullRatioColumn, setNullRatioColumn] = useState<string>('amount');
-  const [nullRatioThreshold, setNullRatioThreshold] = useState<number>(0.1);
   const [rowCountBoundsEnabled, setRowCountBoundsEnabled] = useState(true);
   const [rowCountBoundsMin, setRowCountBoundsMin] = useState<number>(500);
   const [rowCountBoundsMax, setRowCountBoundsMax] = useState<number>(100000);
@@ -89,22 +82,13 @@ export const TableMetadataModal: React.FC<TableMetadataModalProps> = ({
   // Valid ODCS status values
   const STATUS_OPTIONS = ['proposed', 'draft', 'active', 'deprecated', 'retired'] as const;
 
-  /** Names/identifiers of managed DQ rules that are hidden from the custom JSON editor */
-  const MANAGED_RULE_NAMES = new Set([
-    'table_is_not_empty',
-    'no_duplicate_records',
-    'column_jurisdiction_exists', // also matched by engine=great-expectations + expect_column_to_exist
-    'amount_null_ratio',
-    'row_count_within_bounds',
-  ]);
+  /** Names/identifiers of managed table-level DQ rules hidden from the custom JSON editor */
+  const MANAGED_RULE_NAMES = new Set(['table_is_not_empty', 'row_count_within_bounds']);
 
   /** Returns true when a rule is managed by the dedicated UI controls */
   const isManagedRule = (r: any): boolean => {
     if (r.type === 'library' && r.metric === 'freshness') return true;
     if (r.name && MANAGED_RULE_NAMES.has(r.name)) return true;
-    // Match column-exists by implementation shape even if name differs
-    if (r.type === 'custom' && r.implementation?.expectation === 'expect_column_to_exist')
-      return true;
     return false;
   };
 
@@ -169,49 +153,6 @@ export const TableMetadataModal: React.FC<TableMetadataModalProps> = ({
       // --- Row count (table_is_not_empty) ---
       const existingRowCount = rulesArray.find((r: any) => r.name === 'table_is_not_empty') as any;
       setRowCountEnabled(existingRowCount ? true : !hasManagedRules ? true : false);
-
-      // --- No duplicate records ---
-      const existingDuplicates = rulesArray.find(
-        (r: any) => r.name === 'no_duplicate_records'
-      ) as any;
-      if (existingDuplicates) {
-        setNoDuplicatesEnabled(true);
-        setNoDuplicatesColumns(existingDuplicates.arguments?.columns || []);
-      } else {
-        setNoDuplicatesEnabled(!hasManagedRules ? true : false);
-        setNoDuplicatesColumns([]);
-      }
-
-      // --- Column exists ---
-      const existingColExists = rulesArray.find(
-        (r: any) =>
-          r.name === 'column_jurisdiction_exists' ||
-          (r.type === 'custom' && r.implementation?.expectation === 'expect_column_to_exist')
-      ) as any;
-      if (existingColExists) {
-        setColumnExistsEnabled(true);
-        // Extract column name from the rule name pattern "column_{name}_exists"
-        const nameMatch = existingColExists.name?.match(/^column_(.+)_exists$/);
-        setColumnExistsColumn(nameMatch?.[1] || 'jurisdiction');
-      } else {
-        setColumnExistsEnabled(!hasManagedRules ? true : false);
-        setColumnExistsColumn('jurisdiction');
-      }
-
-      // --- Null ratio ---
-      const existingNullRatio = rulesArray.find(
-        (r: any) =>
-          r.name === 'amount_null_ratio' || (r.metric === 'nullValues' && r.type === 'library')
-      ) as any;
-      if (existingNullRatio) {
-        setNullRatioEnabled(true);
-        setNullRatioColumn(existingNullRatio.arguments?.column || 'amount');
-        setNullRatioThreshold(existingNullRatio.mustBeLessThan ?? 0.1);
-      } else {
-        setNullRatioEnabled(!hasManagedRules ? true : false);
-        setNullRatioColumn('amount');
-        setNullRatioThreshold(0.1);
-      }
 
       // --- Row count within bounds ---
       const existingBounds = rulesArray.find(
@@ -338,44 +279,6 @@ export const TableMetadataModal: React.FC<TableMetadataModalProps> = ({
             });
           }
 
-          if (noDuplicatesEnabled && noDuplicatesColumns.length > 0) {
-            managedRules.push({
-              type: 'library',
-              name: 'no_duplicate_records',
-              description: 'No duplicate rows across the natural key',
-              dimension: 'uniqueness',
-              metric: 'duplicateValues',
-              arguments: { columns: noDuplicatesColumns },
-              mustBe: 0,
-              severity: 'error',
-            });
-          }
-
-          if (columnExistsEnabled && columnExistsColumn) {
-            managedRules.push({
-              type: 'custom',
-              engine: 'great-expectations',
-              name: `column_${columnExistsColumn}_exists`,
-              description: `Column '${columnExistsColumn}' must exist in the table`,
-              dimension: 'consistency',
-              severity: 'error',
-              implementation: { expectation: 'expect_column_to_exist' },
-            });
-          }
-
-          if (nullRatioEnabled && nullRatioColumn) {
-            managedRules.push({
-              type: 'library',
-              name: `${nullRatioColumn}_null_ratio`,
-              description: `${nullRatioColumn} column should not be more than ${Math.round(nullRatioThreshold * 100)}% null`,
-              dimension: 'completeness',
-              metric: 'nullValues',
-              arguments: { column: nullRatioColumn },
-              mustBeLessThan: nullRatioThreshold,
-              severity: 'warning',
-            });
-          }
-
           if (rowCountBoundsEnabled && rowCountBoundsDateColumn) {
             managedRules.push({
               type: 'sql',
@@ -407,6 +310,43 @@ export const TableMetadataModal: React.FC<TableMetadataModalProps> = ({
           const allRules = [...managedRules, ...customRulesArray];
           return allRules.length > 0 ? allRules : undefined;
         })(),
+        // Generate column-level quality rules (column_exists + null_ratio per column)
+        columns: (table.columns || []).map((col) => {
+          const existingRules = Array.isArray(col.quality_rules) ? col.quality_rules : [];
+          // Strip any previously-managed column-level rules
+          const customColRules = existingRules.filter(
+            (r: any) =>
+              !(
+                r.type === 'custom' && r.implementation?.expectation === 'expect_column_to_exist'
+              ) && !(r.type === 'library' && r.metric === 'nullValues')
+          );
+          const managedColRules: Record<string, unknown>[] = [];
+          // Every column gets a column_exists check
+          managedColRules.push({
+            type: 'custom',
+            engine: 'great-expectations',
+            name: `column_${col.name}_exists`,
+            description: `Column '${col.name}' must exist in the table`,
+            dimension: 'consistency',
+            severity: 'error',
+            implementation: { expectation: 'expect_column_to_exist' },
+          });
+          // Nullable columns get a null ratio check
+          if (col.nullable) {
+            managedColRules.push({
+              type: 'library',
+              name: `${col.name}_null_ratio`,
+              description: `${col.name} column should not be more than 10% null`,
+              dimension: 'completeness',
+              metric: 'nullValues',
+              arguments: { column: col.name },
+              mustBeLessThan: 0.1,
+              severity: 'warning',
+            });
+          }
+          const allColRules = [...managedColRules, ...customColRules];
+          return { ...col, quality_rules: allColRules.length > 0 ? allColRules : undefined };
+        }),
         last_modified_at: new Date().toISOString(),
       };
 
@@ -1885,7 +1825,7 @@ export const TableMetadataModal: React.FC<TableMetadataModalProps> = ({
         {/* Data Quality Checks */}
         {isEditable && (
           <div>
-            <h3 className="text-sm font-semibold text-gray-700 mb-2">Data Quality Checks</h3>
+            <h3 className="text-sm font-semibold text-gray-700 mb-2">Table-Level Quality Checks</h3>
             <div className="space-y-3">
               {/* 1. Table is not empty */}
               <div className="p-3 bg-gray-50 rounded-md border border-gray-200">
@@ -1900,195 +1840,13 @@ export const TableMetadataModal: React.FC<TableMetadataModalProps> = ({
                     className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                   />
                   <span className="text-sm font-medium text-gray-700">Table is not empty</span>
-                  <span className="ml-auto text-xs px-1.5 py-0.5 rounded bg-red-100 text-red-700">
-                    error
-                  </span>
                 </label>
                 <p className="text-xs text-gray-500 mt-1 pl-6">
                   Table must contain at least one row
                 </p>
               </div>
 
-              {/* 2. No duplicate records */}
-              <div className="p-3 bg-gray-50 rounded-md border border-gray-200">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={noDuplicatesEnabled}
-                    onChange={(e) => {
-                      setNoDuplicatesEnabled(e.target.checked);
-                      setHasUnsavedChanges(true);
-                    }}
-                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                  />
-                  <span className="text-sm font-medium text-gray-700">No duplicate records</span>
-                  <span className="ml-auto text-xs px-1.5 py-0.5 rounded bg-red-100 text-red-700">
-                    error
-                  </span>
-                </label>
-                {noDuplicatesEnabled && (
-                  <div className="mt-2 pl-6">
-                    <label className="block text-xs font-medium text-gray-600 mb-1">
-                      Natural key columns
-                    </label>
-                    <div className="flex flex-wrap gap-1.5 mb-2">
-                      {noDuplicatesColumns.map((col, i) => (
-                        <span
-                          key={i}
-                          className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 text-blue-800 text-xs rounded-full"
-                        >
-                          {col}
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setNoDuplicatesColumns(
-                                noDuplicatesColumns.filter((_, idx) => idx !== i)
-                              );
-                              setHasUnsavedChanges(true);
-                            }}
-                            className="text-blue-600 hover:text-blue-800"
-                          >
-                            &times;
-                          </button>
-                        </span>
-                      ))}
-                    </div>
-                    <select
-                      value=""
-                      onChange={(e) => {
-                        if (e.target.value && !noDuplicatesColumns.includes(e.target.value)) {
-                          setNoDuplicatesColumns([...noDuplicatesColumns, e.target.value]);
-                          setHasUnsavedChanges(true);
-                        }
-                      }}
-                      className="w-full px-3 py-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white"
-                    >
-                      <option value="">Add column...</option>
-                      {(table.columns || [])
-                        .filter((c) => !c.parent_column_id && !noDuplicatesColumns.includes(c.name))
-                        .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
-                        .map((c) => (
-                          <option key={c.id} value={c.name}>
-                            {c.name}
-                          </option>
-                        ))}
-                    </select>
-                    <p className="text-xs text-gray-500 mt-1">
-                      Select columns that form the natural key for duplicate detection
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              {/* 3. Column exists */}
-              <div className="p-3 bg-gray-50 rounded-md border border-gray-200">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={columnExistsEnabled}
-                    onChange={(e) => {
-                      setColumnExistsEnabled(e.target.checked);
-                      setHasUnsavedChanges(true);
-                    }}
-                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                  />
-                  <span className="text-sm font-medium text-gray-700">Column exists check</span>
-                  <span className="ml-auto text-xs px-1.5 py-0.5 rounded bg-red-100 text-red-700">
-                    error
-                  </span>
-                </label>
-                {columnExistsEnabled && (
-                  <div className="mt-2 pl-6">
-                    <label className="block text-xs font-medium text-gray-600 mb-1">
-                      Column that must exist
-                    </label>
-                    <select
-                      value={columnExistsColumn}
-                      onChange={(e) => {
-                        setColumnExistsColumn(e.target.value);
-                        setHasUnsavedChanges(true);
-                      }}
-                      className="w-full px-3 py-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white"
-                    >
-                      <option value="">Select a column...</option>
-                      {(table.columns || [])
-                        .filter((c) => !c.parent_column_id)
-                        .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
-                        .map((c) => (
-                          <option key={c.id} value={c.name}>
-                            {c.name}
-                          </option>
-                        ))}
-                    </select>
-                  </div>
-                )}
-              </div>
-
-              {/* 4. Null ratio */}
-              <div className="p-3 bg-gray-50 rounded-md border border-gray-200">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={nullRatioEnabled}
-                    onChange={(e) => {
-                      setNullRatioEnabled(e.target.checked);
-                      setHasUnsavedChanges(true);
-                    }}
-                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                  />
-                  <span className="text-sm font-medium text-gray-700">Null ratio check</span>
-                  <span className="ml-auto text-xs px-1.5 py-0.5 rounded bg-yellow-100 text-yellow-800">
-                    warning
-                  </span>
-                </label>
-                {nullRatioEnabled && (
-                  <div className="mt-2 pl-6 space-y-2">
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">Column</label>
-                      <select
-                        value={nullRatioColumn}
-                        onChange={(e) => {
-                          setNullRatioColumn(e.target.value);
-                          setHasUnsavedChanges(true);
-                        }}
-                        className="w-full px-3 py-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white"
-                      >
-                        <option value="">Select a column...</option>
-                        {(table.columns || [])
-                          .filter((c) => !c.parent_column_id)
-                          .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
-                          .map((c) => (
-                            <option key={c.id} value={c.name}>
-                              {c.name}
-                            </option>
-                          ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">
-                        Max null ratio (0-1)
-                      </label>
-                      <input
-                        type="number"
-                        min={0}
-                        max={1}
-                        step={0.01}
-                        value={nullRatioThreshold}
-                        onChange={(e) => {
-                          setNullRatioThreshold(parseFloat(e.target.value) || 0.1);
-                          setHasUnsavedChanges(true);
-                        }}
-                        className="w-full px-3 py-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                      />
-                      <p className="text-xs text-gray-500 mt-1">
-                        Column should not be more than {Math.round(nullRatioThreshold * 100)}% null
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* 5. Row count within bounds */}
+              {/* 2. Row count within bounds */}
               <div className="p-3 bg-gray-50 rounded-md border border-gray-200">
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
@@ -2101,9 +1859,6 @@ export const TableMetadataModal: React.FC<TableMetadataModalProps> = ({
                     className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                   />
                   <span className="text-sm font-medium text-gray-700">Row count within bounds</span>
-                  <span className="ml-auto text-xs px-1.5 py-0.5 rounded bg-yellow-100 text-yellow-800">
-                    warning
-                  </span>
                 </label>
                 {rowCountBoundsEnabled && (
                   <div className="mt-2 pl-6 space-y-2">
@@ -2170,7 +1925,7 @@ export const TableMetadataModal: React.FC<TableMetadataModalProps> = ({
                 )}
               </div>
 
-              {/* 6. Freshness check */}
+              {/* 3. Freshness check */}
               <div className="p-3 bg-gray-50 rounded-md border border-gray-200">
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
@@ -2187,9 +1942,6 @@ export const TableMetadataModal: React.FC<TableMetadataModalProps> = ({
                     className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                   />
                   <span className="text-sm font-medium text-gray-700">Freshness check</span>
-                  <span className="ml-auto text-xs px-1.5 py-0.5 rounded bg-yellow-100 text-yellow-800">
-                    warning
-                  </span>
                 </label>
                 {freshnessEnabled && (
                   <div className="mt-2 pl-6 space-y-2">
@@ -2235,6 +1987,10 @@ export const TableMetadataModal: React.FC<TableMetadataModalProps> = ({
                 )}
               </div>
             </div>
+            <p className="text-xs text-gray-500 mt-2">
+              Column-level checks (column exists, null ratio) are applied automatically per column
+              on save.
+            </p>
           </div>
         )}
 
