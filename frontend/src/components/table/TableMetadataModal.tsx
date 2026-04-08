@@ -328,7 +328,7 @@ export const TableMetadataModal: React.FC<TableMetadataModalProps> = ({
           managedColRules.push({
             type: 'custom',
             engine: 'great-expectations',
-            name: `column_${col.name}_exists`,
+            name: `column_${col.name.replace(/\s+/g, '_')}_exists`,
             description: `Column '${col.name}' must exist in the table`,
             dimension: 'consistency',
             severity: 'error',
@@ -342,7 +342,7 @@ export const TableMetadataModal: React.FC<TableMetadataModalProps> = ({
             const threshold = existingNullRule?.mustBeLessThan ?? 0.1;
             managedColRules.push({
               type: 'library',
-              name: `${col.name}_null_ratio`,
+              name: `${col.name.replace(/\s+/g, '_')}_null_ratio`,
               description: `${col.name} column should not be more than ${Math.round(threshold * 100)}% null`,
               dimension: 'completeness',
               metric: 'nullValues',
