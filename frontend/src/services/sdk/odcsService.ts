@@ -129,7 +129,8 @@ class ODCSService {
 
       // WORKAROUND: SDK returns snake_case 'custom_properties', but we also need 'custom' (app extension)
       // Also extract 'id' field from raw YAML to preserve table identity on reload
-      let rawSchemaMap: Map<string, { id?: string; properties?: any[] }> = new Map();
+      let rawSchemaMap: Map<string, { id?: string; properties?: any[]; quality?: any[] }> =
+        new Map();
       try {
         const rawParsed = yaml.load(yamlContent) as any;
         if (rawParsed?.schema && Array.isArray(rawParsed.schema)) {
@@ -138,6 +139,7 @@ class ODCSService {
               rawSchemaMap.set(schemaItem.name, {
                 id: schemaItem.id,
                 properties: schemaItem.properties,
+                quality: schemaItem.quality,
               });
             }
           }
@@ -184,6 +186,12 @@ class ODCSService {
               }
             }
           }
+        }
+
+        // Preserve table-level quality rules from raw YAML (SDK may not pass these through)
+        const rawQuality = rawSchemaMap.get(schemaEntry.name)?.quality;
+        if (rawQuality && !schemaEntry.quality) {
+          schemaEntry.quality = rawQuality;
         }
 
         return schemaEntry;
@@ -310,6 +318,13 @@ class ODCSService {
     ).trim();
 
     console.log(`[ODCSService] normalizeTableV2 - Processing table: ${tableName}`);
+    if (table.quality || table.quality_rules || table.qualityRules) {
+      console.log(`[ODCSService] normalizeTableV2 - Table "${tableName}" has quality rules:`, {
+        quality: table.quality,
+        quality_rules: table.quality_rules,
+        qualityRules: table.qualityRules,
+      });
+    }
 
     // Extract columns/properties
     let columns: any[] = [];
@@ -618,7 +633,7 @@ class ODCSService {
       team: table.team,
       sla,
       metadata,
-      quality_rules: table.quality_rules || table.qualityRules,
+      quality_rules: table.quality_rules || table.qualityRules || table.quality,
       position_x: table.position_x ?? index * 300,
       position_y: table.position_y ?? index * 100,
       width: table.width ?? 200,
