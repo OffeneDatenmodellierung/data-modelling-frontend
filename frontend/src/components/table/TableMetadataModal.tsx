@@ -49,12 +49,22 @@ export const TableMetadataModal: React.FC<TableMetadataModalProps> = ({
   const [tagsInput, setTagsInput] = useState('');
   const [metadata, setMetadata] = useState<Record<string, unknown>>({});
   const [internalMetadata, setInternalMetadata] = useState<Record<string, unknown>>({});
-  const [qualityRules, setQualityRules] = useState<Record<string, unknown>>({});
+  const [qualityRules, setQualityRules] = useState<Record<string, unknown> | unknown[]>({});
   const [status, setStatus] = useState<string>('');
   const [sourceTopic, setSourceTopic] = useState<string>('');
   const [catalog, setCatalog] = useState<string>('');
   const [schema, setSchema] = useState<string>('');
   const [resourceType, setResourceType] = useState<ResourceType | undefined>(undefined);
+  // Managed DQ check state — table-level
+  const [freshnessEnabled, setFreshnessEnabled] = useState(false);
+  const [freshnessColumn, setFreshnessColumn] = useState<string>('');
+  const [freshnessThreshold, setFreshnessThreshold] = useState<number>(60);
+  const [rowCountEnabled, setRowCountEnabled] = useState(true);
+  const [rowCountBoundsEnabled, setRowCountBoundsEnabled] = useState(true);
+  const [rowCountBoundsMin, setRowCountBoundsMin] = useState<number>(500);
+  const [rowCountBoundsMax, setRowCountBoundsMax] = useState<number>(100000);
+  const [rowCountBoundsDateColumn, setRowCountBoundsDateColumn] =
+    useState<string>('operation_date');
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -71,6 +81,16 @@ export const TableMetadataModal: React.FC<TableMetadataModalProps> = ({
 
   // Valid ODCS status values
   const STATUS_OPTIONS = ['proposed', 'draft', 'active', 'deprecated', 'retired'] as const;
+
+  /** Names/identifiers of managed table-level DQ rules hidden from the custom JSON editor */
+  const MANAGED_RULE_NAMES = new Set(['table_is_not_empty', 'row_count_within_bounds']);
+
+  /** Returns true when a rule is managed by the dedicated UI controls */
+  const isManagedRule = (r: any): boolean => {
+    if (r.type === 'library' && r.metric === 'freshness') return true;
+    if (r.name && MANAGED_RULE_NAMES.has(r.name)) return true;
+    return false;
+  };
 
   // Helper to get status from customProperties
   const getStatusFromCustomProperties = (
@@ -111,7 +131,54 @@ export const TableMetadataModal: React.FC<TableMetadataModalProps> = ({
       setInternalMetadata(internal);
       setMetadata(userEditable);
 
-      setQualityRules(table.quality_rules || {});
+      // Parse quality rules and extract managed DQ checks
+      const rawRules = table.quality_rules;
+      const rulesArray = Array.isArray(rawRules) ? rawRules : [];
+      const hasManagedRules = rulesArray.some((r: any) => isManagedRule(r));
+
+      // --- Freshness ---
+      const existingFreshness = rulesArray.find(
+        (r: any) => r.type === 'library' && r.metric === 'freshness'
+      ) as any;
+      if (existingFreshness) {
+        setFreshnessEnabled(true);
+        setFreshnessColumn(existingFreshness.arguments?.column || '');
+        setFreshnessThreshold(existingFreshness.mustBeGreaterThan ?? 60);
+      } else {
+        setFreshnessEnabled(false);
+        setFreshnessColumn('');
+        setFreshnessThreshold(60);
+      }
+
+      // --- Row count (table_is_not_empty) ---
+      const existingRowCount = rulesArray.find((r: any) => r.name === 'table_is_not_empty') as any;
+      setRowCountEnabled(existingRowCount ? true : !hasManagedRules ? true : false);
+
+      // --- Row count within bounds ---
+      const existingBounds = rulesArray.find(
+        (r: any) => r.name === 'row_count_within_bounds'
+      ) as any;
+      if (existingBounds) {
+        setRowCountBoundsEnabled(true);
+        // Parse min/max from the SQL query pattern "BETWEEN X AND Y"
+        const boundsMatch = existingBounds.query?.match(/BETWEEN\s+(\d+)\s+AND\s+(\d+)/i);
+        setRowCountBoundsMin(boundsMatch ? parseInt(boundsMatch[1], 10) : 500);
+        setRowCountBoundsMax(boundsMatch ? parseInt(boundsMatch[2], 10) : 100000);
+        // Parse date column from "WHERE {col} = CURRENT_DATE()"
+        const dateColMatch = existingBounds.query?.match(/WHERE\s+(\w+)\s*=/i);
+        setRowCountBoundsDateColumn(dateColMatch?.[1] || 'operation_date');
+      } else {
+        setRowCountBoundsEnabled(!hasManagedRules ? true : false);
+        setRowCountBoundsMin(500);
+        setRowCountBoundsMax(100000);
+        setRowCountBoundsDateColumn('operation_date');
+      }
+
+      // Store non-managed rules for the custom JSON editor
+      const customRules = rulesArray.filter((r: any) => !isManagedRule(r));
+      setQualityRules(
+        customRules.length > 0 ? customRules : rawRules && !Array.isArray(rawRules) ? rawRules : {}
+      );
       // Read status from customProperties (ODCS compliant)
       setStatus(getStatusFromCustomProperties(table.customProperties));
       setSourceTopic(getSourceTopic(table.customProperties) || '');
@@ -196,7 +263,94 @@ export const TableMetadataModal: React.FC<TableMetadataModalProps> = ({
           const merged = { ...internalMetadata, ...metadata };
           return Object.keys(merged).length > 0 ? merged : undefined;
         })(),
-        quality_rules: Object.keys(qualityRules).length > 0 ? qualityRules : undefined,
+        quality_rules: (() => {
+          // Collect all managed DQ rules that are enabled
+          const managedRules: Record<string, unknown>[] = [];
+
+          if (rowCountEnabled) {
+            managedRules.push({
+              type: 'library',
+              name: 'table_is_not_empty',
+              description: 'Table must contain at least one row',
+              dimension: 'completeness',
+              metric: 'rowCount',
+              mustBeGreaterThan: 0,
+              severity: 'error',
+            });
+          }
+
+          if (rowCountBoundsEnabled && rowCountBoundsDateColumn) {
+            managedRules.push({
+              type: 'sql',
+              name: 'row_count_within_bounds',
+              description: 'Daily row count should be within expected range',
+              dimension: 'completeness',
+              query: `SELECT CASE WHEN COUNT(*) BETWEEN ${rowCountBoundsMin} AND ${rowCountBoundsMax} THEN 0 ELSE 1 END FROM {table} WHERE ${rowCountBoundsDateColumn} = CURRENT_DATE()`,
+              mustBe: 0,
+              severity: 'warning',
+            });
+          }
+
+          if (freshnessEnabled && freshnessColumn) {
+            managedRules.push({
+              type: 'library',
+              metric: 'freshness',
+              dimension: 'timeliness',
+              arguments: { column: freshnessColumn },
+              mustBeGreaterThan: freshnessThreshold,
+            });
+          }
+
+          // Merge with custom rules from the JSON editor
+          const customRulesArray = Array.isArray(qualityRules)
+            ? qualityRules
+            : Object.keys(qualityRules as Record<string, unknown>).length > 0
+              ? [qualityRules]
+              : [];
+          const allRules = [...managedRules, ...customRulesArray];
+          return allRules.length > 0 ? allRules : undefined;
+        })(),
+        // Generate column-level quality rules (column_exists + null_ratio per column)
+        columns: (table.columns || []).map((col) => {
+          const existingRules = Array.isArray(col.quality_rules) ? col.quality_rules : [];
+          // Strip any previously-managed column-level rules
+          const customColRules = existingRules.filter(
+            (r: any) =>
+              !(
+                r.type === 'custom' && r.implementation?.expectation === 'expect_column_to_exist'
+              ) && !(r.type === 'library' && r.metric === 'nullValues')
+          );
+          const managedColRules: Record<string, unknown>[] = [];
+          // Every column gets a column_exists check
+          managedColRules.push({
+            type: 'custom',
+            engine: 'great-expectations',
+            name: `column_${col.name}_exists`,
+            description: `Column '${col.name}' must exist in the table`,
+            dimension: 'consistency',
+            severity: 'error',
+            implementation: { expectation: 'expect_column_to_exist' },
+          });
+          // Nullable columns get a null ratio check — preserve any existing per-column threshold
+          if (col.nullable) {
+            const existingNullRule = existingRules.find(
+              (r: any) => r.type === 'library' && r.metric === 'nullValues'
+            ) as any;
+            const threshold = existingNullRule?.mustBeLessThan ?? 0.1;
+            managedColRules.push({
+              type: 'library',
+              name: `${col.name}_null_ratio`,
+              description: `${col.name} column should not be more than ${Math.round(threshold * 100)}% null`,
+              dimension: 'completeness',
+              metric: 'nullValues',
+              arguments: { column: col.name },
+              mustBeLessThan: threshold,
+              severity: 'warning',
+            });
+          }
+          const allColRules = [...managedColRules, ...customColRules];
+          return { ...col, quality_rules: allColRules.length > 0 ? allColRules : undefined };
+        }),
         last_modified_at: new Date().toISOString(),
       };
 
@@ -1672,12 +1826,190 @@ export const TableMetadataModal: React.FC<TableMetadataModalProps> = ({
           </div>
         )}
 
-        {/* Quality Rules (JSON) */}
+        {/* Data Quality Checks */}
         {isEditable && (
           <div>
-            <h3 className="text-sm font-semibold text-gray-700 mb-2">Quality Rules (JSON)</h3>
+            <h3 className="text-sm font-semibold text-gray-700 mb-2">Table-Level Quality Checks</h3>
+            <div className="space-y-3">
+              {/* 1. Table is not empty */}
+              <div className="p-3 bg-gray-50 rounded-md border border-gray-200">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={rowCountEnabled}
+                    onChange={(e) => {
+                      setRowCountEnabled(e.target.checked);
+                      setHasUnsavedChanges(true);
+                    }}
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="text-sm font-medium text-gray-700">Table is not empty</span>
+                </label>
+                <p className="text-xs text-gray-500 mt-1 pl-6">
+                  Table must contain at least one row
+                </p>
+              </div>
+
+              {/* 2. Row count within bounds */}
+              <div className="p-3 bg-gray-50 rounded-md border border-gray-200">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={rowCountBoundsEnabled}
+                    onChange={(e) => {
+                      setRowCountBoundsEnabled(e.target.checked);
+                      setHasUnsavedChanges(true);
+                    }}
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="text-sm font-medium text-gray-700">Row count within bounds</span>
+                </label>
+                {rowCountBoundsEnabled && (
+                  <div className="mt-2 pl-6 space-y-2">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">
+                        Date column
+                      </label>
+                      <select
+                        value={rowCountBoundsDateColumn}
+                        onChange={(e) => {
+                          setRowCountBoundsDateColumn(e.target.value);
+                          setHasUnsavedChanges(true);
+                        }}
+                        className="w-full px-3 py-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white"
+                      >
+                        <option value="">Select a column...</option>
+                        {(table.columns || [])
+                          .filter((c) => !c.parent_column_id)
+                          .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+                          .map((c) => (
+                            <option key={c.id} value={c.name}>
+                              {c.name}
+                            </option>
+                          ))}
+                      </select>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">
+                          Min rows
+                        </label>
+                        <input
+                          type="number"
+                          min={0}
+                          value={rowCountBoundsMin}
+                          onChange={(e) => {
+                            setRowCountBoundsMin(parseInt(e.target.value, 10) || 0);
+                            setHasUnsavedChanges(true);
+                          }}
+                          className="w-full px-3 py-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">
+                          Max rows
+                        </label>
+                        <input
+                          type="number"
+                          min={0}
+                          value={rowCountBoundsMax}
+                          onChange={(e) => {
+                            setRowCountBoundsMax(parseInt(e.target.value, 10) || 100000);
+                            setHasUnsavedChanges(true);
+                          }}
+                          className="w-full px-3 py-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                        />
+                      </div>
+                    </div>
+                    <p className="text-xs text-gray-500">
+                      Daily row count for current date should be between{' '}
+                      {rowCountBoundsMin.toLocaleString()} and {rowCountBoundsMax.toLocaleString()}
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* 3. Freshness check */}
+              <div className="p-3 bg-gray-50 rounded-md border border-gray-200">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={freshnessEnabled}
+                    onChange={(e) => {
+                      setFreshnessEnabled(e.target.checked);
+                      if (!e.target.checked) {
+                        setFreshnessColumn('');
+                        setFreshnessThreshold(60);
+                      }
+                      setHasUnsavedChanges(true);
+                    }}
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="text-sm font-medium text-gray-700">Freshness check</span>
+                </label>
+                {freshnessEnabled && (
+                  <div className="mt-2 pl-6 space-y-2">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">
+                        Timestamp column
+                      </label>
+                      <select
+                        value={freshnessColumn}
+                        onChange={(e) => {
+                          setFreshnessColumn(e.target.value);
+                          setHasUnsavedChanges(true);
+                        }}
+                        className="w-full px-3 py-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white"
+                      >
+                        <option value="">Select a column...</option>
+                        {(table.columns || [])
+                          .filter((c) => !c.parent_column_id)
+                          .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+                          .map((c) => (
+                            <option key={c.id} value={c.name}>
+                              {c.name}
+                            </option>
+                          ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">
+                        Must be greater than (minutes)
+                      </label>
+                      <input
+                        type="number"
+                        min={1}
+                        value={freshnessThreshold}
+                        onChange={(e) => {
+                          setFreshnessThreshold(parseInt(e.target.value, 10) || 60);
+                          setHasUnsavedChanges(true);
+                        }}
+                        className="w-full px-3 py-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+            <p className="text-xs text-gray-500 mt-2">
+              Column-level checks (column exists, null ratio) are applied automatically per column
+              on save.
+            </p>
+          </div>
+        )}
+
+        {/* Custom Quality Rules (JSON) */}
+        {isEditable && (
+          <div>
+            <h3 className="text-sm font-semibold text-gray-700 mb-2">
+              Custom Quality Rules (JSON)
+            </h3>
             <textarea
-              value={JSON.stringify(qualityRules, null, 2)}
+              value={JSON.stringify(
+                Array.isArray(qualityRules) && qualityRules.length === 0 ? {} : qualityRules,
+                null,
+                2
+              )}
               onChange={(e) => {
                 try {
                   const parsed = JSON.parse(e.target.value);
@@ -1688,10 +2020,12 @@ export const TableMetadataModal: React.FC<TableMetadataModalProps> = ({
                 }
               }}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm font-mono"
-              rows={6}
-              placeholder='{"min_rows": 1000, "max_null_percentage": 5}'
+              rows={4}
+              placeholder='[{"type": "custom", "name": "my_check", "dimension": "accuracy"}]'
             />
-            <p className="mt-1 text-xs text-gray-500">Enter valid JSON for quality rules</p>
+            <p className="mt-1 text-xs text-gray-500">
+              Additional quality rules beyond the managed checks above
+            </p>
           </div>
         )}
 

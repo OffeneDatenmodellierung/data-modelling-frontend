@@ -382,6 +382,7 @@ export const ColumnDetailsModal: React.FC<ColumnDetailsModalProps> = ({
 
   // Quality Rules
   const [qualityRules, setQualityRules] = useState<QualityRule[]>([]);
+  const [nullRatioThreshold, setNullRatioThreshold] = useState<number>(0.1);
   const [metadata, setMetadata] = useState<Record<string, unknown>>({});
 
   // UI State
@@ -473,8 +474,20 @@ export const ColumnDetailsModal: React.FC<ColumnDetailsModalProps> = ({
 
     if (Array.isArray(column.quality_rules)) {
       extractFromQualityArray(column.quality_rules);
+      // Extract null ratio threshold from managed rule if present
+      const existingNullRule = column.quality_rules.find(
+        (r: any) => r.type === 'library' && r.metric === 'nullValues'
+      ) as any;
+      if (existingNullRule?.mustBeLessThan !== undefined) {
+        setNullRatioThreshold(existingNullRule.mustBeLessThan);
+      } else {
+        setNullRatioThreshold(0.1);
+      }
     } else if (column.quality_rules && typeof column.quality_rules === 'object') {
       Object.assign(allConstraints, column.quality_rules);
+      setNullRatioThreshold(0.1);
+    } else {
+      setNullRatioThreshold(0.1);
     }
 
     const rawQuality = (column as any).quality;
@@ -719,7 +732,34 @@ export const ColumnDetailsModal: React.FC<ColumnDetailsModalProps> = ({
         default_value: defaultValue || undefined,
         description: description || undefined,
         constraints: Object.keys(updatedConstraints).length > 0 ? updatedConstraints : undefined,
-        quality_rules: Object.keys(updatedConstraints).length > 0 ? updatedConstraints : undefined,
+        // Preserve managed column-level DQ rules (column_exists, null_ratio) and merge with constraint-based rules
+        quality_rules: (() => {
+          const existingRules = Array.isArray(column.quality_rules) ? column.quality_rules : [];
+          // Keep managed rules, updating null ratio threshold
+          const managedRules = existingRules
+            .filter(
+              (r: any) =>
+                (r.type === 'custom' &&
+                  r.implementation?.expectation === 'expect_column_to_exist') ||
+                (r.type === 'library' && r.metric === 'nullValues')
+            )
+            .map((r: any) => {
+              if (r.type === 'library' && r.metric === 'nullValues') {
+                return {
+                  ...r,
+                  mustBeLessThan: nullRatioThreshold,
+                  description: `${column.name} column should not be more than ${Math.round(nullRatioThreshold * 100)}% null`,
+                };
+              }
+              return r;
+            });
+          // If there are managed rules, return them as an array (constraints are in the constraints field)
+          if (managedRules.length > 0) {
+            return managedRules;
+          }
+          // Fallback: use constraints as quality_rules for backward compat
+          return Object.keys(updatedConstraints).length > 0 ? updatedConstraints : undefined;
+        })(),
 
         // ODCS Naming
         businessName: businessName || undefined,
@@ -1315,6 +1355,29 @@ export const ColumnDetailsModal: React.FC<ColumnDetailsModalProps> = ({
                 title="Quality Rules"
                 description="Define data quality constraints and validation rules"
               />
+
+              {/* Null ratio threshold — only shown for nullable columns */}
+              {column.nullable && (
+                <div className="p-3 bg-gray-50 rounded-md border border-gray-200 mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Max null ratio
+                  </label>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="number"
+                      min={0}
+                      max={1}
+                      step={0.01}
+                      value={nullRatioThreshold}
+                      onChange={(e) => setNullRatioThreshold(parseFloat(e.target.value) || 0.1)}
+                      className="w-32 px-3 py-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    />
+                    <span className="text-xs text-gray-500">
+                      Column should not be more than {Math.round(nullRatioThreshold * 100)}% null
+                    </span>
+                  </div>
+                </div>
+              )}
 
               <div className="flex items-center gap-2 mb-4">
                 <select

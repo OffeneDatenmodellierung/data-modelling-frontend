@@ -111,7 +111,7 @@ export interface Table {
   team?: TeamMember[]; // Team members and their history (formerly stakeholders in v2.x)
   sla?: SLA;
   metadata?: Record<string, unknown>; // Custom metadata including quality_tier, data_modeling_method, and indexes
-  quality_rules?: Record<string, unknown>; // Table-level quality rules
+  quality_rules?: Record<string, unknown> | unknown[]; // Table-level quality rules (array of ODCS quality objects or legacy object)
 
   // ODCS v3.1.0 fields (SDK 2.0.4+)
   status?: string; // Contract/table status (e.g., "active", "draft", "deprecated")
