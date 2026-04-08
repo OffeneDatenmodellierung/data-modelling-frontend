@@ -1116,6 +1116,8 @@ class ODCSService {
           authoritativeDefinitions: table.authoritativeDefinitions,
         }),
         ...(table.tags && table.tags.length > 0 && { tags: table.tags }),
+        // Include table-level quality rules
+        ...(table.quality_rules && { quality: table.quality_rules }),
         // Filter customProperties to exclude fields already serialized as top-level schema properties
         // This prevents duplicate keys in the YAML output
         ...(() => {
@@ -1433,6 +1435,26 @@ class ODCSService {
         }
       };
       validateProperties(schema.properties, `schema[${schema.name}]`);
+      // Validate table-level quality rules
+      if (schema.quality && Array.isArray(schema.quality)) {
+        for (let j = 0; j < schema.quality.length; j++) {
+          const rule = schema.quality[j];
+          qualityRulesValidated++;
+          if (!rule.name) {
+            console.error(
+              `[ODCSService] Table-level quality rule missing 'name' at schema[${schema.name}].quality[${j}]:`,
+              rule
+            );
+            rule.name = rule.dimension
+              ? `${rule.dimension} Check`
+              : rule.type
+                ? `${rule.type} Rule`
+                : `Quality Rule ${j + 1}`;
+            qualityRulesFixed++;
+            console.warn(`[ODCSService] Assigned fallback quality rule name: "${rule.name}"`);
+          }
+        }
+      }
     }
     console.log(
       `[ODCSService] Validation complete: ${propertiesValidated} properties checked (${propertiesFixed} fixed), ${qualityRulesValidated} quality rules checked (${qualityRulesFixed} fixed)`
