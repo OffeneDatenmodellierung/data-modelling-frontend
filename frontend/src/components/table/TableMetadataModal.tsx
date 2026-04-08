@@ -58,7 +58,7 @@ export const TableMetadataModal: React.FC<TableMetadataModalProps> = ({
   // Managed DQ check state — table-level
   const [freshnessEnabled, setFreshnessEnabled] = useState(false);
   const [freshnessColumn, setFreshnessColumn] = useState<string>('');
-  const [freshnessThreshold, setFreshnessThreshold] = useState<number>(60);
+  const [freshnessThreshold, setFreshnessThreshold] = useState<number>(1440);
   const [rowCountEnabled, setRowCountEnabled] = useState(true);
   const [rowCountBoundsEnabled, setRowCountBoundsEnabled] = useState(true);
   const [rowCountBoundsMin, setRowCountBoundsMin] = useState<number>(500);
@@ -147,7 +147,7 @@ export const TableMetadataModal: React.FC<TableMetadataModalProps> = ({
       } else {
         setFreshnessEnabled(false);
         setFreshnessColumn('');
-        setFreshnessThreshold(60);
+        setFreshnessThreshold(1440);
       }
 
       // --- Row count (table_is_not_empty) ---
@@ -285,7 +285,7 @@ export const TableMetadataModal: React.FC<TableMetadataModalProps> = ({
               name: 'row_count_within_bounds',
               description: 'Daily row count should be within expected range',
               dimension: 'completeness',
-              query: `SELECT CASE WHEN COUNT(*) BETWEEN ${rowCountBoundsMin} AND ${rowCountBoundsMax} THEN 0 ELSE 1 END FROM {table} WHERE ${rowCountBoundsDateColumn} = CURRENT_DATE()`,
+              query: `SELECT CASE WHEN COUNT(*) BETWEEN ${rowCountBoundsMin} AND ${rowCountBoundsMax} THEN 0 ELSE 1 END FROM {table} WHERE ${rowCountBoundsDateColumn} = DATEADD(DAY, -1, CURRENT_DATE())`,
               mustBe: 0,
               severity: 'warning',
             });
@@ -294,10 +294,13 @@ export const TableMetadataModal: React.FC<TableMetadataModalProps> = ({
           if (freshnessEnabled && freshnessColumn) {
             managedRules.push({
               type: 'library',
+              name: 'timeliness_check',
+              description: `Data in ${freshnessColumn} should not be older than ${freshnessThreshold} minutes`,
               metric: 'freshness',
               dimension: 'timeliness',
               arguments: { column: freshnessColumn },
               mustBeGreaterThan: freshnessThreshold,
+              severity: 'warning',
             });
           }
 
@@ -1939,7 +1942,7 @@ export const TableMetadataModal: React.FC<TableMetadataModalProps> = ({
                       setFreshnessEnabled(e.target.checked);
                       if (!e.target.checked) {
                         setFreshnessColumn('');
-                        setFreshnessThreshold(60);
+                        setFreshnessThreshold(1440);
                       }
                       setHasUnsavedChanges(true);
                     }}
@@ -1981,7 +1984,7 @@ export const TableMetadataModal: React.FC<TableMetadataModalProps> = ({
                         min={1}
                         value={freshnessThreshold}
                         onChange={(e) => {
-                          setFreshnessThreshold(parseInt(e.target.value, 10) || 60);
+                          setFreshnessThreshold(parseInt(e.target.value, 10) || 1440);
                           setHasUnsavedChanges(true);
                         }}
                         className="w-full px-3 py-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
